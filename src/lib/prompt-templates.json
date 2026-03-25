@@ -1,0 +1,547 @@
+{
+  "meta": {
+    "title": "AI Video Generation — Cinematography Prompt Template Library",
+    "version": "1.0.0",
+    "created": "2026-03-25",
+    "compatible_models": ["Veo 3", "Sora 2", "Kling 3.0", "Runway Gen-4", "Pika 2.0", "Hailuo MiniMax"],
+    "usage": "Replace {variables} with your specific values. Combine templates across categories for complex shots."
+  },
+  "categories": [
+    {
+      "id": "camera-movement",
+      "name": "Camera Movement",
+      "icon": "video",
+      "description": "Control how the camera moves through the scene — the foundation of visual storytelling",
+      "templates": [
+        {
+          "name": "Smooth Dolly Push",
+          "description": "Slow, deliberate dolly push-in that draws the viewer toward the subject, building intimacy or tension",
+          "prompt": "Smooth dolly push-in toward {subject} in {location}. Shot on 35mm anamorphic lens, slow steady forward movement at walking pace, {lighting} lighting, shallow depth of field with f/1.4 bokeh. {mood} atmosphere. Subtle camera breathing. Film grain. 24fps cinematic motion blur.",
+          "variables": ["subject", "location", "lighting", "mood"]
+        },
+        {
+          "name": "Epic Crane Rise",
+          "description": "Camera rises vertically on a crane to reveal the full scope of a scene, from intimate to grand",
+          "prompt": "Crane shot rising slowly from ground level close-up of {foreground_detail} upward to reveal {wide_scene}. Shot on 24mm wide-angle lens, smooth vertical ascent over 8 seconds. {time_of_day} lighting with {sky_condition}. Parallax between foreground and background elements. Cinematic color grading, {color_palette} tones. 4K resolution, filmic texture.",
+          "variables": ["foreground_detail", "wide_scene", "time_of_day", "sky_condition", "color_palette"]
+        },
+        {
+          "name": "Handheld Urgency",
+          "description": "Raw, documentary-style handheld movement that creates tension and immediacy",
+          "prompt": "Handheld camera following {subject} through {location}. Naturalistic camera shake with subtle breathing motion, shot on 40mm lens at T/2.8. {lighting} lighting with lens imperfections — small flares and focus hunting. Gritty {film_stock} film stock look. Intimate, raw, {emotion} energy. Shallow depth of field snapping in and out of focus.",
+          "variables": ["subject", "location", "lighting", "film_stock", "emotion"]
+        },
+        {
+          "name": "360 Orbit",
+          "description": "Camera orbits smoothly around the subject, revealing all angles and creating a heroic or dramatic moment",
+          "prompt": "Smooth 360-degree orbit around {subject} in {location}. Camera circles at {speed} speed, maintaining consistent distance on a 50mm lens at f/2.0. {lighting} with volumetric {atmosphere_element} catching the light. Background blurs with parallax motion. {mood} tone, cinematic depth. Camera height at {camera_height}.",
+          "variables": ["subject", "location", "speed", "lighting", "atmosphere_element", "mood", "camera_height"]
+        },
+        {
+          "name": "Whip Pan Discovery",
+          "description": "Fast snap between two subjects or scenes, creating energy and surprise",
+          "prompt": "Whip pan from {subject_a} to {subject_b} in {location}. Violent fast pan with heavy motion blur in the middle of the movement, snapping sharply into focus on the landing. Shot on 35mm lens. {lighting} lighting. The whip pan covers approximately {degrees} degrees. Energetic, {mood} feel. 24fps with natural motion streak.",
+          "variables": ["subject_a", "subject_b", "location", "lighting", "degrees", "mood"]
+        },
+        {
+          "name": "Steadicam Follow",
+          "description": "Smooth, floating tracking shot following a subject through a space, Kubrick-style",
+          "prompt": "Steadicam tracking shot following {subject} from behind as they move through {location}. Ultra-smooth floating camera motion, shot on 28mm lens at T/2.0. {subject} is {action}. {lighting} illumination with practical lights visible in frame. Steady, hypnotic pace. {mood} atmosphere. Symmetrical framing when possible. 24fps, anamorphic widescreen 2.39:1 aspect ratio.",
+          "variables": ["subject", "location", "action", "lighting", "mood"]
+        },
+        {
+          "name": "Drone Sweeping Reveal",
+          "description": "Aerial drone shot sweeping over terrain to reveal a dramatic vista or location",
+          "prompt": "Aerial drone shot sweeping {direction} over {terrain} at {altitude} altitude, gradually revealing {destination}. Wide 16mm lens perspective, smooth and cinematic flight path. {time_of_day} with {sky_condition}. Natural wind movement in vegetation below. {color_grade} color grading. Slow, majestic pace. Shot at 60fps for subtle slow motion feel. Epic, breathtaking scale.",
+          "variables": ["direction", "terrain", "altitude", "destination", "time_of_day", "sky_condition", "color_grade"]
+        },
+        {
+          "name": "Vertigo Dolly Zoom",
+          "description": "The classic Hitchcock dolly-zoom (zolly) effect where background warps while subject stays the same size",
+          "prompt": "Dolly zoom effect on {subject} in {location}. Camera dollies {direction} while simultaneously zooming {zoom_direction} to keep {subject} the same size in frame. Background warps and stretches unnervingly. Shot transitioning between 24mm and 70mm focal lengths. {lighting} lighting. Disorienting, {mood} atmosphere. Slow, deliberate 6-second movement. {color_palette} color palette.",
+          "variables": ["subject", "location", "direction", "zoom_direction", "lighting", "mood", "color_palette"]
+        }
+      ]
+    },
+    {
+      "id": "shot-types",
+      "name": "Shot Types",
+      "icon": "frame",
+      "description": "Define the framing and composition — how much of the scene the viewer sees",
+      "templates": [
+        {
+          "name": "Extreme Close-Up Detail",
+          "description": "Macro-level framing that fills the screen with a small detail, forcing the viewer to notice what would normally be missed",
+          "prompt": "Extreme close-up of {detail} on {subject}. Shot on 100mm macro lens at f/2.8, razor-thin depth of field with everything outside the focal plane dissolved into creamy bokeh. {lighting} lighting revealing texture and micro-detail. {surface_quality} surface quality visible. Subtle {movement} movement. {mood} tone. 4K, photorealistic skin/material detail.",
+          "variables": ["detail", "subject", "lighting", "surface_quality", "movement", "mood"]
+        },
+        {
+          "name": "Wide Establishing Master",
+          "description": "Grand wide shot that establishes the world, setting, and scale before the story begins",
+          "prompt": "Wide establishing shot of {location} during {time_of_day}. Shot on 18mm wide-angle lens, deep focus with everything sharp from foreground to infinity. {weather_condition} atmosphere. {subject_or_element} visible in the scene providing scale. {color_grade} color grading, {mood} mood. Subtle environmental movement — {ambient_motion}. Cinematic 2.39:1 aspect ratio. Photorealistic detail.",
+          "variables": ["location", "time_of_day", "weather_condition", "subject_or_element", "color_grade", "mood", "ambient_motion"]
+        },
+        {
+          "name": "Over-the-Shoulder Tension",
+          "description": "Classic OTS framing with one character's shoulder in foreground, creating spatial relationship and tension",
+          "prompt": "Over-the-shoulder shot from behind {character_a}, looking at {character_b} in {location}. {character_a}'s shoulder and partial head out of focus in the left foreground. Shot on 85mm lens at T/1.8, shallow depth of field. {character_b} is {expression_or_action}. {lighting} lighting. {mood} tension between the two figures. Eye-level camera height. Cinematic color palette with {color_tone} tones.",
+          "variables": ["character_a", "character_b", "location", "expression_or_action", "lighting", "mood", "color_tone"]
+        },
+        {
+          "name": "POV Immersion",
+          "description": "First-person perspective that puts the viewer directly into the character's eyes",
+          "prompt": "First-person POV shot of {character}'s perspective as they {action} through {location}. Subtle head-bob movement matching {movement_style} pace. Shot on 28mm lens simulating human field of view. {character}'s hands occasionally visible at bottom of frame. {lighting} lighting. {environmental_elements} in the surroundings. {mood} atmosphere. Naturalistic focus shifts as the eye would move. Slight lens distortion at edges.",
+          "variables": ["character", "action", "location", "movement_style", "lighting", "environmental_elements", "mood"]
+        },
+        {
+          "name": "Bird's Eye Tableau",
+          "description": "Directly overhead shot looking straight down, transforming the scene into a graphic, almost abstract composition",
+          "prompt": "Bird's eye view looking directly downward at {scene}. Perfectly top-down 90-degree angle. Shot on 35mm lens. {subject_arrangement} arranged in {pattern} pattern across the frame. {lighting} lighting casting {shadow_type} shadows. {color_palette} color palette. {surface_texture} ground/surface texture. Subtle {movement} movement visible from above. Graphic, almost abstract composition. Clean, {mood} aesthetic.",
+          "variables": ["scene", "subject_arrangement", "pattern", "lighting", "shadow_type", "color_palette", "surface_texture", "movement", "mood"]
+        },
+        {
+          "name": "Dutch Angle Unease",
+          "description": "Tilted camera creating visual tension, unease, or stylistic disorientation",
+          "prompt": "Dutch angle shot of {subject} in {location}, camera tilted {tilt_degrees} degrees. Shot on 35mm lens at f/2.0. Diagonal lines dominate the composition, creating visual tension. {lighting} lighting with {shadow_quality} shadows. {subject} is {action_or_expression}. {mood} atmosphere, unsettling and off-balance. {color_grade} color grading. Cinematic grain and contrast.",
+          "variables": ["subject", "location", "tilt_degrees", "lighting", "shadow_quality", "action_or_expression", "mood", "color_grade"]
+        },
+        {
+          "name": "Worm's Eye Power Shot",
+          "description": "Ultra-low angle looking upward, making the subject appear dominant, powerful, or imposing",
+          "prompt": "Worm's eye view looking straight up at {subject} from ground level in {location}. Shot on 24mm wide-angle lens, slight barrel distortion enhancing the towering perspective. {subject} looms large in frame, {action_or_pose}. {sky_or_ceiling} visible behind them. {lighting} lighting, {light_direction} from above. {mood} energy. Deep shadows under features. Heroic, larger-than-life framing.",
+          "variables": ["subject", "location", "action_or_pose", "sky_or_ceiling", "lighting", "light_direction", "mood"]
+        },
+        {
+          "name": "Medium Two-Shot",
+          "description": "Medium framing capturing two characters from the waist up, balanced and conversational",
+          "prompt": "Medium two-shot of {character_a} and {character_b} in {location}, framed from the waist up. Shot on 50mm lens at f/2.8, both characters in focus. {character_a} is on the {side_a} and {character_b} on the {side_b}. {lighting} lighting. They are {interaction}. {mood} tone between them. Balanced composition with {background_element} visible behind. Cinematic depth, natural skin tones. 24fps.",
+          "variables": ["character_a", "character_b", "location", "side_a", "side_b", "lighting", "interaction", "mood", "background_element"]
+        }
+      ]
+    },
+    {
+      "id": "lighting",
+      "name": "Lighting",
+      "icon": "sun",
+      "description": "Shape the mood, depth, and emotion of every frame through light and shadow",
+      "templates": [
+        {
+          "name": "Golden Hour Magic",
+          "description": "Warm, low-angle sunlight during the last hour before sunset, bathing everything in amber tones",
+          "prompt": "Golden hour shot of {subject} in {location}. Warm amber sunlight streaming in from a low angle at {light_direction}, casting long soft shadows. Shot on {lens}mm lens. Lens flares dancing across the frame. Warm color temperature around 3200K. {subject} is {action}. Backlit hair and edges glowing with {highlight_color} rim light. Soft, romantic, {mood} atmosphere. Shallow depth of field, golden bokeh orbs in background.",
+          "variables": ["subject", "location", "light_direction", "lens", "action", "highlight_color", "mood"]
+        },
+        {
+          "name": "Chiaroscuro Drama",
+          "description": "Extreme contrast between light and dark, Caravaggio-style, with deep blacks and selective illumination",
+          "prompt": "Chiaroscuro lighting on {subject} in {location}. Single strong directional light source from {light_direction}, creating deep impenetrable shadows and brilliant highlights. Most of the frame swallowed in darkness. Shot on 85mm lens at f/1.4. {subject}'s {lit_features} illuminated while {shadow_features} disappear into black. Renaissance painting quality. {mood} and dramatic atmosphere. Rich, deep contrast ratio. Minimal fill light.",
+          "variables": ["subject", "location", "light_direction", "lit_features", "shadow_features", "mood"]
+        },
+        {
+          "name": "Neon Night",
+          "description": "Vibrant neon signs and artificial city lights reflecting off wet surfaces, cyberpunk energy",
+          "prompt": "Neon-lit night scene of {subject} in {location}. Multiple {neon_colors} neon signs casting colored light across the scene. Wet streets reflecting neon in puddles and on surfaces. Shot on 35mm lens at f/1.4. {subject} is {action}. Mixed color temperature lighting — cool and warm competing. {atmosphere} in the air catching light beams. Cyberpunk, {mood} energy. Chromatic aberration on bright light sources. High ISO grain.",
+          "variables": ["subject", "location", "neon_colors", "action", "atmosphere", "mood"]
+        },
+        {
+          "name": "Silhouette Rim",
+          "description": "Subject reduced to a dark silhouette shape against a bright background, with a thin rim of light defining the edge",
+          "prompt": "Silhouette shot of {subject} against {bright_background}. Subject completely backlit, reduced to a pure black shape with a thin {rim_color} rim light tracing their outline. Shot on {lens}mm lens. {subject} in {pose_or_action} — recognizable only by shape. {background_detail} in the bright background. {mood} and {emotion} feeling. Underexposed foreground, properly exposed background. Dramatic contrast. High dynamic range look.",
+          "variables": ["subject", "bright_background", "rim_color", "lens", "pose_or_action", "background_detail", "mood", "emotion"]
+        },
+        {
+          "name": "Volumetric God Rays",
+          "description": "Visible shafts of light cutting through atmosphere — dust, fog, or haze — creating three-dimensional light beams",
+          "prompt": "Volumetric light rays piercing through {light_source} into {location}. Thick shafts of {light_color} light made visible by {atmosphere} in the air. Shot on 35mm anamorphic lens. {subject} stands within the light beams, partially illuminated. Particles of {particle_type} floating and sparkling in the light shafts. {mood} atmosphere, almost spiritual quality. Deep shadows between the beams of light. Dramatic, painterly composition. 24fps.",
+          "variables": ["light_source", "location", "light_color", "atmosphere", "subject", "particle_type", "mood"]
+        },
+        {
+          "name": "Split Light Portrait",
+          "description": "Light hitting exactly half the face, dividing it into a lit and shadow side — classic portrait technique",
+          "prompt": "Split lighting portrait of {subject} in {location}. Hard light source at exact 90 degrees from camera, illuminating precisely one half of {subject}'s face while the other half falls into complete shadow. Shot on 85mm lens at f/2.0, tight framing. {lit_side} side bathed in {light_color} light. No fill on the shadow side. {expression} expression. {mood} mood. Studio-quality skin detail on the lit side. {background} background. Rembrandt-inspired, dramatic.",
+          "variables": ["subject", "location", "lit_side", "light_color", "expression", "mood", "background"]
+        },
+        {
+          "name": "Practical Lights Only",
+          "description": "Scene lit entirely by in-frame practical light sources — lamps, candles, screens, signs — for naturalistic warmth",
+          "prompt": "Scene lit entirely by practical lights in {location}. {light_sources} providing all visible illumination — no hidden film lights. Shot on 50mm lens at f/1.2, wide open to gather available light. {subject} is {action}, faces lit by the warm glow of {primary_light_source}. Pools of light and deep shadows throughout the space. Naturalistic, {mood} atmosphere. Warm color temperature. High ISO look with subtle grain. Intimate, voyeuristic quality.",
+          "variables": ["location", "light_sources", "subject", "action", "primary_light_source", "mood"]
+        },
+        {
+          "name": "Blue Hour Melancholy",
+          "description": "The brief twilight period after sunset where the sky turns deep blue and city lights begin to glow",
+          "prompt": "Blue hour scene of {subject} in {location}. Deep cobalt blue sky with the last traces of {horizon_color} on the horizon. Artificial lights — {artificial_lights} — beginning to glow warm against the cool blue atmosphere. Shot on 35mm lens at f/2.0. {subject} is {action}. Melancholic, {mood} feeling. Cool 7500K color temperature dominating with warm 3200K practicals as accents. Long exposure feel with soft highlights. Contemplative, quiet energy.",
+          "variables": ["subject", "location", "horizon_color", "artificial_lights", "action", "mood"]
+        }
+      ]
+    },
+    {
+      "id": "transitions-effects",
+      "name": "Transitions & Effects",
+      "icon": "sparkles",
+      "description": "Creative in-camera and post-production transitions that connect shots with visual flair",
+      "templates": [
+        {
+          "name": "Match Cut Transform",
+          "description": "Seamless cut matching the shape, movement, or composition of one subject to another across scenes",
+          "prompt": "Match cut transition: Start on a close-up of {object_a} in {location_a} — {object_a} is {shape_or_motion_a}. Cut to {object_b} in {location_b} matching the exact same {match_element} in the frame. Seamless visual connection between the two shots. Both shots on {lens}mm lens with matching composition. {lighting_a} lighting in the first shot, {lighting_b} in the second. {mood} transition, {emotion} feeling of connection between scenes.",
+          "variables": ["object_a", "location_a", "shape_or_motion_a", "object_b", "location_b", "match_element", "lens", "lighting_a", "lighting_b", "mood", "emotion"]
+        },
+        {
+          "name": "Whip Transition Snap",
+          "description": "Ultra-fast camera whip connecting two completely different scenes through motion blur",
+          "prompt": "Whip transition: Camera whips {direction} away from {scene_a} with extreme motion blur, then snaps into focus on {scene_b} as if the camera traveled between worlds. The blur streak lasts 6-8 frames. {scene_a} has {mood_a} energy with {lighting_a}. {scene_b} has {mood_b} energy with {lighting_b}. The transition feels energetic and seamless. 24fps, anamorphic streak visible in the motion blur. Colors of both scenes blend during the whip.",
+          "variables": ["direction", "scene_a", "scene_b", "mood_a", "lighting_a", "mood_b", "lighting_b"]
+        },
+        {
+          "name": "Morph Dissolve",
+          "description": "One subject smoothly morphs and transforms into another through fluid shape-shifting",
+          "prompt": "Smooth morph transition from {subject_a} to {subject_b}. {subject_a} in {pose_a} gradually and fluidly transforms — features shifting, reshaping, flowing — into {subject_b} in {pose_b}. The morph takes approximately {duration} seconds. {lighting} lighting maintained throughout the transformation. {background} background stays consistent. {mood} atmosphere. Organic, fluid morphing motion. No hard cuts — completely seamless metamorphosis. Shot on 50mm lens, centered composition.",
+          "variables": ["subject_a", "subject_b", "pose_a", "pose_b", "duration", "lighting", "background", "mood"]
+        },
+        {
+          "name": "Bullet Time Freeze",
+          "description": "Time freezes on the subject while the camera continues to arc around them, Matrix-style",
+          "prompt": "Bullet time effect: {subject} frozen mid-{action} in {location}. Time completely stops — {frozen_elements} suspended in mid-air. Camera arcs smoothly around the frozen moment at {orbit_speed} speed, revealing the scene from all angles. Shot with virtual multi-camera array effect. {lighting} lighting with {atmosphere} visible frozen in the light beams. {particles} frozen in space around the subject. {mood} atmosphere. Hyper-detailed, every frozen element razor sharp.",
+          "variables": ["subject", "action", "location", "frozen_elements", "orbit_speed", "lighting", "atmosphere", "particles", "mood"]
+        },
+        {
+          "name": "Speed Ramp Hit",
+          "description": "Dramatic shift from slow motion to real-time (or vice versa) at a key moment for impact",
+          "prompt": "Speed ramp shot: {subject} performing {action} in {location}. Start in {start_speed} motion, then at the peak moment of {impact_moment}, ramp {ramp_direction} to {end_speed} motion. The speed transition is smooth and dramatic. Shot on {lens}mm lens at f/2.0. {lighting} lighting. The ramp emphasizes the {emphasis_element} of the action. {mood} energy throughout. Motion blur increases during fast sections, crystal clarity during slow sections. {color_grade} color grading.",
+          "variables": ["subject", "action", "location", "start_speed", "impact_moment", "ramp_direction", "end_speed", "lens", "lighting", "emphasis_element", "mood", "color_grade"]
+        },
+        {
+          "name": "Glitch Reality Break",
+          "description": "Digital glitch effects that fragment, distort, and corrupt the image as if reality is breaking down",
+          "prompt": "Glitch effect on {subject} in {location}. Reality fractures with {glitch_type} — RGB channel splitting, pixel displacement, scan line distortion, and data moshing artifacts. The glitch intensifies from subtle to extreme over {duration} seconds. {subject} is {action} as the image corrupts around them. {color_palette} colors fragment and scatter. {lighting} lighting distorted by the glitching. {mood} unsettling atmosphere. Digital artifacts and noise bursts. The image reassembles {resolution} at the end.",
+          "variables": ["subject", "location", "glitch_type", "duration", "action", "color_palette", "lighting", "mood", "resolution"]
+        },
+        {
+          "name": "Seamless Zoom Portal",
+          "description": "Camera zooms into a detail that becomes a portal into an entirely different scene",
+          "prompt": "Seamless zoom transition: Camera pushes into {zoom_target} in {scene_a}. As the camera enters the detail, it seamlessly becomes {scene_b} — the textures and shapes of {zoom_target} transform into the geography of the new scene. No visible cut point. The zoom is smooth and continuous on a {lens}mm lens. {lighting_a} in the first scene transitions to {lighting_b} in the second. {mood} feeling of traveling between worlds. The scale shifts from {scale_a} to {scale_b}. Dreamlike, fluid motion.",
+          "variables": ["zoom_target", "scene_a", "scene_b", "lens", "lighting_a", "lighting_b", "mood", "scale_a", "scale_b"]
+        },
+        {
+          "name": "Reverse Entropy",
+          "description": "Time runs backward as broken or scattered elements reassemble themselves",
+          "prompt": "Reverse motion shot: {scattered_elements} in {location} reassemble themselves in reverse. Fragments fly backward through the air, liquids flow upward, {specific_reversal} reverses perfectly. Shot on 50mm lens at 120fps played in reverse for smooth backward motion. {lighting} lighting. Every element finds its original position as time rewinds. {mood} atmosphere — {emotion} quality to the impossible reversal. {color_grade} color grading. The final assembled state reveals {reveal}.",
+          "variables": ["scattered_elements", "location", "specific_reversal", "lighting", "mood", "emotion", "color_grade", "reveal"]
+        }
+      ]
+    },
+    {
+      "id": "film-styles",
+      "name": "Film Styles",
+      "icon": "film",
+      "description": "Emulate the visual language of specific genres, eras, and filmmaking traditions",
+      "templates": [
+        {
+          "name": "Classic Cinematic",
+          "description": "High-end Hollywood cinematic look with anamorphic lenses, perfect lighting, and premium production value",
+          "prompt": "Cinematic shot of {subject} in {location}. Shot on Arri Alexa with Cooke anamorphic lenses, 2.39:1 widescreen aspect ratio. {subject} is {action}. {lighting} lighting with motivated sources. Shallow depth of field at T/2.0. Rich, {color_grade} color grading with lifted blacks. Subtle film grain. {mood} atmosphere. Production-quality composition with {composition_technique}. 24fps with natural motion blur. Dolby Vision HDR-grade dynamic range.",
+          "variables": ["subject", "location", "action", "lighting", "color_grade", "mood", "composition_technique"]
+        },
+        {
+          "name": "Raw Documentary",
+          "description": "Unpolished, intimate documentary style with available light and observational framing",
+          "prompt": "Documentary-style shot of {subject} in {location}. Handheld camera, available light only. Shot on a Super 16mm-style sensor with 16mm lens. {subject} is {action}, captured candidly without posing. Naturalistic, slightly overexposed highlights. {ambient_sound_description} environment. Observational distance, voyeuristic framing. {mood} tone. Slight lens breathing during focus pulls. Real-world imperfections — dust on lens, minor flares. 4:3 or 16:9 aspect ratio. Verité style.",
+          "variables": ["subject", "location", "action", "ambient_sound_description", "mood"]
+        },
+        {
+          "name": "Retro VHS Analog",
+          "description": "Authentic VHS camcorder aesthetic with tracking errors, color bleed, and analog warmth",
+          "prompt": "VHS camcorder footage of {subject} in {location}. Authentic {decade} analog video aesthetic — scan lines, tracking distortion at the top and bottom, color bleeding, slightly soft focus. {subject} is {action}. Oversaturated {dominant_color} tones. VHS timestamp visible in the corner reading {timestamp}. Auto-focus hunting. Built-in camera microphone audio quality. {mood} nostalgic atmosphere. 4:3 aspect ratio, 480i interlaced resolution look. Warm, degraded color science.",
+          "variables": ["subject", "location", "decade", "action", "dominant_color", "timestamp", "mood"]
+        },
+        {
+          "name": "Film Noir Shadow",
+          "description": "1940s-50s film noir style with hard shadows, venetian blind patterns, and moral ambiguity",
+          "prompt": "Film noir scene of {subject} in {location}. Black and white with extreme contrast. Hard directional {light_source} casting {shadow_pattern} shadows across the scene. {subject} is {action}, face half in shadow. Shot on 40mm lens, low angle. Smoke or {atmosphere} drifting through the light beams. {mood} atmosphere, morally ambiguous tension. Wet reflective surfaces. 1940s production design aesthetic. Deep focus cinematography. High contrast silver gelatin look.",
+          "variables": ["subject", "location", "light_source", "shadow_pattern", "action", "atmosphere", "mood"]
+        },
+        {
+          "name": "Anime Cinematic",
+          "description": "Anime-influenced visual style with dramatic lighting, vivid colors, and stylized composition",
+          "prompt": "{animation_style} anime style shot of {subject} in {location}. Vivid {color_palette} color palette. {subject} is {action} with dramatic {wind_or_effect} effect. Detailed background art with {background_style}. {lighting} lighting with exaggerated lens flares and light bloom. Speed lines and {visual_effect} visual accents. Dynamic camera angle — {angle}. Studio Ghibli/Makoto Shinkai-level environmental detail. {mood} emotional tone. Cinematic anime composition, 2D animation style rendered in high detail.",
+          "variables": ["animation_style", "subject", "location", "color_palette", "action", "wind_or_effect", "background_style", "lighting", "visual_effect", "angle", "mood"]
+        },
+        {
+          "name": "Fashion Film Editorial",
+          "description": "High-fashion editorial video with precise styling, bold lighting, and runway-level production",
+          "prompt": "High-fashion editorial shot of {model_description} wearing {wardrobe} in {location}. Shot on medium format equivalent lens, 65mm at f/2.0. {lighting_setup} lighting — {key_light_quality}. {model_description} is {pose_or_movement}. {color_grade} color grading with {skin_tone_quality} skin tones. Clean, {mood} aesthetic. {styling_detail} adds texture to the frame. Vogue/Dazed-quality production value. Slow, deliberate movement. Negative space in composition. Fashion-forward, editorial, aspirational.",
+          "variables": ["model_description", "wardrobe", "location", "lighting_setup", "key_light_quality", "pose_or_movement", "color_grade", "skin_tone_quality", "mood", "styling_detail"]
+        },
+        {
+          "name": "Sci-Fi Future World",
+          "description": "Science fiction visual language with futuristic technology, otherworldly environments, and speculative design",
+          "prompt": "Sci-fi shot of {subject} in {futuristic_location}. {technology_elements} visible in the environment — holographic displays, {tech_detail}. Shot on 35mm anamorphic lens with {anamorphic_flare_color} anamorphic flares. {lighting} lighting with {light_color} accent tones. {subject} is {action}. Futuristic {material_surfaces} surfaces and architecture. {atmosphere} in the air. {mood} atmosphere — {subgenre} sci-fi aesthetic. Clean geometric compositions. Blade Runner meets {reference} visual tone.",
+          "variables": ["subject", "futuristic_location", "technology_elements", "tech_detail", "anamorphic_flare_color", "lighting", "light_color", "action", "material_surfaces", "atmosphere", "mood", "subgenre", "reference"]
+        },
+        {
+          "name": "Horror Dread",
+          "description": "Atmospheric horror with slow-building dread, deep shadows, and unsettling framing",
+          "prompt": "Horror shot of {subject} in {location}. Unsettling, slow camera movement — barely perceptible push-in. Shot on 28mm lens at f/4.0 for deep uncomfortable focus. {lighting} lighting with {shadow_quality} shadows dominating the frame. {subject} is {action_or_state}. Something {threat_element} barely visible in the {threat_location}. {mood} dread, heavy silence. Desaturated {color_palette} palette with {accent_color} accent. Negative space used to create anxiety. Low camera angle. {atmosphere} thickening the air.",
+          "variables": ["subject", "location", "lighting", "shadow_quality", "action_or_state", "threat_element", "threat_location", "mood", "color_palette", "accent_color", "atmosphere"]
+        }
+      ]
+    },
+    {
+      "id": "color-mood",
+      "name": "Color & Mood",
+      "icon": "palette",
+      "description": "Control the emotional language of color — grading, palette, and tonal atmosphere",
+      "templates": [
+        {
+          "name": "Teal and Orange Blockbuster",
+          "description": "The classic Hollywood complementary color grade — warm skin tones against cool backgrounds",
+          "prompt": "Teal and orange color graded shot of {subject} in {location}. {subject}'s skin tones pushed warm and amber, shadows and background shifted to deep teal and cyan. Shot on {lens}mm lens. {subject} is {action}. {lighting} lighting emphasizing the color split. Blockbuster cinema color science — warm highlights, cool shadows. {mood} atmosphere. High production value, punchy contrast. Skin tones glow warm against the cool environment. Michael Bay / David Fincher color palette.",
+          "variables": ["subject", "location", "lens", "action", "lighting", "mood"]
+        },
+        {
+          "name": "Desaturated Bleach Bypass",
+          "description": "Muted, drained color with increased contrast — the visual language of gritty realism",
+          "prompt": "Desaturated bleach bypass look: {subject} in {location}. Color saturation pulled down to {saturation_level}%, contrast boosted. Metallic, silvery quality to highlights. {subject} is {action}. {lighting} lighting with harsh, contrasty shadows. Muted {residual_color} as the only remaining color hint. {mood} tone — gritty, raw, unromantic. High grain structure. Shot on 40mm lens. Saving Private Ryan / Se7en color treatment. Cold, clinical atmosphere with stripped-back emotion.",
+          "variables": ["subject", "location", "saturation_level", "action", "lighting", "residual_color", "mood"]
+        },
+        {
+          "name": "Pastel Dream",
+          "description": "Soft, desaturated pastels creating a dreamy, wistful, or nostalgic mood",
+          "prompt": "Pastel-toned shot of {subject} in {location}. Soft {pastel_colors} color palette — every tone muted and lifted, like a faded Polaroid or watercolor painting. Shot on 85mm lens at f/1.8 with gauzy soft focus. {subject} is {action}. {lighting} lighting, overexposed by half a stop for an airy, ethereal feel. {mood} atmosphere, dreamy and nostalgic. Bloom on highlights. Wes Anderson / Sofia Coppola color sensibility. Gentle, {emotion} feeling. Soft grain.",
+          "variables": ["subject", "location", "pastel_colors", "action", "lighting", "mood", "emotion"]
+        },
+        {
+          "name": "Neon Noir Nightscape",
+          "description": "Dark noir foundation punctuated by intense neon color accents — moody and electric",
+          "prompt": "Neon noir scene of {subject} in {location} at night. Predominantly dark frame with intense {neon_color_a} and {neon_color_b} neon accents slicing through the darkness. Shot on 35mm lens at f/1.4. {subject} is {action}. Neon reflections on {reflective_surface}. Deep crushed blacks with vivid neon highlights — extreme color contrast. {mood} atmosphere, dangerous and electric. Rain-slicked surfaces optional. Nicolas Winding Refn / Wong Kar-wai color sensibility. Isolated pools of saturated color in a sea of shadow.",
+          "variables": ["subject", "location", "neon_color_a", "neon_color_b", "action", "reflective_surface", "mood"]
+        },
+        {
+          "name": "Warm Amber Intimacy",
+          "description": "Deep warm tones creating closeness, comfort, and emotional warmth",
+          "prompt": "Warm-toned intimate shot of {subject} in {location}. Everything bathed in deep {warm_tone} amber warmth — 2700K color temperature. Shot on 50mm lens at f/1.4, close and personal. {subject} is {action}. {light_source} providing soft, warm illumination. Golden highlights wrapping around skin and surfaces. {mood} atmosphere, intimate and tender. Shadows warm, not cold — chocolate browns and burnt sienna. Soft film grain. Everything feels close, safe, {emotion}. Terrence Malick-level warmth.",
+          "variables": ["subject", "location", "warm_tone", "action", "light_source", "mood", "emotion"]
+        },
+        {
+          "name": "Monochrome High Contrast",
+          "description": "Pure black and white with extreme contrast — graphic, bold, and timeless",
+          "prompt": "High-contrast black and white shot of {subject} in {location}. Pure monochrome — no color. Deep impenetrable blacks and bright paper whites with minimal midtones. Shot on {lens}mm lens at f/{aperture}. {subject} is {action}. {lighting} lighting creating dramatic {shadow_type} shadows. Graphic, almost woodcut quality. {mood} atmosphere. Tri-X 400 pushed to 1600 film grain. {composition_element} driving the composition. Timeless, powerful, stripped of color to reveal pure form and emotion.",
+          "variables": ["subject", "location", "lens", "aperture", "action", "lighting", "shadow_type", "mood", "composition_element"]
+        },
+        {
+          "name": "Cool Blue Isolation",
+          "description": "Cold, blue-shifted tones creating loneliness, detachment, or clinical sterility",
+          "prompt": "Cool blue-toned shot of {subject} in {location}. Entire frame shifted toward {blue_shade} — 8000K+ color temperature. Shot on 35mm lens. {subject} is {action}, alone in the frame. {lighting} lighting with no warm tones anywhere — everything steel blue, slate grey, cold white. {mood} atmosphere of isolation and distance. Breath potentially visible in the cold. Skin tones drained of warmth, almost pallid. {environment_detail} reinforcing the coldness. Denis Villeneuve / David Fincher cool palette. Emotional distance made visual.",
+          "variables": ["subject", "location", "blue_shade", "action", "lighting", "mood", "environment_detail"]
+        }
+      ]
+    },
+    {
+      "id": "scene-types",
+      "name": "Scene Types",
+      "icon": "clapperboard",
+      "description": "Common narrative and commercial scene types with built-in visual storytelling structure",
+      "templates": [
+        {
+          "name": "Action Impact Sequence",
+          "description": "Fast-paced action with dynamic camera, impacts, and kinetic energy",
+          "prompt": "Action sequence: {character} performing {action} in {location}. Dynamic handheld camera with rapid movement, following the action closely. Shot on 28mm lens for immersive perspective. {lighting} lighting. Speed ramps at key impact moments — slow motion for {impact_moment}, then snapping back to full speed. {debris_or_effect} flying through frame. {mood} intensity. Quick cuts between {angle_count} angles. Practical camera shake on impacts. Adrenaline-pumping energy. {color_grade} color grading.",
+          "variables": ["character", "action", "location", "lighting", "impact_moment", "debris_or_effect", "mood", "angle_count", "color_grade"]
+        },
+        {
+          "name": "Intimate Dialogue Scene",
+          "description": "Two characters in conversation with shifting focus, subtle performances, and emotional subtext",
+          "prompt": "Dialogue scene between {character_a} and {character_b} in {location}. Shot-reverse-shot coverage on 85mm lens at f/1.8. {character_a} speaks about {topic}, {character_b} listens with {reaction}. Shallow depth of field softly isolating each speaker. {lighting} lighting — {light_source} motivated. Subtle focus pulls between characters. {mood} emotional undertone. Natural pauses and breathing. {background_detail} visible but soft in the background. Intimate camera distance, close-up framing. Quiet, {tone} atmosphere.",
+          "variables": ["character_a", "character_b", "location", "topic", "reaction", "lighting", "light_source", "mood", "background_detail", "tone"]
+        },
+        {
+          "name": "Hero Product Reveal",
+          "description": "Premium product shot with controlled lighting, slow reveal, and commercial-grade presentation",
+          "prompt": "Product hero shot of {product} on {surface} with {background}. Slow, smooth camera push-in or orbit revealing the product. Shot on 100mm macro lens for flattering compression. {lighting_setup} — {key_light} as key, {accent_light} as accent. {product} rotates or is revealed with {reveal_method}. Clean, {mood} commercial aesthetic. {reflection_quality} reflections on surface. Razor-sharp product detail. {color_grade} color grading. Negative space in composition. Apple/luxury brand production value. 60fps for silky smooth motion.",
+          "variables": ["product", "surface", "background", "lighting_setup", "key_light", "accent_light", "reveal_method", "mood", "reflection_quality", "color_grade"]
+        },
+        {
+          "name": "Emotional Climax Moment",
+          "description": "The peak emotional beat of a scene — a reaction, realization, or breakthrough moment",
+          "prompt": "Emotional close-up of {character} in {location} at the moment of {emotional_event}. Tight framing on 85mm lens at f/1.4, eyes and face filling the frame. {character}'s expression shifts from {emotion_a} to {emotion_b}. {lighting} lighting, {light_quality} quality on the face. A single {detail} — a tear, a breath, a muscle twitch — sells the moment. Slow, almost imperceptible push-in. {mood} atmosphere. Sound design would be {sound_quality}. {color_grade} color grading. Time seems to slow. The most human moment in the film.",
+          "variables": ["character", "location", "emotional_event", "emotion_a", "emotion_b", "lighting", "light_quality", "detail", "mood", "sound_quality", "color_grade"]
+        },
+        {
+          "name": "Chase Sequence Tension",
+          "description": "Urgent chase scene with pursuing and pursued, escalating speed and tension",
+          "prompt": "Chase scene: {pursuer} chasing {pursued} through {location}. Rapidly escalating pace — camera alternates between {pursuer} and {pursued}. Shot on 24mm wide-angle lens for distorted speed. Handheld with aggressive camera shake. {lighting} lighting, {time_of_day}. {obstacles} in the environment creating near-misses. Speed increases as the gap closes. {mood} tension building. Heavy breathing pace. Quick whip pans between angles. {color_grade} color grading with {contrast_level} contrast. Heart-pounding momentum.",
+          "variables": ["pursuer", "pursued", "location", "lighting", "time_of_day", "obstacles", "mood", "color_grade", "contrast_level"]
+        },
+        {
+          "name": "Grand Reveal Shot",
+          "description": "The camera reveals something hidden — a location, character, or plot element — with maximum impact",
+          "prompt": "Reveal shot: Camera {reveal_movement} to unveil {revealed_subject} in {location}. The reveal is earned through {buildup_technique} — starting on {starting_frame} before {reveal_movement} exposes the full scene. Shot on {lens}mm lens. {lighting} lighting shifts as the reveal happens, from {lighting_before} to {lighting_after}. {mood} impact. Musical swell moment. The viewer sees {revealed_subject} for the first time in its full glory. {color_grade} color grading. Awe-inspiring, {emotional_impact} reaction from the audience.",
+          "variables": ["reveal_movement", "revealed_subject", "location", "buildup_technique", "starting_frame", "lens", "lighting", "lighting_before", "lighting_after", "mood", "color_grade", "emotional_impact"]
+        },
+        {
+          "name": "Underwater World",
+          "description": "Submerged cinematography with light refraction, floating movement, and aquatic atmosphere",
+          "prompt": "Underwater shot of {subject} submerged in {water_type}. {subject} is {action} beneath the surface. Dappled {light_source} light filtering down from above, creating caustic patterns on {subject} and the surrounding {underwater_environment}. Shot on wide-angle {lens}mm lens in underwater housing. Particles and {floating_elements} drifting through frame. {water_color} water color with {visibility} visibility. {mood} atmosphere — weightless, {emotion}. Slow, graceful motion. Hair and fabric flowing in the current. Bubbles rising occasionally. Ethereal, otherworldly beauty.",
+          "variables": ["subject", "water_type", "action", "light_source", "underwater_environment", "lens", "floating_elements", "water_color", "visibility", "mood", "emotion"]
+        }
+      ]
+    },
+    {
+      "id": "character-performance",
+      "name": "Character & Performance",
+      "icon": "user",
+      "description": "Direct character actions, poses, and performances for AI-generated talent",
+      "templates": [
+        {
+          "name": "Confident Walk Toward Camera",
+          "description": "Character walking directly at the camera with purpose and presence",
+          "prompt": "{character_description} walking confidently toward camera in {location}. Slow, purposeful stride with {walking_style} gait. Shot on 50mm lens at f/2.0, camera at {camera_height} height. {lighting} lighting. {wardrobe} outfit catching the light. Background blurs with shallow depth of field as {character_description} gets closer. {mood} energy. Wind gently affecting {hair_or_fabric}. Shot at 48fps for slightly smooth motion. {color_grade} color grading. Power, presence, arrival.",
+          "variables": ["character_description", "location", "walking_style", "camera_height", "lighting", "wardrobe", "mood", "hair_or_fabric", "color_grade"]
+        },
+        {
+          "name": "Direct-to-Camera Address",
+          "description": "Character speaking or looking directly into the lens, breaking the fourth wall",
+          "prompt": "Close-up of {character_description} speaking directly to camera in {location}. Shot on 85mm lens at f/2.0, centered framing. {character_description} looks directly into the lens with {expression} expression, speaking about {topic}. {lighting} lighting with {light_quality} quality on face. Natural hand gestures occasionally entering frame. {mood} tone. Authentic, connected, intimate delivery. {background} softly out of focus behind. Eye contact unwavering. {color_grade} color grading. The feeling of being spoken to personally.",
+          "variables": ["character_description", "location", "expression", "topic", "lighting", "light_quality", "mood", "background", "color_grade"]
+        },
+        {
+          "name": "Solo Dance Performance",
+          "description": "Single dancer performing with cinematic camera coverage and dramatic lighting",
+          "prompt": "{dancer_description} performing {dance_style} solo in {location}. Full body framing on 35mm lens, camera smoothly tracking the movement. {lighting} lighting with {light_color} accents. {dancer_description} moves with {movement_quality} — every gesture intentional and powerful. {wardrobe} outfit flowing with the movement. {floor_surface} floor reflecting the light. {mood} energy matching the rhythm. Camera occasionally drops to low angle for heroic framing. {atmosphere} in the air. Cinematic, music video quality choreography.",
+          "variables": ["dancer_description", "dance_style", "location", "lighting", "light_color", "movement_quality", "wardrobe", "floor_surface", "mood", "atmosphere"]
+        },
+        {
+          "name": "Reaction Shot Micro-Expression",
+          "description": "Capturing the subtle shift in a character's face as they process information or emotion",
+          "prompt": "Reaction shot: Tight close-up of {character_description} in {location} as they {react_to}. Shot on 100mm lens at f/1.8 — only the face in focus. The reaction plays out in micro-expressions over {duration} seconds: {expression_sequence}. {lighting} lighting with {catch_light} catch lights in the eyes. Every muscle movement visible. {mood} tone. No dialogue — pure visual performance. The eyes tell the story. {color_grade} color grading. Intimate, voyeuristic, deeply human moment.",
+          "variables": ["character_description", "location", "react_to", "duration", "expression_sequence", "lighting", "catch_light", "mood", "color_grade"]
+        },
+        {
+          "name": "Silhouette Hero Pose",
+          "description": "Character posed in silhouette against a dramatic backlight, iconic and graphic",
+          "prompt": "Silhouette of {character_description} in {hero_pose} against {backlight_source} in {location}. Pure black silhouette shape — all detail reduced to outline. {character_description}'s pose is {pose_quality} — immediately readable as {pose_meaning}. Shot on 35mm lens. Thin {rim_color} rim light just barely tracing the edges. {backlight_source} creates {background_pattern} in the background. {mood} atmosphere. Wind affecting {wind_element}. Iconic, poster-worthy composition. Minimal, graphic, powerful. Camera holds the shot for a beat.",
+          "variables": ["character_description", "hero_pose", "backlight_source", "location", "pose_quality", "pose_meaning", "rim_color", "background_pattern", "mood", "wind_element"]
+        },
+        {
+          "name": "Group Formation",
+          "description": "Multiple characters arranged in a deliberate composition, establishing their dynamic",
+          "prompt": "Group shot of {group_description} in {location}. {number} people arranged in {formation} — the composition tells you their {relationship_dynamic}. Shot on 35mm lens at f/4.0 for deep enough focus to hold the group. {central_character} is positioned {central_position}, the clear focal point. {lighting} lighting. Each character has distinct {distinguishing_quality}. {mood} energy between them. {wardrobe_description} wardrobes. {background} background. Cinematic ensemble framing. {color_grade} color grading. Power, unity, {group_emotion}.",
+          "variables": ["group_description", "location", "number", "formation", "relationship_dynamic", "central_character", "central_position", "lighting", "distinguishing_quality", "mood", "wardrobe_description", "background", "color_grade", "group_emotion"]
+        },
+        {
+          "name": "Running Full Stride",
+          "description": "Character in full sprint, captured with dynamic camera matching their speed",
+          "prompt": "{character_description} sprinting at full speed through {location}. Camera tracking alongside at matching velocity on a 40mm lens. {character_description} is {running_reason} — {facial_expression} expression, arms pumping, feet striking {surface}. {lighting} lighting. {wardrobe} clothing in motion. Shot at 120fps for dramatic slow motion option. {debris_or_effect} kicked up by the running. {mood} urgency. Background streaking past in a motion blur. {color_grade} color grading. Raw physical effort, desperation or determination visible in every frame.",
+          "variables": ["character_description", "location", "running_reason", "facial_expression", "surface", "lighting", "wardrobe", "debris_or_effect", "mood", "color_grade"]
+        }
+      ]
+    },
+    {
+      "id": "time-speed",
+      "name": "Time & Speed",
+      "icon": "clock",
+      "description": "Manipulate the perception of time — stretch it, compress it, freeze it, reverse it",
+      "templates": [
+        {
+          "name": "Ultra Slow Motion Beauty",
+          "description": "Extreme slow motion revealing beauty in movement that the naked eye cannot perceive",
+          "prompt": "Ultra slow motion shot of {subject} performing {action} in {location}. Shot at {framerate}fps, played back at 24fps for extreme time stretch. Every detail of the {action} revealed — {micro_details} visible in the slowed movement. {lighting} lighting, {light_quality}. Shot on {lens}mm lens at f/{aperture}. {particles_or_elements} suspended in the air around the action. {mood} beauty in the extreme temporal detail. {color_grade} color grading. Time nearly frozen. The physics of the movement laid bare. Ethereal, breathtaking.",
+          "variables": ["subject", "action", "location", "framerate", "micro_details", "lighting", "light_quality", "lens", "aperture", "particles_or_elements", "mood", "color_grade"]
+        },
+        {
+          "name": "City Timelapse Flow",
+          "description": "Hours compressed into seconds, showing the rhythm and flow of an environment over time",
+          "prompt": "Timelapse of {location} from {start_time} to {end_time}. Camera locked on tripod, {framing_description}. {moving_elements} flow like liquid through the frame — {speed_description}. Clouds race across the sky, light shifts from {start_light} to {end_light}. Shot on {lens}mm lens at f/{aperture}. {static_elements} remain perfectly still while time rushes around them. {mood} atmosphere. {color_shift} color shift as time progresses. Smooth, mesmerizing, meditative. {special_element} adds visual interest during the sequence.",
+          "variables": ["location", "start_time", "end_time", "framing_description", "moving_elements", "speed_description", "start_light", "end_light", "lens", "aperture", "static_elements", "mood", "color_shift", "special_element"]
+        },
+        {
+          "name": "Hyperlapse Journey",
+          "description": "Timelapse with a moving camera, creating an accelerated journey through space and time",
+          "prompt": "Hyperlapse moving through {location} during {time_of_day}. Camera glides forward at accelerated speed through {path_description}, covering {distance} in the compressed timeframe. Shot on {lens}mm wide-angle lens with stabilization. {elements_passing} streak past on both sides. Light shifts as the camera travels. {mood} energy — the feeling of rapid forward momentum through {location}. {color_grade} color grading. Smooth, stabilized motion despite the speed. {sky_condition} sky overhead. The world compressed into a rapid, flowing journey.",
+          "variables": ["location", "time_of_day", "path_description", "distance", "lens", "elements_passing", "mood", "color_grade", "sky_condition"]
+        },
+        {
+          "name": "Time Freeze World Stop",
+          "description": "Everything in the world freezes except the camera, which continues to move through the frozen moment",
+          "prompt": "Time freeze: The entire world stops — {frozen_scene} completely frozen in place in {location}. {frozen_details} suspended mid-motion. Camera moves freely through the frozen moment, gliding past {notable_frozen_element}. Shot on 28mm lens. {lighting} lighting, {atmosphere} also frozen in the beams. Every detail razor sharp in the stopped time. {mood} atmosphere of impossible stillness. {color_grade} color grading. Camera movement is smooth and exploratory, examining the frozen instant from multiple angles. The silence of stopped time. Eerie, beautiful, impossible.",
+          "variables": ["frozen_scene", "location", "frozen_details", "notable_frozen_element", "lighting", "atmosphere", "mood", "color_grade"]
+        },
+        {
+          "name": "Speed Ramp Action Moment",
+          "description": "Dynamic speed shift at the climactic moment of an action, from regular to slow and back",
+          "prompt": "Speed ramp: {subject} performing {action} in {location}. Real-time speed as the action begins — then at the exact moment of {peak_moment}, time stretches to extreme slow motion at {slow_speed}x speed, holding for {hold_duration} seconds of screen time, before snapping back to full speed. Shot at 240fps on {lens}mm lens. {lighting} lighting. The slow section reveals {revealed_detail}. {mood} impact at the ramp point. {particles_or_effects} dramatically affected by the speed change. {color_grade} color grading shifts subtly with the speed. Pure kinetic poetry.",
+          "variables": ["subject", "action", "location", "peak_moment", "slow_speed", "hold_duration", "lens", "lighting", "revealed_detail", "mood", "particles_or_effects", "color_grade"]
+        },
+        {
+          "name": "Reverse Flow",
+          "description": "Time running in reverse, creating surreal and poetic visuals as effects undo themselves",
+          "prompt": "Reverse motion: {subject} in {location} with time flowing backward. {reverse_action} plays in perfect reverse — {specific_reversal_details}. Shot on 50mm lens at {framerate}fps, played in reverse. {lighting} lighting. Elements that should fall rise, things that scatter reassemble, {poetic_reversal}. {mood} atmosphere — {emotion} quality to the impossible backward flow. {color_grade} color grading. The viewer gradually realizes time is reversed. Beautiful, uncanny, {tone}. Every physics-defying detail meticulously reversed.",
+          "variables": ["subject", "location", "reverse_action", "specific_reversal_details", "framerate", "lighting", "poetic_reversal", "mood", "emotion", "color_grade", "tone"]
+        },
+        {
+          "name": "Day-to-Night Transition",
+          "description": "Continuous shot showing the passage from day to night (or vice versa) in compressed time",
+          "prompt": "Continuous day-to-night transition of {subject_or_scene} in {location}. Camera holds framing as light transforms from {start_condition} to {end_condition} over the compressed sequence. {subject_or_scene} is {action_or_state} throughout. Sky color shifts through {color_progression}. {practical_lights} gradually {lights_action} as darkness falls. Stars appear. Shot on {lens}mm lens at f/{aperture}. {mood} atmosphere as the world transforms. Shadows lengthen and rotate. {ambient_changes} mark the passage of time. Poetic, meditative, awe-inspiring.",
+          "variables": ["subject_or_scene", "location", "start_condition", "end_condition", "action_or_state", "color_progression", "practical_lights", "lights_action", "lens", "aperture", "mood", "ambient_changes"]
+        }
+      ]
+    },
+    {
+      "id": "texture-detail",
+      "name": "Texture & Detail",
+      "icon": "eye",
+      "description": "Highlight the tactile, material, and atmospheric details that make images feel real and immersive",
+      "templates": [
+        {
+          "name": "Macro World",
+          "description": "Extreme close-up macro photography revealing a miniature world of detail invisible to the naked eye",
+          "prompt": "Macro shot of {subject} at extreme magnification. Shot on 100mm macro lens at f/2.8 with 1:1 reproduction ratio. The {surface_detail} of {subject} fills the entire frame, revealing {micro_texture} at a scale the naked eye cannot see. Paper-thin depth of field — only a sliver in focus. {lighting} lighting revealing surface topology. {color_palette} colors at the micro level. {mood} discovery of hidden detail. Subtle {movement_or_change} visible at this scale. {background_bokeh} bokeh behind the focal plane. Scientific beauty, alien familiarity.",
+          "variables": ["subject", "surface_detail", "micro_texture", "lighting", "color_palette", "mood", "movement_or_change", "background_bokeh"]
+        },
+        {
+          "name": "Cinematic Bokeh Field",
+          "description": "Beautiful out-of-focus light orbs creating a dreamy, layered background",
+          "prompt": "Bokeh-heavy shot of {subject} in {location}. Shot on {lens}mm lens at f/1.2 — maximum aperture for extreme background blur. {background_lights} in the background dissolve into large, creamy {bokeh_shape} bokeh orbs. {subject} is sharp in the foreground, {action}. {lighting} lighting. The bokeh creates a {bokeh_color} sea of soft light behind {subject}. {mood} atmosphere, romantic and dreamy. Foreground elements also blur softly. Cat's eye bokeh at the edges of frame. Shallow depth isolates {subject} in their own world.",
+          "variables": ["subject", "location", "lens", "background_lights", "bokeh_shape", "action", "lighting", "bokeh_color", "mood"]
+        },
+        {
+          "name": "Rain and Reflection",
+          "description": "Rain falling through the scene, creating reflections, textures, and atmospheric mood",
+          "prompt": "Rain scene: {subject} in {location} during heavy rainfall. Individual raindrops visible catching {light_source} light. Wet surfaces — {wet_elements} — reflecting {reflections} in pools and slicked surfaces. Shot on 50mm lens at f/2.0. {subject} is {action}. Rain streaks visible against {background_element}. {mood} atmosphere. Droplets splashing on impact, creating tiny crowns of water. {color_grade} color grading with {color_tone} tones. Sound of rain implied by the visual weight. Steam or mist rising from warm surfaces. Textured, immersive, sensory.",
+          "variables": ["subject", "location", "light_source", "wet_elements", "reflections", "action", "background_element", "mood", "color_grade", "color_tone"]
+        },
+        {
+          "name": "Smoke and Atmosphere",
+          "description": "Smoke, fog, or haze filling the scene, adding depth layers and catching light beautifully",
+          "prompt": "{atmosphere_type} filling {location}, creating visible depth layers. {light_source} light cutting through the {atmosphere_type}, creating volumetric beams and god rays. {subject} partially obscured by the swirling {atmosphere_type}, {action}. Shot on 35mm lens at f/2.8. {atmosphere_type} moves slowly, organically — {movement_quality} motion. {color_palette} color palette filtered through the haze. {mood} atmosphere, mysterious and painterly. Depth compression as layers of {atmosphere_type} stack up. Particles visible floating in the light beams. Chiaroscuro effect enhanced by the atmosphere.",
+          "variables": ["atmosphere_type", "location", "light_source", "subject", "action", "movement_quality", "color_palette", "mood"]
+        },
+        {
+          "name": "Lens Flare Character",
+          "description": "Intentional, characterful lens flares adding warmth, energy, or sci-fi quality to the image",
+          "prompt": "Shot featuring characterful lens flares: {subject} in {location} with {light_source} creating prominent {flare_type} lens flares across the frame. Shot on {lens_type} lens — the optics producing {flare_character} flare patterns. {flare_color} flare elements streaking and blooming across the image. {subject} is {action}. The flare adds {flare_mood} energy to the scene. {lighting} base lighting. Flare intensity {flare_behavior} as the camera subtly shifts. {mood} atmosphere. The imperfection of the flare makes the image feel alive and organic. {color_grade} overall grade.",
+          "variables": ["subject", "location", "light_source", "flare_type", "lens_type", "flare_character", "flare_color", "action", "flare_mood", "lighting", "flare_behavior", "mood", "color_grade"]
+        },
+        {
+          "name": "Fabric and Material Flow",
+          "description": "Textiles, fabric, or materials in motion — catching light and revealing texture through movement",
+          "prompt": "{material_type} in motion in {location}. The {material_description} fabric catches {light_source} light as it {movement} — every fold, wrinkle, and wave revealing texture and structure. Shot on 85mm lens at f/2.0 in {framerate}fps slow motion. {color_palette} colors shifting across the material surface as it moves. {lighting} lighting creating {shadow_quality} shadows in the fabric folds. {mood} beauty in pure material movement. The weight and drape of the {material_type} visible — {material_quality} quality. Wind or movement source: {movement_source}. Tactile, sensory, almost synesthetic.",
+          "variables": ["material_type", "location", "material_description", "light_source", "movement", "framerate", "color_palette", "lighting", "shadow_quality", "mood", "material_quality", "movement_source"]
+        },
+        {
+          "name": "Particle Suspension",
+          "description": "Fine particles — dust, snow, embers, pollen — floating in the air, catching light",
+          "prompt": "{particle_type} suspended in the air in {location}. Thousands of individual {particle_type} particles floating, drifting, catching {light_source} light and sparkling. Shot on {lens}mm lens at f/{aperture} — particles at various distances creating depth layers, some in focus, many as soft bokeh points. {subject} visible {subject_position} among the particles. {lighting} lighting making each particle glow {particle_color}. {mood} atmosphere, {emotion}. Shot at {framerate}fps for floating slow motion. The air itself made visible and beautiful. {color_grade} color grading. Meditative, magical, alive.",
+          "variables": ["particle_type", "location", "light_source", "lens", "aperture", "subject", "subject_position", "lighting", "particle_color", "mood", "emotion", "framerate", "color_grade"]
+        },
+        {
+          "name": "Water Surface Abstraction",
+          "description": "Water surface as abstract art — reflections, ripples, light play, and liquid texture",
+          "prompt": "Close-up of {water_type} surface in {location}. Camera focused on the water's surface, capturing {surface_behavior} — ripples, reflections, light refraction. Shot on {lens}mm lens at f/{aperture}. {light_source} light creating {light_pattern} patterns on the water surface. {reflected_elements} reflected and distorted in the moving water. {color_palette} colors shimmering across the liquid surface. {mood} atmosphere. {underwater_elements} occasionally visible beneath the surface. Abstract, painterly, hypnotic. The water becomes a living canvas of light and movement. {framerate}fps for {motion_quality} motion rendering.",
+          "variables": ["water_type", "location", "surface_behavior", "lens", "aperture", "light_source", "light_pattern", "reflected_elements", "color_palette", "mood", "underwater_elements", "framerate", "motion_quality"]
+        }
+      ]
+    }
+  ]
+}

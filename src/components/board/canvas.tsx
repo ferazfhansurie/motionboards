@@ -1,0 +1,404 @@
+"use client";
+
+import { useRef, useCallback, useEffect, useState } from "react";
+import { useAppStore, type BoardItem } from "@/lib/store";
+import { BoardItemCard } from "./board-item";
+import { PromptBar } from "./prompt-bar";
+import { ModelPanel } from "./model-panel";
+import { Toolbar } from "./toolbar";
+import { ZoomPreview } from "./zoom-preview";
+import { EditPanel } from "./edit-panel";
+import { TemplatesPanel } from "./templates-panel";
+import { ProfilePanel, HistoryPanel } from "./dashboard-modal";
+import { parsePsdBuffer } from "@/lib/psd";
+
+export function Canvas() {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const {
+    items,
+    panX,
+    panY,
+    zoom,
+    setPan,
+    setZoom,
+    addItem,
+    selectItem,
+    selectedItemId,
+  } = useAppStore();
+
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [previewItem, setPreviewItem] = useState<BoardItem | null>(null);
+
+  // Drag state for moving items
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Resize state
+  const [resizeId, setResizeId] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, w: 0, h: 0 });
+
+  // Space held for pan mode
+  const [spaceHeld, setSpaceHeld] = useState(false);
+
+  // Space key tracking
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code === "Space" && e.target === document.body) {
+        e.preventDefault();
+        setSpaceHeld(true);
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSpaceHeld(false);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+
+  // Left-click on empty canvas = pan. Click on item = handled by item.
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const isCanvas = target === canvasRef.current || !!target.dataset.canvas;
+
+      if (isCanvas) {
+        selectItem(null);
+      }
+
+      // Pan: middle-click, alt+click, space+click, or left-click on empty canvas
+      if (
+        e.button === 1 ||
+        (e.button === 0 && e.altKey) ||
+        (e.button === 0 && spaceHeld) ||
+        (e.button === 0 && isCanvas)
+      ) {
+        setIsPanning(true);
+        setPanStart({ x: e.clientX - panX, y: e.clientY - panY });
+        e.preventDefault();
+      }
+    },
+    [panX, panY, selectItem, spaceHeld]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (isPanning) {
+        setPan(e.clientX - panStart.x, e.clientY - panStart.y);
+        return;
+      }
+      if (resizeId) {
+        const dx = (e.clientX - resizeStart.x) / zoom;
+        const dy = (e.clientY - resizeStart.y) / zoom;
+        const newW = Math.max(100, resizeStart.w + dx);
+        const ratio = resizeStart.h / resizeStart.w;
+        const newH = Math.round(newW * ratio);
+        useAppStore.getState().updateItem(resizeId, { width: Math.round(newW), height: newH });
+        return;
+      }
+      if (dragId) {
+        const x = (e.clientX - panX - dragOffset.x) / zoom;
+        const y = (e.clientY - panY - dragOffset.y) / zoom;
+        useAppStore.getState().moveItem(dragId, x, y);
+      }
+    },
+    [isPanning, panStart, dragId, dragOffset, resizeId, resizeStart, panX, panY, zoom, setPan]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+    setDragId(null);
+    setResizeId(null);
+  }, []);
+
+  // Zoom with scroll
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.08 : 0.08;
+      setZoom(zoom + delta);
+    },
+    [zoom, setZoom]
+  );
+
+  // Item drag start
+  const handleItemDragStart = useCallback(
+    (id: string, e: React.MouseEvent) => {
+      // If space is held, pan instead of drag
+      if (spaceHeld) return;
+
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+      e.stopPropagation();
+      selectItem(id);
+      setDragId(id);
+      setDragOffset({
+        x: e.clientX - panX - item.x * zoom,
+        y: e.clientY - panY - item.y * zoom,
+      });
+    },
+    [items, panX, panY, zoom, selectItem, spaceHeld]
+  );
+
+  // Item resize start
+  const handleResizeStart = useCallback(
+    (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+      setResizeId(id);
+      setResizeStart({ x: e.clientX, y: e.clientY, w: item.width, h: item.height });
+    },
+    [items]
+  );
+
+  // Item double-click => zoom preview
+  const handleItemDoubleClick = useCallback(
+    (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (item) setPreviewItem(item);
+    },
+    [items]
+  );
+
+  // Paste from clipboard
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const clipboardItems = e.clipboardData?.items;
+      if (!clipboardItems) return;
+
+      for (const clipItem of Array.from(clipboardItems)) {
+        if (clipItem.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = clipItem.getAsFile();
+          if (!file) continue;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const src = ev.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+              const maxW = 500;
+              const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+              const w = Math.round(img.naturalWidth * scale);
+              const h = Math.round(img.naturalHeight * scale);
+              addItem({
+                id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                type: "image",
+                x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
+                y: (-panY + window.innerHeight / 2 - h / 2) / zoom,
+                width: w,
+                height: h,
+                src,
+                fileName: file.name,
+                createdAt: new Date().toISOString(),
+              });
+            };
+            img.src = src;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    };
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [addItem, panX, panY, zoom]);
+
+  // Drop files onto canvas
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files);
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      if (!canvasRect) return;
+
+      files.forEach(async (file, i) => {
+        const baseX = (e.clientX - canvasRect.left - panX) / zoom + i * 20;
+        const baseY = (e.clientY - canvasRect.top - panY) / zoom + i * 20;
+
+        // PSD file handling
+        if (file.name.toLowerCase().endsWith(".psd")) {
+          try {
+            const buffer = await file.arrayBuffer();
+            const parsed = parsePsdBuffer(buffer);
+            const groupId = `psd_${Date.now()}`;
+            const maxW = 500;
+            const scale = parsed.width > maxW ? maxW / parsed.width : 1;
+
+            parsed.layers.forEach((layer) => {
+              if (layer.hidden) return;
+              addItem({
+                id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                type: "psd-layer",
+                x: baseX + layer.left * scale,
+                y: baseY + layer.top * scale,
+                width: Math.round(layer.width * scale),
+                height: Math.round(layer.height * scale),
+                src: layer.dataUrl,
+                fileName: layer.name,
+                psdGroupId: groupId,
+                psdLayerName: layer.name,
+                psdLayerOrder: layer.order,
+                psdBlendMode: layer.blendMode,
+                psdOpacity: layer.opacity,
+                psdHidden: layer.hidden,
+                createdAt: new Date().toISOString(),
+              });
+            });
+          } catch (err) {
+            console.error("Failed to parse PSD:", err);
+          }
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const src = ev.target?.result as string;
+          let type: BoardItem["type"] = "image";
+          if (file.type.startsWith("video/")) type = "video";
+          else if (file.type.startsWith("audio/")) type = "audio";
+
+          if (type === "image") {
+            const img = new window.Image();
+            img.onload = () => {
+              const maxW = 500;
+              const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+              addItem({
+                id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                type,
+                x: baseX, y: baseY,
+                width: Math.round(img.naturalWidth * scale),
+                height: Math.round(img.naturalHeight * scale),
+                src, fileName: file.name,
+                createdAt: new Date().toISOString(),
+              });
+            };
+            img.src = src;
+          } else if (type === "video") {
+            const vid = document.createElement("video");
+            vid.preload = "metadata";
+            vid.onloadedmetadata = () => {
+              const maxW = 500;
+              const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
+              addItem({
+                id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                type,
+                x: baseX, y: baseY,
+                width: Math.round(vid.videoWidth * scale),
+                height: Math.round(vid.videoHeight * scale),
+                src, fileName: file.name,
+                createdAt: new Date().toISOString(),
+              });
+              URL.revokeObjectURL(vid.src);
+            };
+            vid.src = URL.createObjectURL(file);
+          } else {
+            addItem({
+              id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              type,
+              x: baseX, y: baseY,
+              width: 280, height: 80,
+              src, fileName: file.name,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    },
+    [addItem, panX, panY, zoom]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const cursorClass = spaceHeld || isPanning
+    ? "cursor-grabbing"
+    : "cursor-crosshair";
+
+  return (
+    <div className="relative h-screen w-screen overflow-hidden bg-white">
+      {/* Canvas area */}
+      <div
+        ref={canvasRef}
+        data-canvas="true"
+        className={`absolute inset-0 ${cursorClass}`}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        style={{ touchAction: "none" }}
+      >
+        {/* Grid pattern — perspective dots */}
+        <div
+          className="absolute inset-0"
+          data-canvas="true"
+          style={{
+            backgroundImage: `radial-gradient(circle, rgba(13,17,23,0.12) 1.2px, transparent 1.2px)`,
+            backgroundSize: `${30 * zoom}px ${30 * zoom}px`,
+            backgroundPosition: `${panX}px ${panY}px`,
+          }}
+        />
+        {/* Subtle radial gradient for depth */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          data-canvas="true"
+          style={{
+            background: `radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(8,19,31,0.04) 100%)`,
+          }}
+        />
+
+        {/* Transform container */}
+        <div
+          data-canvas="true"
+          style={{
+            transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+            transformOrigin: "0 0",
+          }}
+        >
+          {items.map((item) => (
+            <BoardItemCard
+              key={item.id}
+              item={item}
+              isSelected={item.id === selectedItemId}
+              onMouseDown={(e) => handleItemDragStart(item.id, e)}
+              onDoubleClick={() => handleItemDoubleClick(item.id)}
+              onResizeStart={(e) => handleResizeStart(item.id, e)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Top toolbar */}
+      <Toolbar />
+
+      {/* Bottom prompt bar */}
+      <PromptBar />
+
+      {/* Model panel */}
+      <ModelPanel />
+
+      {/* Edit panel */}
+      <EditPanel />
+
+      {/* Templates panel */}
+      <TemplatesPanel />
+      <ProfilePanel />
+      <HistoryPanel />
+
+      {/* Zoom preview */}
+      {previewItem && (
+        <ZoomPreview item={previewItem} onClose={() => setPreviewItem(null)} />
+      )}
+    </div>
+  );
+}
