@@ -1,13 +1,76 @@
 "use client";
 
 import { useRef } from "react";
-import { ZoomIn, ZoomOut, RotateCcw, Undo, Redo, HelpCircle, FileUp, Download, ScrollText } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCcw, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { parsePsdBuffer, buildPsdFromItems, downloadPsd } from "@/lib/psd";
 
 export function Toolbar() {
   const { zoom, setZoom, setPan, items, addItem, boardName } = useAppStore();
   const psdInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const { panX, panY, zoom: z } = useAppStore.getState();
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const itemId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const localUrl = URL.createObjectURL(file);
+      const baseX = (-panX + window.innerWidth / 2 - 150) / z + i * 30;
+      const baseY = (-panY + window.innerHeight / 2 - 100) / z + i * 30;
+
+      let type: "image" | "video" | "audio" = "image";
+      if (file.type.startsWith("video/")) type = "video";
+      else if (file.type.startsWith("audio/")) type = "audio";
+
+      if (type === "image") {
+        const img = new window.Image();
+        img.onload = () => {
+          const maxW = 500;
+          const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+          addItem({
+            id: itemId, type, x: baseX, y: baseY,
+            width: Math.round(img.naturalWidth * scale),
+            height: Math.round(img.naturalHeight * scale),
+            src: localUrl, fileName: file.name,
+            createdAt: new Date().toISOString(),
+          });
+          // Upload in background
+          uploadFileToStorage(file).then((url) => {
+            useAppStore.getState().updateItem(itemId, { src: url });
+            URL.revokeObjectURL(localUrl);
+          });
+        };
+        img.src = localUrl;
+      } else {
+        addItem({
+          id: itemId, type, x: baseX, y: baseY,
+          width: type === "video" ? 400 : 280,
+          height: type === "video" ? 225 : 80,
+          src: localUrl, fileName: file.name,
+          createdAt: new Date().toISOString(),
+        });
+        uploadFileToStorage(file).then((url) => {
+          useAppStore.getState().updateItem(itemId, { src: url });
+          URL.revokeObjectURL(localUrl);
+        });
+      }
+    }
+    e.target.value = "";
+  };
+
+  async function uploadFileToStorage(file: File): Promise<string> {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.url) return data.url;
+    } catch {}
+    return URL.createObjectURL(file);
+  }
 
   const handleImportPsd = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,8 +169,23 @@ export function Toolbar() {
         {/* Separator */}
         <div className="h-4 w-px bg-gray-200 mx-1" />
 
-        {/* PSD Import/Export */}
+        {/* Upload + PSD Import/Export */}
         <div className="flex items-center gap-0.5">
+          <button
+            className="rounded p-1.5 text-gray-400 hover:bg-[#f26522]/10 hover:text-[#f26522] transition-colors"
+            onClick={() => uploadInputRef.current?.click()}
+            title="Upload files to canvas"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+          </button>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            multiple
+            accept="image/*,video/*,audio/*"
+            className="hidden"
+            onChange={handleUpload}
+          />
           <button
             className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#0d1117] transition-colors"
             onClick={() => psdInputRef.current?.click()}
