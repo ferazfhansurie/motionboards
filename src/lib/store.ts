@@ -127,6 +127,7 @@ export interface AppState {
   isDashboardOpen: boolean;
   isProfileOpen: boolean;
   isHistoryOpen: boolean;
+  isAIPromptOpen: boolean;
 
   // References
   startFrameId: string | null;
@@ -156,6 +157,7 @@ export interface AppState {
   setDashboardOpen: (open: boolean) => void;
   setProfileOpen: (open: boolean) => void;
   setHistoryOpen: (open: boolean) => void;
+  setAIPromptOpen: (open: boolean) => void;
   setStartFrame: (id: string | null) => void;
   setEndFrame: (id: string | null) => void;
   toggleInputRef: (id: string) => void;
@@ -203,6 +205,7 @@ export const useAppStore = create<AppState>((set) => {
   isDashboardOpen: false,
   isProfileOpen: false,
   isHistoryOpen: false,
+  isAIPromptOpen: false,
   pendingPrompt: null,
   startFrameId: null,
   endFrameId: null,
@@ -239,6 +242,7 @@ export const useAppStore = create<AppState>((set) => {
   setDashboardOpen: (isDashboardOpen) => set({ isDashboardOpen }),
   setProfileOpen: (isProfileOpen) => set({ isProfileOpen, isHistoryOpen: false }),
   setHistoryOpen: (isHistoryOpen) => set({ isHistoryOpen, isProfileOpen: false }),
+  setAIPromptOpen: (isAIPromptOpen) => set({ isAIPromptOpen }),
   setStartFrame: (startFrameId) => set({ startFrameId }),
   setEndFrame: (endFrameId) => set({ endFrameId }),
   toggleInputRef: (id) =>

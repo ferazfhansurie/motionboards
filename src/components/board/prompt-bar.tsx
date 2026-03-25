@@ -7,7 +7,7 @@ import {
   ChevronDown,
   LayoutGrid,
   FileImage,
-  Layers,
+  Sparkles,
   User,
   X,
   BookOpen,
@@ -49,6 +49,8 @@ export function PromptBar() {
     setProfileOpen,
     isHistoryOpen,
     setHistoryOpen,
+    isAIPromptOpen,
+    setAIPromptOpen,
     boards,
     activeBoardId,
     addBoard,
@@ -468,12 +470,18 @@ export function PromptBar() {
               <span>Templates</span>
             </button>
 
-            {/* Files */}
+            {/* AI Prompt Generator */}
             <button
-              className="inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none bg-white text-[#374151] hover:bg-gray-100 border border-gray-200 h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1"
-              title="Files"
+              className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
+                isAIPromptOpen
+                  ? "bg-[#f26522] text-white border border-[#f26522]"
+                  : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+              }`}
+              title="AI Prompt Generator"
+              onClick={() => setAIPromptOpen(!isAIPromptOpen)}
             >
-              <Layers className="w-3.5 h-3.5 shrink-0" />
+              <img src="/aios-icon.png" alt="AI" className="w-3.5 h-3.5 rounded-sm" />
+              <span>AI</span>
             </button>
 
             {/* Recent Generations */}

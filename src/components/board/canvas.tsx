@@ -10,6 +10,7 @@ import { ZoomPreview } from "./zoom-preview";
 import { EditPanel } from "./edit-panel";
 import { TemplatesPanel } from "./templates-panel";
 import { ProfilePanel, HistoryPanel } from "./dashboard-modal";
+import { AIPromptPanel } from "./ai-prompt-panel";
 import { parsePsdBuffer } from "@/lib/psd";
 
 // Upload file to fal storage, returns URL. Falls back to data URI on failure.
@@ -393,6 +394,46 @@ export function Canvas() {
         onWheel={handleWheel}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onTouchStart={(e) => {
+          if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const target = touch.target as HTMLElement;
+            const isCanvas = target === canvasRef.current || !!target.dataset.canvas;
+            if (isCanvas) {
+              selectItem(null);
+              setIsPanning(true);
+              setPanStart({ x: touch.clientX - panX, y: touch.clientY - panY });
+            }
+          }
+        }}
+        onTouchMove={(e) => {
+          if (isPanning && e.touches.length === 1) {
+            const touch = e.touches[0];
+            setPan(touch.clientX - panStart.x, touch.clientY - panStart.y);
+          }
+          if (e.touches.length === 2) {
+            // Pinch to zoom
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+            const el = canvasRef.current as HTMLElement & { _lastPinchDist?: number };
+            if (el._lastPinchDist) {
+              const delta = (dist - el._lastPinchDist) * 0.005;
+              setZoom(zoom + delta);
+            }
+            el._lastPinchDist = dist;
+          }
+        }}
+        onTouchEnd={(e) => {
+          setIsPanning(false);
+          setDragId(null);
+          setResizeId(null);
+          const el = canvasRef.current as HTMLElement & { _lastPinchDist?: number };
+          if (el) el._lastPinchDist = undefined;
+          if (e.touches.length === 0) {
+            // All fingers lifted
+          }
+        }}
         style={{ touchAction: "none" }}
       >
         {/* Grid pattern — perspective dots */}
@@ -451,6 +492,7 @@ export function Canvas() {
       <TemplatesPanel />
       <ProfilePanel />
       <HistoryPanel />
+      <AIPromptPanel />
 
       {/* Zoom preview */}
       {previewItem && (
