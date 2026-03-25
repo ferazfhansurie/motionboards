@@ -188,7 +188,17 @@ export function AIPromptPanel() {
               {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
             </button>
           </div>
-          <p className="text-[8px] text-gray-300 text-center mt-1.5">Powered by GPT-4o · Cinematography Expert</p>
+          <div className="flex items-center justify-between mt-1.5">
+            <p className="text-[8px] text-gray-300">Powered by GPT-4o</p>
+            <a
+              href="https://wa.me/60112167672?text=Hi%2C%20I%20want%20to%20upgrade%20my%20AI%20on%20MotionBoards%20%F0%9F%9A%80"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[8px] font-semibold text-[#f26522] hover:text-[#d9541a] transition-colors flex items-center gap-0.5"
+            >
+              ⚡ Upgrade AI
+            </a>
+          </div>
         </div>
       </div>
     </div>
