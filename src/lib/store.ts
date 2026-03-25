@@ -2,6 +2,46 @@
 
 import { create } from "zustand";
 
+// --- LocalStorage autosave ---
+const STORAGE_KEY = "motionboards_state";
+
+interface SavedState {
+  boards: Board[];
+  activeBoardId: string;
+  selectedModelId: string | null;
+}
+
+function loadSavedState(): Partial<SavedState> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SavedState;
+  } catch {
+    return null;
+  }
+}
+
+function saveState(state: AppState) {
+  if (typeof window === "undefined") return;
+  try {
+    // Save current board items into boards array
+    const boards = state.boards.map((b) =>
+      b.id === state.activeBoardId
+        ? { ...b, items: state.items, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
+        : b
+    );
+    const data: SavedState = {
+      boards,
+      activeBoardId: state.activeBoardId,
+      selectedModelId: state.selectedModelId,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
+
 export interface ImageEditState {
   brightness: number;   // default 100
   contrast: number;     // default 100
@@ -141,16 +181,23 @@ const initialBoard: Board = {
   zoom: 1,
 };
 
-export const useAppStore = create<AppState>((set) => ({
-  boards: [initialBoard],
-  activeBoardId: "board_1",
-  items: [],
+export const useAppStore = create<AppState>((set) => {
+  // Load saved state
+  const saved = loadSavedState();
+  const startBoard = saved?.boards?.[0]
+    ? (saved.boards.find((b) => b.id === saved.activeBoardId) || saved.boards[0])
+    : initialBoard;
+
+  return ({
+  boards: saved?.boards || [initialBoard],
+  activeBoardId: saved?.activeBoardId || "board_1",
+  items: startBoard.items || [],
   selectedItemId: null,
-  panX: 0,
-  panY: 0,
-  zoom: 1,
-  boardName: "Board 1",
-  selectedModelId: null,
+  panX: startBoard.panX || 0,
+  panY: startBoard.panY || 0,
+  zoom: startBoard.zoom || 1,
+  boardName: startBoard.name || "Board 1",
+  selectedModelId: saved?.selectedModelId || null,
   isModelPanelOpen: false,
   isTemplatesOpen: false,
   isDashboardOpen: false,
@@ -307,4 +354,47 @@ export const useAppStore = create<AppState>((set) => ({
       boards: s.boards.map((b) => (b.id === boardId ? { ...b, name } : b)),
       boardName: s.activeBoardId === boardId ? name : s.boardName,
     })),
-}));
+});
+});
+
+// Autosave on every state change (debounced) — localStorage + DB
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+useAppStore.subscribe((state) => {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveState(state); // localStorage
+    // Also save to DB
+    const boards = state.boards.map((b) =>
+      b.id === state.activeBoardId
+        ? { ...b, items: state.items, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
+        : b
+    );
+    fetch("/api/boards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ boards, activeBoardId: state.activeBoardId, selectedModelId: state.selectedModelId }),
+    }).catch(() => {}); // silent fail
+  }, 2000); // 2s debounce for DB saves
+});
+
+// Load from DB on startup
+if (typeof window !== "undefined") {
+  fetch("/api/boards")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data?.boards?.length > 0) {
+        const board = data.boards.find((b: Board) => b.id === data.activeBoardId) || data.boards[0];
+        useAppStore.setState({
+          boards: data.boards,
+          activeBoardId: data.activeBoardId || data.boards[0].id,
+          items: board.items || [],
+          panX: board.panX || 0,
+          panY: board.panY || 0,
+          zoom: board.zoom || 1,
+          boardName: board.name || "Board 1",
+          selectedModelId: data.selectedModelId || null,
+        });
+      }
+    })
+    .catch(() => {}); // fall back to localStorage
+}
