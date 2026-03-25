@@ -98,13 +98,14 @@ export function EditPanel() {
 
   return (
     <div className="absolute left-3 bottom-16 z-40 pointer-events-auto w-56">
-      <div className="rounded-xl bg-[#0d1f30]/95 border border-white/10 backdrop-blur-md shadow-2xl overflow-hidden">
+      <div className="rounded-xl bg-white border border-gray-200 shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-          <span className="text-[11px] font-semibold text-neutral-200">Edit Image</span>
+        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+          <span className="text-[11px] font-semibold text-[#0d1117]">Edit Image</span>
           <button
+            type="button"
             onClick={handleCancel}
-            className="rounded p-0.5 text-neutral-500 hover:text-neutral-300 hover:bg-[#0f2538] transition-colors"
+            className="rounded p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           >
             <X className="h-3 w-3" />
           </button>
@@ -115,11 +116,11 @@ export function EditPanel() {
           {filters.map((f) => (
             <div key={f.key}>
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 text-neutral-400">
+                <div className="flex items-center gap-1.5 text-gray-500">
                   {f.icon}
                   <span className="text-[10px]">{f.label}</span>
                 </div>
-                <span className="text-[10px] text-neutral-500 tabular-nums w-8 text-right">
+                <span className="text-[10px] text-gray-400 tabular-nums w-8 text-right">
                   {Math.round(editState[f.key])}{f.unit}
                 </span>
               </div>
@@ -137,13 +138,14 @@ export function EditPanel() {
         </div>
 
         {/* Crop toggle */}
-        <div className="px-3 py-2 border-t border-white/5">
+        <div className="px-3 py-2 border-t border-gray-100">
           <button
-            onClick={() => setCropMode(!isCropMode)}
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCropMode(!isCropMode); }}
             className={`flex items-center gap-1.5 w-full rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors ${
               isCropMode
                 ? "bg-[#f26522] text-white"
-                : "bg-[#0f2538] text-neutral-400 hover:bg-[#0d1f30] hover:text-neutral-300"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
             }`}
           >
             <Crop className="h-3 w-3" />
@@ -152,15 +154,17 @@ export function EditPanel() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 px-3 py-2 border-t border-white/5">
+        <div className="flex items-center gap-1.5 px-3 py-2 border-t border-gray-100">
           <button
+            type="button"
             onClick={handleReset}
-            className="flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 bg-[#0f2538] text-neutral-400 hover:bg-[#0d1f30] hover:text-neutral-300 text-[10px] font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 bg-gray-100 text-gray-500 hover:bg-[#0d1f30] hover:text-gray-600 text-[10px] font-medium transition-colors"
           >
             <RotateCcw className="h-3 w-3" />
             Reset
           </button>
           <button
+            type="button"
             onClick={handleApply}
             className="flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 bg-green-600 text-white hover:bg-green-500 text-[10px] font-medium transition-colors"
           >

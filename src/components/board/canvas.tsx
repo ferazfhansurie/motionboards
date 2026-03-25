@@ -12,6 +12,23 @@ import { TemplatesPanel } from "./templates-panel";
 import { ProfilePanel, HistoryPanel } from "./dashboard-modal";
 import { parsePsdBuffer } from "@/lib/psd";
 
+// Upload file to fal storage, returns URL. Falls back to data URI on failure.
+async function uploadFile(file: File): Promise<string> {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (data.url) return data.url;
+  } catch {}
+  // Fallback: data URI
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const {
@@ -177,30 +194,27 @@ export function Canvas() {
           e.preventDefault();
           const file = clipItem.getAsFile();
           if (!file) continue;
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const src = ev.target?.result as string;
-            const img = new Image();
-            img.onload = () => {
-              const maxW = 500;
-              const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
-              const w = Math.round(img.naturalWidth * scale);
-              const h = Math.round(img.naturalHeight * scale);
-              addItem({
-                id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                type: "image",
-                x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
-                y: (-panY + window.innerHeight / 2 - h / 2) / zoom,
-                width: w,
-                height: h,
-                src,
-                fileName: file.name,
+          const src = await uploadFile(file);
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            const maxW = 500;
+            const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+            const w = Math.round(img.naturalWidth * scale);
+            const h = Math.round(img.naturalHeight * scale);
+            addItem({
+              id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              type: "image",
+              x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
+              y: (-panY + window.innerHeight / 2 - h / 2) / zoom,
+              width: w,
+              height: h,
+              src,
+              fileName: file.name,
                 createdAt: new Date().toISOString(),
               });
-            };
-            img.src = src;
           };
-          reader.readAsDataURL(file);
+          img.src = src;
         }
       }
     };
@@ -255,48 +269,39 @@ export function Canvas() {
           return;
         }
 
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const src = ev.target?.result as string;
-          let type: BoardItem["type"] = "image";
-          if (file.type.startsWith("video/")) type = "video";
-          else if (file.type.startsWith("audio/")) type = "audio";
+        let type: BoardItem["type"] = "image";
+        if (file.type.startsWith("video/")) type = "video";
+        else if (file.type.startsWith("audio/")) type = "audio";
 
-          if (type === "image") {
-            const img = new window.Image();
-            img.onload = () => {
-              const maxW = 500;
-              const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
-              addItem({
-                id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                type,
-                x: baseX, y: baseY,
-                width: Math.round(img.naturalWidth * scale),
-                height: Math.round(img.naturalHeight * scale),
-                src, fileName: file.name,
-                createdAt: new Date().toISOString(),
-              });
-            };
-            img.src = src;
-          } else if (type === "video") {
-            const vid = document.createElement("video");
-            vid.preload = "metadata";
-            vid.onloadedmetadata = () => {
-              const maxW = 500;
-              const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
-              addItem({
-                id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                type,
-                x: baseX, y: baseY,
-                width: Math.round(vid.videoWidth * scale),
-                height: Math.round(vid.videoHeight * scale),
-                src, fileName: file.name,
-                createdAt: new Date().toISOString(),
-              });
-              URL.revokeObjectURL(vid.src);
-            };
-            vid.src = URL.createObjectURL(file);
-          } else {
+        const src = await uploadFile(file);
+
+        if (type === "image") {
+          const img = new window.Image();
+          img.onload = () => {
+            const maxW = 500;
+            const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+            addItem({
+              id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              type,
+              x: baseX, y: baseY,
+              width: Math.round(img.naturalWidth * scale),
+              height: Math.round(img.naturalHeight * scale),
+              src, fileName: file.name,
+              createdAt: new Date().toISOString(),
+            });
+          };
+          img.crossOrigin = "anonymous";
+          img.src = src;
+        } else if (type === "video") {
+          addItem({
+            id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            type,
+            x: baseX, y: baseY,
+            width: 400, height: 225,
+            src, fileName: file.name,
+            createdAt: new Date().toISOString(),
+          });
+        } else {
             addItem({
               id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
               type,
@@ -306,8 +311,6 @@ export function Canvas() {
               createdAt: new Date().toISOString(),
             });
           }
-        };
-        reader.readAsDataURL(file);
       });
     },
     [addItem, panX, panY, zoom]
