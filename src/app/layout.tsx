@@ -3,8 +3,15 @@ import "./globals.css";
 import { Providers } from "@/components/layout/providers";
 
 export const metadata: Metadata = {
-  title: "MotionBoards — AI Creative Canvas | Works with Adobe PSD",
-  description: "Generate AI videos and images with 30+ models. Import and export PSD files. Edit, crop, and adjust — all on one infinite canvas.",
+  title: "MotionBoards — AI Creative Canvas",
+  description: "Generate AI videos and images with 30+ models. Edit, crop, and adjust — all on one infinite canvas.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "192x77" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
