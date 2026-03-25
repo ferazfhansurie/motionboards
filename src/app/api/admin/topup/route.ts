@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken, addCredits } from "@/lib/db";
 import { neon } from "@neondatabase/serverless";
 
-const sql = neon(process.env.DATABASE_URL!);
+function getSql() {
+  return neon(process.env.DATABASE_URL!);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find user by email
-    const rows = await sql`SELECT id FROM mb_users WHERE LOWER(email) = LOWER(${email})`;
+    const rows = await getSql()`SELECT id FROM mb_users WHERE LOWER(email) = LOWER(${email})`;
     if (rows.length === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

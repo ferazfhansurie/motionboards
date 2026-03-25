@@ -3,7 +3,13 @@ import { createHash, randomBytes } from "crypto";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 
-const sql = neon(process.env.DATABASE_URL!);
+type SqlRow = Record<string, unknown>;
+type SqlFn = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<SqlRow[]>;
+
+const sql: SqlFn = (strings, ...values) => {
+  const fn = neon(process.env.DATABASE_URL!);
+  return fn(strings, ...values) as Promise<SqlRow[]>;
+};
 
 // --- Settings (still JSON — admin-only, no need for DB) ---
 
