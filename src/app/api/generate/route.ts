@@ -32,13 +32,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid model" }, { status: 400 });
     }
 
-    // Use creditCost from model definition (in sen, 100 = RM1.00)
+    // Check credits (but don't deduct yet)
     const creditCost = modelInfo.creditCost;
     if (user.credits < creditCost) {
       const rmCost = (creditCost / 100).toFixed(2);
       const rmBalance = (user.credits / 100).toFixed(2);
       return NextResponse.json(
-        { error: `Insufficient credits. This model costs RM${rmCost} (${modelInfo.cost}). You have RM${rmBalance}. Top up at /dashboard.` },
+        { error: `Insufficient credits. This model costs RM${rmCost} (${modelInfo.cost}). You have RM${rmBalance}. Top up your credits.` },
         { status: 402 }
       );
     }
@@ -46,12 +46,6 @@ export async function POST(req: NextRequest) {
     const needsPrompt = modelInfo.inputs.some((inp) => inp.type === "text" && inp.required);
     if (needsPrompt && (!prompt || !prompt.trim())) {
       return NextResponse.json({ error: "Prompt is required for this model" }, { status: 400 });
-    }
-
-    // Deduct credits upfront
-    const deducted = await deductCredits(user.id, creditCost);
-    if (!deducted) {
-      return NextResponse.json({ error: "Failed to deduct credits" }, { status: 402 });
     }
 
     const settings = getSettings();
@@ -137,15 +131,28 @@ export async function POST(req: NextRequest) {
       }
 
       const duration = (Date.now() - startTime) / 1000;
-      const updated = await updateGeneration(generation.id, {
-        status: outputUrl ? "completed" : "failed",
-        outputUrl,
-        duration,
-        error: outputUrl ? null : "No output received from AI provider",
-      });
 
-      return NextResponse.json(updated);
+      if (outputUrl) {
+        // SUCCESS — deduct credits only now
+        await deductCredits(user.id, creditCost);
+
+        const updated = await updateGeneration(generation.id, {
+          status: "completed",
+          outputUrl,
+          duration,
+        });
+        return NextResponse.json(updated);
+      } else {
+        // No output — don't charge
+        const updated = await updateGeneration(generation.id, {
+          status: "failed",
+          error: "No output received from AI provider",
+          duration,
+        });
+        return NextResponse.json(updated);
+      }
     } catch (genError) {
+      // Generation failed — don't charge
       const duration = (Date.now() - startTime) / 1000;
       const errorMsg = genError instanceof Error ? genError.message : "Generation failed";
       const updated = await updateGeneration(generation.id, {
