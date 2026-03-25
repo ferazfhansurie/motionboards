@@ -85,6 +85,27 @@ export function PromptBar() {
     if (!selectedModel) return;
     if (!prompt.trim() && selectedModel.inputs.some((i) => i.type === "text" && i.required)) return;
 
+    // Check required inputs
+    const needsImage = selectedModel.inputs.some((i) => (i.type === "image") && i.required);
+    const needsVideo = selectedModel.inputs.some((i) => i.type === "video" && i.required);
+    const needsAudio = selectedModel.inputs.some((i) => i.type === "audio" && i.required);
+    const hasImageInput = inputRefs.length > 0 || startFrameId;
+    const hasVideoInput = inputRefs.some((id) => items.find((i) => i.id === id)?.type === "video");
+
+    if (needsImage && !hasImageInput) {
+      alert(`${selectedModel.name} requires an image input. Select an image on the canvas and set it as INPUT.`);
+      return;
+    }
+    if (needsVideo && !hasVideoInput && !inputRefs.length) {
+      alert(`${selectedModel.name} requires a video input. Select a video on the canvas and set it as INPUT.`);
+      return;
+    }
+    if (needsAudio) {
+      // Audio inputs not yet supported via canvas — warn
+      alert(`${selectedModel.name} requires an audio input. Audio input support coming soon.`);
+      return;
+    }
+
     setIsGenerating(true);
     const pos = getNextPosition();
 
@@ -156,7 +177,7 @@ export function PromptBar() {
 
   // Context for selected item — model-aware reference buttons
   const selectedItem = selectedItemId ? items.find((i) => i.id === selectedItemId) : null;
-  const canSetAsRef = selectedItem && (selectedItem.type === "image" || selectedItem.type === "psd-layer" || selectedItem.type === "generation");
+  const canSetAsRef = selectedItem && (selectedItem.type === "image" || selectedItem.type === "psd-layer" || selectedItem.type === "generation" || selectedItem.type === "video");
 
   // Determine which reference types apply to current model
   const modelType = selectedModel?.type;

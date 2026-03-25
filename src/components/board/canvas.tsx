@@ -340,18 +340,25 @@ export function Canvas() {
           };
           img.src = localUrl;
         } else if (type === "video") {
-          addItem({
-            id: itemId,
-            type,
-            x: baseX, y: baseY,
-            width: 400, height: 225,
-            src: localUrl, fileName: file.name,
-            createdAt: new Date().toISOString(),
-          });
-          uploadFile(file).then((url) => {
-            useAppStore.getState().updateItem(itemId, { src: url });
-            URL.revokeObjectURL(localUrl);
-          });
+          const vid = document.createElement("video");
+          vid.preload = "metadata";
+          vid.onloadedmetadata = () => {
+            const maxW = 500;
+            const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
+            addItem({
+              id: itemId, type,
+              x: baseX, y: baseY,
+              width: Math.round(vid.videoWidth * scale),
+              height: Math.round(vid.videoHeight * scale),
+              src: localUrl, fileName: file.name,
+              createdAt: new Date().toISOString(),
+            });
+            uploadFile(file).then((url) => {
+              useAppStore.getState().updateItem(itemId, { src: url });
+              URL.revokeObjectURL(localUrl);
+            });
+          };
+          vid.src = localUrl;
         } else {
             addItem({
               id: itemId,

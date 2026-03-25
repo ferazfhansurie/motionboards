@@ -44,11 +44,29 @@ export function Toolbar() {
           });
         };
         img.src = localUrl;
+      } else if (type === "video") {
+        const vid = document.createElement("video");
+        vid.preload = "metadata";
+        vid.onloadedmetadata = () => {
+          const maxW = 500;
+          const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
+          addItem({
+            id: itemId, type, x: baseX, y: baseY,
+            width: Math.round(vid.videoWidth * scale),
+            height: Math.round(vid.videoHeight * scale),
+            src: localUrl, fileName: file.name,
+            createdAt: new Date().toISOString(),
+          });
+          uploadFileToStorage(file).then((url) => {
+            useAppStore.getState().updateItem(itemId, { src: url });
+            URL.revokeObjectURL(localUrl);
+          });
+        };
+        vid.src = localUrl;
       } else {
         addItem({
           id: itemId, type, x: baseX, y: baseY,
-          width: type === "video" ? 400 : 280,
-          height: type === "video" ? 225 : 80,
+          width: 280, height: 80,
           src: localUrl, fileName: file.name,
           createdAt: new Date().toISOString(),
         });
