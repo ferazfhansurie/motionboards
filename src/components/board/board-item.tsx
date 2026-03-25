@@ -247,31 +247,37 @@ export function BoardItemCard({
         )}
       </div>
 
-      {/* Overlay buttons — outside card container */}
-      {isImageType && isSelected && (
-        <button
-          className="absolute left-[-8px] top-[-2px] z-20 rounded-full bg-blue-500 p-1 text-white shadow-lg hover:bg-blue-600"
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            selectItem(item.id);
-            setEditMode(true);
-          }}
-          title="Edit image"
-        >
-          <Pencil className="h-3 w-3" />
-        </button>
-      )}
-
+      {/* Action buttons — above card, outside container */}
       {isSelected && (
-        <button
-          className="absolute right-[-8px] top-[-2px] z-20 rounded-full bg-red-500 p-1 text-white shadow-lg hover:bg-red-600"
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            useAppStore.getState().removeItem(item.id);
-          }}
-        >
-          <X className="h-3 w-3" />
-        </button>
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] z-20 flex items-center gap-1 bg-white rounded-lg border border-gray-200 shadow-lg px-1.5 py-1">
+          {isImageType && (
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                selectItem(item.id);
+                setEditMode(true);
+              }}
+              title="Edit image"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit
+            </button>
+          )}
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-red-500 hover:bg-red-50 transition-colors"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              useAppStore.getState().removeItem(item.id);
+            }}
+            title="Delete"
+          >
+            <X className="h-3 w-3" />
+            Delete
+          </button>
+        </div>
       )}
 
       {/* Info below card */}
