@@ -377,24 +377,48 @@ useAppStore.subscribe((state) => {
   }, 2000); // 2s debounce for DB saves
 });
 
-// Load from DB on startup
+// Load from DB on startup — keyed by user session
 if (typeof window !== "undefined") {
-  fetch("/api/boards")
+  fetch("/api/auth/me")
     .then((r) => r.json())
-    .then((data) => {
-      if (data?.boards?.length > 0) {
-        const board = data.boards.find((b: Board) => b.id === data.activeBoardId) || data.boards[0];
+    .then((authData) => {
+      const userId = authData?.user?.id;
+      if (!userId) return;
+
+      // Check if localStorage belongs to this user
+      const storedUser = localStorage.getItem("motionboards_user");
+      if (storedUser !== userId) {
+        // Different user — clear localStorage and reset store
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem("motionboards_user", userId);
         useAppStore.setState({
-          boards: data.boards,
-          activeBoardId: data.activeBoardId || data.boards[0].id,
-          items: board.items || [],
-          panX: board.panX || 0,
-          panY: board.panY || 0,
-          zoom: board.zoom || 1,
-          boardName: board.name || "Board 1",
-          selectedModelId: data.selectedModelId || null,
+          boards: [{ id: "board_1", name: "Board 1", items: [], panX: 0, panY: 0, zoom: 1 }],
+          activeBoardId: "board_1",
+          items: [],
+          panX: 0, panY: 0, zoom: 1,
+          boardName: "Board 1",
+          selectedModelId: null,
         });
       }
+
+      // Load from DB
+      return fetch("/api/boards")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.boards?.length > 0) {
+            const board = data.boards.find((b: Board) => b.id === data.activeBoardId) || data.boards[0];
+            useAppStore.setState({
+              boards: data.boards,
+              activeBoardId: data.activeBoardId || data.boards[0].id,
+              items: board.items || [],
+              panX: board.panX || 0,
+              panY: board.panY || 0,
+              zoom: board.zoom || 1,
+              boardName: board.name || "Board 1",
+              selectedModelId: data.selectedModelId || null,
+            });
+          }
+        });
     })
-    .catch(() => {}); // fall back to localStorage
+    .catch(() => {});
 }

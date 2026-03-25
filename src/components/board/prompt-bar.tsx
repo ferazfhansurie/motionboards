@@ -130,6 +130,12 @@ export function PromptBar() {
       });
 
       const data = await res.json();
+      if (!res.ok) {
+        // Remove the placeholder item and show error
+        useAppStore.getState().removeItem(genItem.id);
+        alert(data.error || "Generation failed");
+        return;
+      }
       useAppStore.getState().updateItem(genItem.id, {
         status: data.status === "completed" ? "completed" : "failed",
         outputUrl: data.outputUrl || null,

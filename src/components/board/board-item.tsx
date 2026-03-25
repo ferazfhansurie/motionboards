@@ -11,7 +11,7 @@ interface BoardItemCardProps {
   isSelected: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
-  onResizeStart: (e: React.MouseEvent) => void;
+  onResizeStart: (e: React.MouseEvent, edge: string) => void;
 }
 
 export function BoardItemCard({
@@ -195,20 +195,55 @@ export function BoardItemCard({
           <CropOverlay item={item} />
         )}
 
-        {/* Resize handle (bottom-right corner) — visible on hover or selected */}
+        {/* Resize handles — edges and corners, visible on hover or selected */}
         {(item.type === "image" || item.type === "video" || item.type === "generation" || item.type === "psd-layer") && (
-          <div
-            className={`absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize transition-opacity ${
-              isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            }`}
-            onMouseDown={onResizeStart}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" className="text-gray-400">
-              <path d="M18 18L8 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M18 18L18 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M18 18L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
+          <>
+            {/* Right edge */}
+            <div
+              className={`absolute top-2 bottom-2 right-0 w-2 cursor-ew-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "e")}
+            />
+            {/* Bottom edge */}
+            <div
+              className={`absolute left-2 right-2 bottom-0 h-2 cursor-ns-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "s")}
+            />
+            {/* Left edge */}
+            <div
+              className={`absolute top-2 bottom-2 left-0 w-2 cursor-ew-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "w")}
+            />
+            {/* Top edge */}
+            <div
+              className={`absolute left-2 right-2 top-0 h-2 cursor-ns-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "n")}
+            />
+            {/* Bottom-right corner */}
+            <div
+              className={`absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "se")}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" className="text-gray-400">
+                <path d="M14 14L6 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M14 14L14 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            {/* Bottom-left corner */}
+            <div
+              className={`absolute bottom-0 left-0 h-4 w-4 cursor-nesw-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "sw")}
+            />
+            {/* Top-right corner */}
+            <div
+              className={`absolute top-0 right-0 h-4 w-4 cursor-nesw-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "ne")}
+            />
+            {/* Top-left corner */}
+            <div
+              className={`absolute top-0 left-0 h-4 w-4 cursor-nwse-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+              onMouseDown={(e) => onResizeStart(e, "nw")}
+            />
+          </>
         )}
       </div>
 

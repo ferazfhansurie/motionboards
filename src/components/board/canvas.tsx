@@ -111,10 +111,39 @@ export function Canvas() {
       if (resizeId) {
         const dx = (e.clientX - resizeStart.x) / zoom;
         const dy = (e.clientY - resizeStart.y) / zoom;
-        const newW = Math.max(100, resizeStart.w + dx);
         const ratio = resizeStart.h / resizeStart.w;
-        const newH = Math.round(newW * ratio);
-        useAppStore.getState().updateItem(resizeId, { width: Math.round(newW), height: newH });
+        const updates: Partial<BoardItem> = {};
+
+        if (resizeEdge.includes("e")) {
+          updates.width = Math.max(50, Math.round(resizeStart.w + dx));
+        }
+        if (resizeEdge.includes("s")) {
+          updates.height = Math.max(50, Math.round(resizeStart.h + dy));
+        }
+        if (resizeEdge.includes("w")) {
+          const newW = Math.max(50, Math.round(resizeStart.w - dx));
+          updates.width = newW;
+          updates.x = resizeItemStart.x + (resizeStart.w - newW);
+        }
+        if (resizeEdge.includes("n")) {
+          const newH = Math.max(50, Math.round(resizeStart.h - dy));
+          updates.height = newH;
+          updates.y = resizeItemStart.y + (resizeStart.h - newH);
+        }
+
+        // Keep aspect ratio for corner drags
+        if (resizeEdge.length === 2) {
+          const w = updates.width || resizeStart.w;
+          updates.height = Math.round(w * ratio);
+          if (resizeEdge.includes("n")) {
+            updates.y = resizeItemStart.y + resizeStart.h - updates.height;
+          }
+        }
+
+        useAppStore.getState().updateItem(resizeId, updates);
+        if (updates.x !== undefined || updates.y !== undefined) {
+          useAppStore.getState().moveItem(resizeId, updates.x ?? resizeItemStart.x, updates.y ?? resizeItemStart.y);
+        }
         return;
       }
       if (dragId) {
@@ -162,14 +191,18 @@ export function Canvas() {
   );
 
   // Item resize start
+  const [resizeEdge, setResizeEdge] = useState("se");
+  const [resizeItemStart, setResizeItemStart] = useState({ x: 0, y: 0 });
   const handleResizeStart = useCallback(
-    (id: string, e: React.MouseEvent) => {
+    (id: string, e: React.MouseEvent, edge: string) => {
       e.stopPropagation();
       e.preventDefault();
       const item = items.find((i) => i.id === id);
       if (!item) return;
       setResizeId(id);
+      setResizeEdge(edge);
       setResizeStart({ x: e.clientX, y: e.clientY, w: item.width, h: item.height });
+      setResizeItemStart({ x: item.x, y: item.y });
     },
     [items]
   );
@@ -194,27 +227,34 @@ export function Canvas() {
           e.preventDefault();
           const file = clipItem.getAsFile();
           if (!file) continue;
-          const src = await uploadFile(file);
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => {
+
+          // Show placeholder immediately with local preview
+          const placeholderId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          const localUrl = URL.createObjectURL(file);
+          const tempImg = new window.Image();
+          tempImg.onload = () => {
             const maxW = 500;
-            const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
-            const w = Math.round(img.naturalWidth * scale);
-            const h = Math.round(img.naturalHeight * scale);
+            const scale = tempImg.naturalWidth > maxW ? maxW / tempImg.naturalWidth : 1;
+            const w = Math.round(tempImg.naturalWidth * scale);
+            const h = Math.round(tempImg.naturalHeight * scale);
             addItem({
-              id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              id: placeholderId,
               type: "image",
               x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
               y: (-panY + window.innerHeight / 2 - h / 2) / zoom,
               width: w,
               height: h,
-              src,
+              src: localUrl,
               fileName: file.name,
-                createdAt: new Date().toISOString(),
-              });
+              createdAt: new Date().toISOString(),
+            });
+            // Upload in background, update src when done
+            uploadFile(file).then((url) => {
+              useAppStore.getState().updateItem(placeholderId, { src: url });
+              URL.revokeObjectURL(localUrl);
+            });
           };
-          img.src = src;
+          tempImg.src = localUrl;
         }
       }
     };
@@ -273,7 +313,9 @@ export function Canvas() {
         if (file.type.startsWith("video/")) type = "video";
         else if (file.type.startsWith("audio/")) type = "audio";
 
-        const src = await uploadFile(file);
+        // Show instant local preview, upload in background
+        const itemId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const localUrl = URL.createObjectURL(file);
 
         if (type === "image") {
           const img = new window.Image();
@@ -281,34 +323,46 @@ export function Canvas() {
             const maxW = 500;
             const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
             addItem({
-              id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              id: itemId,
               type,
               x: baseX, y: baseY,
               width: Math.round(img.naturalWidth * scale),
               height: Math.round(img.naturalHeight * scale),
-              src, fileName: file.name,
+              src: localUrl, fileName: file.name,
               createdAt: new Date().toISOString(),
             });
+            // Upload in background
+            uploadFile(file).then((url) => {
+              useAppStore.getState().updateItem(itemId, { src: url });
+              URL.revokeObjectURL(localUrl);
+            });
           };
-          img.crossOrigin = "anonymous";
-          img.src = src;
+          img.src = localUrl;
         } else if (type === "video") {
           addItem({
-            id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            id: itemId,
             type,
             x: baseX, y: baseY,
             width: 400, height: 225,
-            src, fileName: file.name,
+            src: localUrl, fileName: file.name,
             createdAt: new Date().toISOString(),
+          });
+          uploadFile(file).then((url) => {
+            useAppStore.getState().updateItem(itemId, { src: url });
+            URL.revokeObjectURL(localUrl);
           });
         } else {
             addItem({
-              id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              id: itemId,
               type,
               x: baseX, y: baseY,
               width: 280, height: 80,
-              src, fileName: file.name,
+              src: localUrl, fileName: file.name,
               createdAt: new Date().toISOString(),
+            });
+            uploadFile(file).then((url) => {
+              useAppStore.getState().updateItem(itemId, { src: url });
+              URL.revokeObjectURL(localUrl);
             });
           }
       });
@@ -375,7 +429,7 @@ export function Canvas() {
               isSelected={item.id === selectedItemId}
               onMouseDown={(e) => handleItemDragStart(item.id, e)}
               onDoubleClick={() => handleItemDoubleClick(item.id)}
-              onResizeStart={(e) => handleResizeStart(item.id, e)}
+              onResizeStart={(e, edge) => handleResizeStart(item.id, e, edge)}
             />
           ))}
         </div>
