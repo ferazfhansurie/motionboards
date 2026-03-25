@@ -177,14 +177,24 @@ export function PromptBar() {
 
   // Context for selected item — model-aware reference buttons
   const selectedItem = selectedItemId ? items.find((i) => i.id === selectedItemId) : null;
-  const canSetAsRef = selectedItem && (selectedItem.type === "image" || selectedItem.type === "psd-layer" || selectedItem.type === "generation" || selectedItem.type === "video");
+  const isSelectedImage = selectedItem && (selectedItem.type === "image" || selectedItem.type === "psd-layer" || (selectedItem.type === "generation" && selectedItem.outputType === "image"));
+  const isSelectedVideo = selectedItem && (selectedItem.type === "video" || (selectedItem.type === "generation" && selectedItem.outputType === "video"));
 
   // Determine which reference types apply to current model
   const modelType = selectedModel?.type;
-  const showStartFrame = modelType === "s2e";
-  const showEndFrame = modelType === "s2e";
-  // INPUT ref: i2v, i2i, v2v, upscale, lipsync
-  const showInput = modelType && ["i2v", "i2i", "v2v", "upscale", "lipsync"].includes(modelType);
+  const showStartFrame = modelType === "s2e" && isSelectedImage;
+  const showEndFrame = modelType === "s2e" && isSelectedImage;
+
+  // Check what input types the model needs
+  const modelNeedsImage = selectedModel?.inputs.some((inp) => inp.type === "image");
+  const modelNeedsVideo = selectedModel?.inputs.some((inp) => inp.type === "video");
+
+  // Only show INPUT button if selected item matches what the model accepts
+  const showInput = modelType && (
+    (modelNeedsImage && isSelectedImage) ||
+    (modelNeedsVideo && isSelectedVideo)
+  );
+  const canSetAsRef = selectedItem && (isSelectedImage || isSelectedVideo);
   const showAnyRef = showStartFrame || showEndFrame || showInput;
 
   // Cascading input: figure out the next available input slot
