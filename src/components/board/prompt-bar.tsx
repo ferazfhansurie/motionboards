@@ -417,10 +417,10 @@ export function PromptBar() {
           <div className="pointer-events-auto w-full max-w-xl px-4">
             <div className="text-center mb-6">
               <h2 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-                What do you want to create?
+                Describe anything. We'll generate it.
               </h2>
               <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                Describe your scene and {selectedModel?.name || "AI"} will generate it
+                Type your prompt and {selectedModel?.name || "AI"} will create it for you
               </p>
             </div>
             <div className="relative">
