@@ -367,7 +367,6 @@ export function Canvas() {
   // Paste from clipboard
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
-      if (!requireAuth()) return;
       const clipboardItems = e.clipboardData?.items;
       if (!clipboardItems) return;
 
@@ -415,7 +414,6 @@ export function Canvas() {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      if (!requireAuth()) return;
       const files = Array.from(e.dataTransfer.files);
       const canvasRect = canvasRef.current?.getBoundingClientRect();
       if (!canvasRect) return;

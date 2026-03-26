@@ -224,10 +224,53 @@ export function PromptBar() {
     }
   }, [isCanvasEmpty]);
 
+  // Floating hero images for empty canvas
+  const heroImages = [
+    { src: "/hero/h1.jpg", x: "8%", y: "12%", w: 120, delay: 0, rotate: -6 },
+    { src: "/hero/h2.jpg", x: "78%", y: "8%", w: 140, delay: 0.2, rotate: 5 },
+    { src: "/hero/h3.jpg", x: "4%", y: "55%", w: 110, delay: 0.4, rotate: -4 },
+    { src: "/hero/h4.jpg", x: "82%", y: "50%", w: 130, delay: 0.6, rotate: 7 },
+    { src: "/hero/h5.jpg", x: "18%", y: "75%", w: 100, delay: 0.8, rotate: -3 },
+    { src: "/hero/h6.jpg", x: "72%", y: "78%", w: 115, delay: 1.0, rotate: 4 },
+    { src: "/hero/h7.jpg", x: "35%", y: "5%", w: 90, delay: 0.3, rotate: -2 },
+    { src: "/hero/h8.jpg", x: "55%", y: "4%", w: 95, delay: 0.5, rotate: 3 },
+  ];
+
   // Centered hero prompt for empty canvas
   if (isCanvasEmpty) {
     return (
       <>
+        {/* Floating hero images */}
+        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+          {heroImages.map((img, i) => (
+            <div
+              key={i}
+              className="absolute rounded-xl overflow-hidden shadow-lg opacity-0 border-2 border-white/20"
+              style={{
+                left: img.x,
+                top: img.y,
+                width: img.w,
+                height: img.w * 0.7,
+                transform: `rotate(${img.rotate}deg)`,
+                animation: `heroFloat${i % 3} 6s ease-in-out infinite, heroFadeIn 0.8s ease-out ${img.delay}s forwards`,
+              }}
+            >
+              <img
+                src={img.src}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            </div>
+          ))}
+          <style>{`
+            @keyframes heroFloat0 { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-12px) rotate(-4deg); } }
+            @keyframes heroFloat1 { 0%, 100% { transform: translateY(0) rotate(5deg); } 50% { transform: translateY(-15px) rotate(7deg); } }
+            @keyframes heroFloat2 { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-10px) rotate(-1deg); } }
+            @keyframes heroFadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 0.35; } }
+          `}</style>
+        </div>
+
         {/* Centered prompt */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="pointer-events-auto w-full max-w-xl px-4">

@@ -13,7 +13,6 @@ export function Toolbar() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!requireAuth()) return;
     const files = Array.from(e.target.files || []);
     const { panX, panY, zoom: z } = useAppStore.getState();
 

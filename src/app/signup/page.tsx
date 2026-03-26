@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Check, Zap } from "lucide-react";
+import { Loader2, Check, Zap, ArrowLeft } from "lucide-react";
 
 const PLANS = [
   { id: "starter", name: "Starter", price: "RM10", credits: "RM10 balance", gens: "Pay-per-use" },
@@ -11,7 +11,7 @@ const PLANS = [
 ];
 
 export default function SignupPage() {
-  const [step, setStep] = useState<"plan" | "details">("plan");
+  const [step, setStep] = useState<"details" | "plan">("details");
   const [selectedPlan, setSelectedPlan] = useState("creator");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,10 +21,9 @@ export default function SignupPage() {
 
   const cancelled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("cancelled");
 
-  const handleCheckout = async (e: React.FormEvent) => {
+  const handleDetailsNext = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
     if (!name.trim() || !email.trim() || !password.trim()) {
       setError("All fields are required");
       return;
@@ -33,7 +32,11 @@ export default function SignupPage() {
       setError("Password must be at least 6 characters");
       return;
     }
+    setStep("plan");
+  };
 
+  const handleCheckout = async () => {
+    setError("");
     setLoading(true);
     try {
       const res = await fetch("/api/stripe/checkout", {
@@ -48,7 +51,6 @@ export default function SignupPage() {
         return;
       }
 
-      // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch {
       setError("Something went wrong");
@@ -65,12 +67,12 @@ export default function SignupPage() {
         </div>
 
         <h1 className="text-2xl font-bold text-[#0d1117] text-center mb-1">
-          {step === "plan" ? "Choose your plan" : "Create your account"}
+          {step === "details" ? "Create your account" : "Choose your plan"}
         </h1>
         <p className="text-sm text-gray-400 text-center mb-6">
-          {step === "plan"
-            ? "Select a plan to get started with MotionBoards"
-            : "Fill in your details to proceed to payment"}
+          {step === "details"
+            ? "Sign up to start generating AI videos"
+            : "Select a top-up amount to get started"}
         </p>
 
         {cancelled && (
@@ -85,9 +87,86 @@ export default function SignupPage() {
           </div>
         )}
 
-        {/* Step 1: Plan Selection */}
+        {/* Step 1: Account Details */}
+        {step === "details" && (
+          <form onSubmit={handleDetailsNext} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+                placeholder="Your name"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+                placeholder="you@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+                placeholder="Min 6 characters"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-[#f26522] text-white text-sm font-semibold rounded-xl hover:bg-[#d9541a] transition-colors flex items-center justify-center gap-2"
+            >
+              Continue
+            </button>
+
+            <p className="text-[10px] text-gray-400 text-center mt-2">
+              By continuing, you agree to our{" "}
+              <a href="/terms" className="text-[#f26522] hover:underline">Terms of Service</a>
+              {" & "}
+              <a href="/privacy" className="text-[#f26522] hover:underline">Privacy Policy</a>
+            </p>
+          </form>
+        )}
+
+        {/* Step 2: Plan Selection */}
         {step === "plan" && (
           <>
+            <button
+              type="button"
+              onClick={() => setStep("details")}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#f26522] mb-4 transition-colors"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Back to details
+            </button>
+
+            {/* Account summary */}
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-5">
+              <div className="h-9 w-9 rounded-full bg-[#f26522]/10 flex items-center justify-center text-[#f26522] font-bold text-sm">
+                {name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#0d1117]">{name}</p>
+                <p className="text-[10px] text-gray-400">{email}</p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 mb-6">
               {PLANS.map((plan) => (
                 <button
@@ -127,80 +206,7 @@ export default function SignupPage() {
 
             <button
               type="button"
-              onClick={() => setStep("details")}
-              className="w-full py-3 bg-[#f26522] text-white text-sm font-semibold rounded-xl hover:bg-[#d9541a] transition-colors flex items-center justify-center gap-2"
-            >
-              Continue with {PLANS.find((p) => p.id === selectedPlan)?.name}
-            </button>
-          </>
-        )}
-
-        {/* Step 2: Account Details */}
-        {step === "details" && (
-          <form onSubmit={handleCheckout} className="space-y-4">
-            {/* Plan summary */}
-            <div className="flex items-center justify-between bg-[#f26522]/5 border border-[#f26522]/20 rounded-xl px-4 py-3">
-              <div>
-                <p className="text-xs font-bold text-[#0d1117]">
-                  {PLANS.find((p) => p.id === selectedPlan)?.name} Plan
-                </p>
-                <p className="text-[10px] text-gray-400">
-                  {PLANS.find((p) => p.id === selectedPlan)?.credits}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-[#f26522]">
-                  {PLANS.find((p) => p.id === selectedPlan)?.price}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setStep("plan")}
-                  className="text-[10px] text-gray-400 hover:text-[#f26522] underline"
-                >
-                  Change plan
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
-                placeholder="Your name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
-                placeholder="you@email.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
-                placeholder="Min 6 characters"
-              />
-            </div>
-
-            <button
-              type="submit"
+              onClick={handleCheckout}
               disabled={loading}
               className="w-full py-3 bg-[#f26522] text-white text-sm font-semibold rounded-xl hover:bg-[#d9541a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
@@ -214,17 +220,10 @@ export default function SignupPage() {
               )}
             </button>
 
-            <p className="text-[10px] text-gray-400 text-center">
+            <p className="text-[10px] text-gray-400 text-center mt-3">
               Secure payment powered by Stripe. Your card details never touch our servers.
             </p>
-
-            <p className="text-[10px] text-gray-400 text-center mt-2">
-              By continuing, you agree to our{" "}
-              <a href="/terms" className="text-[#f26522] hover:underline">Terms of Service</a>
-              {" & "}
-              <a href="/privacy" className="text-[#f26522] hover:underline">Privacy Policy</a>
-            </p>
-          </form>
+          </>
         )}
 
         <p className="text-xs text-gray-400 text-center mt-6">
