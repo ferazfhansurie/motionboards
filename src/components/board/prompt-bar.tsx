@@ -203,13 +203,25 @@ export function PromptBar() {
         ? "image"
         : "video";
 
+    // Calculate dimensions based on aspect ratio
+    const ar = (generationOptions.aspect_ratio as string) || selectedModel.options?.aspect_ratio?.default || "16:9";
+    let genW = 300;
+    let genH = outputType === "audio" ? 80 : 200;
+    if (outputType !== "audio") {
+      const arParts = ar.split(":").map(Number);
+      if (arParts.length === 2 && arParts[0] > 0 && arParts[1] > 0) {
+        const ratio = arParts[1] / arParts[0];
+        genH = Math.round(genW * ratio);
+      }
+    }
+
     const genItem: BoardItem = {
       id: `gen_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       type: "generation",
       x: pos.x,
       y: pos.y,
-      width: 300,
-      height: outputType === "audio" ? 80 : 200,
+      width: genW,
+      height: genH,
       src: "",
       prompt,
       model: selectedModel.id,
@@ -253,6 +265,34 @@ export function PromptBar() {
         error: data.error || null,
         cost: data.cost || selectedModel.cost,
       });
+
+      // Auto-resize card to match actual output dimensions
+      if (data.outputUrl && data.status === "completed") {
+        if (outputType === "image") {
+          const img = new window.Image();
+          img.onload = () => {
+            const maxW = 400;
+            const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+            useAppStore.getState().updateItem(genItem.id, {
+              width: Math.round(img.naturalWidth * scale),
+              height: Math.round(img.naturalHeight * scale),
+            });
+          };
+          img.src = data.outputUrl;
+        } else if (outputType === "video") {
+          const vid = document.createElement("video");
+          vid.preload = "metadata";
+          vid.onloadedmetadata = () => {
+            const maxW = 400;
+            const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
+            useAppStore.getState().updateItem(genItem.id, {
+              width: Math.round(vid.videoWidth * scale),
+              height: Math.round(vid.videoHeight * scale),
+            });
+          };
+          vid.src = data.outputUrl;
+        }
+      }
     } catch (err) {
       useAppStore.getState().updateItem(genItem.id, {
         status: "failed",
