@@ -280,28 +280,40 @@ export const models: AIModel[] = [
 
   // === Concept Art & Style ===
 
-  // T2I — text to image
+  // T2I — Nano Banana 2 (latest, best quality)
   {
-    id: "fal-ai/nano-banana",
-    name: "Nano Banana",
+    id: "fal-ai/nano-banana-2",
+    name: "Nano Banana 2",
     provider: "fal", type: "t2i", category: "Concept Art & Style",
-    description: "Fast image generation from text prompts.",
+    description: "Google's latest state-of-the-art fast image generation.",
     cost: "~RM0.18", creditCost: 18, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
     ],
   },
 
-  // I2I — image editing with prompt
+  // I2I — Nano Banana 2 Edit
   {
-    id: "fal-ai/nano-banana/edit",
-    name: "Nano Banana Edit",
+    id: "fal-ai/nano-banana-2/edit",
+    name: "Nano Banana 2 Edit",
     provider: "fal", type: "i2i", category: "Concept Art & Style",
-    description: "Edit images with text prompts. Upload an image and describe changes.",
-    cost: "~RM0.25", creditCost: 25, speed: "~30s", stable: true,
+    description: "Edit images with Nano Banana 2. Upload an image and describe changes.",
+    cost: "~RM0.20", creditCost: 20, speed: "~30s", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Edit description" },
+      { name: "image_url", type: "image", required: true, description: "Image to edit" },
+    ],
+  },
+
+  // T2I — Nano Banana Pro (highest quality)
+  {
+    id: "fal-ai/nano-banana-pro",
+    name: "Nano Banana Pro",
+    provider: "fal", type: "t2i", category: "Concept Art & Style",
+    description: "Google's highest quality image generation with realism and typography.",
+    cost: "~RM0.25", creditCost: 25, speed: "~45s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_url", type: "image", required: true, description: "Image to edit" },
     ],
   },
 
