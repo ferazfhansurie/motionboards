@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/generate", "/dashboard", "/settings", "/logs"],
       },
     ],
-    sitemap: "https://motionboards.com/sitemap.xml",
+    sitemap: "https://motionboards.vercel.app/sitemap.xml",
   };
 }

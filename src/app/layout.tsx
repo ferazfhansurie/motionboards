@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/layout/providers";
 
-const SITE_URL = "https://motionboards.com";
+const SITE_URL = "https://motionboards.vercel.app";
 const SITE_NAME = "MotionBoards";
 const SITE_DESCRIPTION =
   "AI video generator and image creator with 30+ models on one infinite canvas. Create AI videos, AI images, motion graphics, and animations — no editing skills needed.";
