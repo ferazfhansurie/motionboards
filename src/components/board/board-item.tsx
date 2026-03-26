@@ -1,6 +1,7 @@
 "use client";
 
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers } from "lucide-react";
+import { useState } from "react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -44,10 +45,45 @@ export function BoardItemCard({
       : {};
 
   const isImageType = item.type === "image" || item.type === "psd-layer";
+  const isMediaType = isImageType || item.type === "video" || (item.type === "generation" && item.outputUrl);
+
+  // Right-click context menu
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    selectItem(item.id);
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const closeContextMenu = () => setContextMenu(null);
+
+  const handleDownload = async () => {
+    closeContextMenu();
+    const url = item.outputUrl || item.src;
+    if (!url) return;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const ext = item.type === "video" ? "mp4" : item.type === "audio" ? "mp3" : "png";
+      a.download = item.fileName || `motionboards-${item.id}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch {
+      // Fallback: open in new tab
+      window.open(url, "_blank");
+    }
+  };
 
   return (
     <div
       className="absolute select-none group"
+      onContextMenu={handleContextMenu}
       style={{
         left: item.x,
         top: item.y,
@@ -247,37 +283,45 @@ export function BoardItemCard({
         )}
       </div>
 
-      {/* Action buttons — above card, outside container */}
-      {isSelected && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] z-20 flex items-center gap-1 bg-white rounded-lg border border-gray-200 shadow-lg px-1.5 py-1">
-          {isImageType && (
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-[100]" onClick={closeContextMenu} onContextMenu={(e) => { e.preventDefault(); closeContextMenu(); }} />
+          <div
+            className="fixed z-[101] bg-white rounded-xl border border-gray-200 shadow-xl py-1 min-w-[160px] overflow-hidden"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            {isMediaType && (
+              <button
+                type="button"
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium text-[#0d1117] hover:bg-gray-50 transition-colors"
+                onClick={handleDownload}
+              >
+                <Download className="h-3.5 w-3.5 text-gray-400" />
+                Download
+              </button>
+            )}
+            {isImageType && (
+              <button
+                type="button"
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium text-[#0d1117] hover:bg-gray-50 transition-colors"
+                onClick={() => { closeContextMenu(); selectItem(item.id); setEditMode(true); }}
+              >
+                <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                Edit
+              </button>
+            )}
+            <div className="h-px bg-gray-100 my-0.5" />
             <button
               type="button"
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                selectItem(item.id);
-                setEditMode(true);
-              }}
-              title="Edit image"
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium text-red-500 hover:bg-red-50 transition-colors"
+              onClick={() => { closeContextMenu(); useAppStore.getState().removeItem(item.id); }}
             >
-              <Pencil className="h-3 w-3" />
-              Edit
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
             </button>
-          )}
-          <button
-            type="button"
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-red-500 hover:bg-red-50 transition-colors"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              useAppStore.getState().removeItem(item.id);
-            }}
-            title="Delete"
-          >
-            <X className="h-3 w-3" />
-            Delete
-          </button>
-        </div>
+          </div>
+        </>
       )}
 
       {/* Info below card */}
