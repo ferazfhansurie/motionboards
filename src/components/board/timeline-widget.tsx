@@ -1,66 +1,97 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Film, Download, Play, Pause, Plus, Trash2, GripVertical } from "lucide-react";
-import { useAppStore, type TimelineClip } from "@/lib/store";
+import { useState, useRef, useEffect } from "react";
+import { X, Film, Download, Play, GripVertical } from "lucide-react";
+import { useAppStore, type TimelineClip, type BoardItem } from "@/lib/store";
+
+function getClipDuration(clip: TimelineClip): number {
+  const end = clip.trimEnd > 0 ? clip.trimEnd : clip.duration;
+  return Math.max(0.2, end - clip.trimStart);
+}
+
+function isVideoItem(item: BoardItem | undefined): boolean {
+  return item?.type === "video" || (item?.type === "generation" && item?.outputType === "video") || false;
+}
+
+function getThumbUrl(item: BoardItem | undefined): string | null {
+  if (!item) return null;
+  return item.outputUrl || item.src || null;
+}
+
+const PX_PER_SEC = 60;
 
 export function TimelineWidget() {
-  const { isTimelineOpen, setTimelineOpen, timelineClips, items, removeTimelineClip, reorderTimelineClips, updateTimelineClip, theme } = useAppStore();
+  const isTimelineOpen = useAppStore((s) => s.isTimelineOpen);
+  const setTimelineOpen = useAppStore((s) => s.setTimelineOpen);
+  const timelineClips = useAppStore((s) => s.timelineClips);
+  const items = useAppStore((s) => s.items);
+  const removeTimelineClip = useAppStore((s) => s.removeTimelineClip);
+  const reorderTimelineClips = useAppStore((s) => s.reorderTimelineClips);
+  const updateTimelineClip = useAppStore((s) => s.updateTimelineClip);
+  const theme = useAppStore((s) => s.theme);
   const isDark = theme === "dark";
+
   const [exporting, setExporting] = useState(false);
-  const [playheadPos, setPlayheadPos] = useState(0); // pixels
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [playheadPos, setPlayheadPos] = useState(0);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewIsVideo, setPreviewIsVideo] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [trimming, setTrimming] = useState<{ clipId: string; edge: "left" | "right"; startX: number; startVal: number } | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Trim drag state
-  const [trimming, setTrimming] = useState<{ clipId: string; edge: "left" | "right"; startX: number; startVal: number } | null>(null);
-
-  const PX_PER_SEC = 60;
+  // Trim handle drag effect
+  useEffect(() => {
+    if (!trimming) return;
+    const handleMove = (e: MouseEvent) => {
+      const dx = e.clientX - trimming.startX;
+      const dtSec = dx / PX_PER_SEC;
+      const clip = useAppStore.getState().timelineClips.find((c) => c.id === trimming.clipId);
+      if (!clip) return;
+      if (trimming.edge === "left") {
+        const newStart = Math.max(0, Math.min(clip.duration - 0.2, trimming.startVal + dtSec));
+        updateTimelineClip(clip.id, { trimStart: Math.round(newStart * 10) / 10 });
+      } else {
+        const newEnd = Math.max(clip.trimStart + 0.2, Math.min(clip.duration, trimming.startVal + dtSec));
+        updateTimelineClip(clip.id, { trimEnd: Math.round(newEnd * 10) / 10 });
+      }
+    };
+    const handleUp = () => setTrimming(null);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
+  }, [trimming, updateTimelineClip]);
 
   if (!isTimelineOpen) return null;
 
   const getItem = (clip: TimelineClip) => items.find((i) => i.id === clip.itemId);
-  const getThumb = (clip: TimelineClip) => { const it = getItem(clip); return it ? (it.outputUrl || it.src) : null; };
-  const isVideoClip = (clip: TimelineClip) => { const it = getItem(clip); return it?.type === "video" || (it?.type === "generation" && it?.outputType === "video"); };
-  const clipDuration = (clip: TimelineClip) => { const end = clip.trimEnd > 0 ? clip.trimEnd : clip.duration; return Math.max(0.2, end - clip.trimStart); };
-  const totalDuration = timelineClips.reduce((s, c) => s + clipDuration(c), 0);
+  const totalDuration = timelineClips.reduce((s, c) => s + getClipDuration(c), 0);
   const totalWidth = totalDuration * PX_PER_SEC;
 
-  // Update preview when playhead moves or clips change
-  const updatePreview = useCallback((px: number) => {
-    let accum = 0;
-    for (const clip of timelineClips) {
-      const dur = clipDuration(clip);
-      const clipStart = accum * PX_PER_SEC;
-      const clipEnd = (accum + dur) * PX_PER_SEC;
-      if (px >= clipStart && px < clipEnd) {
-        const thumb = getThumb(clip);
-        if (thumb) {
-          setPreviewSrc(thumb);
-          setPreviewIsVideo(isVideoClip(clip));
-        }
-        return;
-      }
-      accum += dur;
-    }
-  }, [timelineClips, items]);
-
-  // Click on track to move playhead
   const handleTrackClick = (e: React.MouseEvent) => {
     if (trimming) return;
     const rect = trackRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = e.clientX - rect.left + (trackRef.current?.scrollLeft || 0);
-    setPlayheadPos(Math.max(0, Math.min(x, totalWidth)));
-    updatePreview(x);
+    const clampedX = Math.max(0, Math.min(x, totalWidth));
+    setPlayheadPos(clampedX);
+    // Update preview
+    let accum = 0;
+    for (const clip of timelineClips) {
+      const dur = getClipDuration(clip);
+      const clipStart = accum * PX_PER_SEC;
+      const clipEnd = (accum + dur) * PX_PER_SEC;
+      if (clampedX >= clipStart && clampedX < clipEnd) {
+        const item = getItem(clip);
+        const thumb = getThumbUrl(item);
+        if (thumb) { setPreviewSrc(thumb); setPreviewIsVideo(isVideoItem(item)); }
+        break;
+      }
+      accum += dur;
+    }
   };
 
-  // Trim handle drag
   const handleTrimStart = (e: React.MouseEvent, clipId: string, edge: "left" | "right") => {
     e.stopPropagation();
     e.preventDefault();
@@ -74,29 +105,6 @@ export function TimelineWidget() {
     });
   };
 
-  useEffect(() => {
-    if (!trimming) return;
-    const handleMove = (e: MouseEvent) => {
-      const dx = e.clientX - trimming.startX;
-      const dtSec = dx / PX_PER_SEC;
-      const clip = timelineClips.find((c) => c.id === trimming.clipId);
-      if (!clip) return;
-
-      if (trimming.edge === "left") {
-        const newStart = Math.max(0, Math.min(clip.duration - 0.2, trimming.startVal + dtSec));
-        updateTimelineClip(clip.id, { trimStart: Math.round(newStart * 10) / 10 });
-      } else {
-        const newEnd = Math.max(clip.trimStart + 0.2, Math.min(clip.duration, trimming.startVal + dtSec));
-        updateTimelineClip(clip.id, { trimEnd: Math.round(newEnd * 10) / 10 });
-      }
-    };
-    const handleUp = () => setTrimming(null);
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
-  }, [trimming, timelineClips, updateTimelineClip]);
-
-  // Drag reorder
   const handleDragStart = (idx: number) => setDragIdx(idx);
   const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); setDragOverIdx(idx); };
   const handleDrop = (idx: number) => {
@@ -109,7 +117,6 @@ export function TimelineWidget() {
     setDragOverIdx(null);
   };
 
-  // Export as MP4 (WebM with vp9 — browser native, widely compatible)
   const handleExport = async () => {
     if (timelineClips.length === 0) return;
     setExporting(true);
@@ -129,9 +136,9 @@ export function TimelineWidget() {
         const item = getItem(clip);
         if (!item) continue;
         const url = item.outputUrl || item.src;
-        const dur = clipDuration(clip);
+        const dur = getClipDuration(clip);
 
-        if (isVideoClip(clip)) {
+        if (isVideoItem(item)) {
           await new Promise<void>((resolve) => {
             const vid = document.createElement("video");
             vid.crossOrigin = "anonymous"; vid.muted = true; vid.playsInline = true; vid.src = url;
@@ -174,10 +181,10 @@ export function TimelineWidget() {
 
       recorder.stop();
       await done;
-      const blob = new Blob(chunks, { type: "video/mp4" });
+      const blob = new Blob(chunks, { type: "video/webm" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `motionboards-export-${Date.now()}.mp4`;
+      a.download = `motionboards-export-${Date.now()}.webm`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
     } catch (err) {
@@ -188,11 +195,7 @@ export function TimelineWidget() {
     }
   };
 
-  // Timecode markers
-  const markers = [];
-  for (let t = 0; t <= Math.ceil(totalDuration); t++) {
-    markers.push(t);
-  }
+  const markers = Array.from({ length: Math.ceil(totalDuration) + 1 }, (_, i) => i);
 
   return (
     <div
@@ -203,7 +206,6 @@ export function TimelineWidget() {
 
         {/* Preview + controls bar */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/10">
-          {/* Preview thumbnail */}
           <div className="w-24 h-14 rounded overflow-hidden bg-black/50 flex items-center justify-center shrink-0">
             {previewSrc ? (
               previewIsVideo ? (
@@ -216,14 +218,12 @@ export function TimelineWidget() {
             )}
           </div>
 
-          {/* Info */}
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-gray-400 font-medium">
               {timelineClips.length} clip{timelineClips.length !== 1 ? "s" : ""} &middot; {totalDuration.toFixed(1)}s
             </p>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-1.5">
             <button
               className="flex items-center gap-1 px-2.5 py-1 bg-[#f26522] text-white text-[10px] font-bold rounded-md hover:bg-[#d9541a] transition-colors disabled:opacity-40"
@@ -233,7 +233,7 @@ export function TimelineWidget() {
               {exporting ? (
                 <><div className="h-2.5 w-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Exporting...</>
               ) : (
-                <><Download className="h-3 w-3" /> Export MP4</>
+                <><Download className="h-3 w-3" /> Export</>
               )}
             </button>
             <button
@@ -245,9 +245,10 @@ export function TimelineWidget() {
           </div>
         </div>
 
-        {/* Timecode ruler */}
+        {/* Timecode ruler + track */}
         <div className="relative overflow-x-auto" ref={trackRef} onClick={handleTrackClick}>
           <div className="relative" style={{ width: Math.max(totalWidth, 600), minHeight: 16 }}>
+            {/* Timecode */}
             <div className="flex border-b border-white/5 h-4">
               {markers.map((t) => (
                 <div key={t} className="shrink-0 border-l border-white/10 relative" style={{ width: PX_PER_SEC }}>
@@ -256,25 +257,21 @@ export function TimelineWidget() {
               ))}
             </div>
 
-            {/* Track area */}
+            {/* Track */}
             <div className="relative" style={{ minHeight: 56 }}>
-              {/* Dotted guide lines */}
-              <div className="absolute inset-0 border-t border-b border-dashed border-white/10" style={{ top: 4, bottom: 4 }} />
-
-              {/* Clips */}
               {timelineClips.length === 0 ? (
                 <div className="flex items-center justify-center h-14 text-gray-500">
                   <Film className="h-4 w-4 mr-2 opacity-50" />
-                  <span className="text-[11px]">Drag material here and start to create</span>
+                  <span className="text-[11px]">Right-click media on canvas → Add to Timeline</span>
                 </div>
               ) : (
                 <div className="flex h-14 items-center">
                   {timelineClips.map((clip, idx) => {
-                    const dur = clipDuration(clip);
+                    const dur = getClipDuration(clip);
                     const w = dur * PX_PER_SEC;
-                    const thumb = getThumb(clip);
-                    const isVid = isVideoClip(clip);
                     const item = getItem(clip);
+                    const thumb = getThumbUrl(item);
+                    const isVid = isVideoItem(item);
 
                     return (
                       <div
@@ -293,7 +290,7 @@ export function TimelineWidget() {
                           if (thumb) { setPreviewSrc(thumb); setPreviewIsVideo(isVid); }
                         }}
                       >
-                        {/* Clip background — thumbnail strip */}
+                        {/* Thumbnail strip */}
                         <div className="absolute inset-0">
                           {thumb ? (
                             <div className="flex h-full">
@@ -312,10 +309,9 @@ export function TimelineWidget() {
                           )}
                         </div>
 
-                        {/* Color tint overlay */}
                         <div className={`absolute inset-0 ${isVid ? "bg-blue-500/20" : "bg-green-500/20"}`} />
 
-                        {/* Top bar with name */}
+                        {/* Label */}
                         <div className="absolute top-0 left-0 right-0 flex items-center gap-1 px-1 py-0.5 bg-black/50">
                           <span className="text-[7px] text-white font-medium truncate">
                             {item?.fileName || item?.modelName || (isVid ? "Video" : "Image")}
@@ -323,15 +319,13 @@ export function TimelineWidget() {
                           <span className="text-[7px] text-white/50 ml-auto shrink-0">{dur.toFixed(1)}s</span>
                         </div>
 
-                        {/* Left trim handle */}
+                        {/* Trim handles */}
                         <div
                           className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize bg-white/0 hover:bg-white/30 transition-colors z-10 flex items-center justify-center"
                           onMouseDown={(e) => handleTrimStart(e, clip.id, "left")}
                         >
                           <div className="w-0.5 h-6 bg-white/60 rounded-full" />
                         </div>
-
-                        {/* Right trim handle */}
                         <div
                           className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-white/0 hover:bg-white/30 transition-colors z-10 flex items-center justify-center"
                           onMouseDown={(e) => handleTrimStart(e, clip.id, "right")}
@@ -339,7 +333,7 @@ export function TimelineWidget() {
                           <div className="w-0.5 h-6 bg-white/60 rounded-full" />
                         </div>
 
-                        {/* Delete button */}
+                        {/* Delete */}
                         <button
                           className="absolute top-0.5 right-2.5 bg-red-500/80 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20"
                           onClick={(e) => { e.stopPropagation(); removeTimelineClip(clip.id); }}
@@ -361,14 +355,6 @@ export function TimelineWidget() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Bottom scroll bar indicator */}
-        <div className="h-1 bg-[#f26522]/30 relative">
-          <div
-            className="h-full bg-[#f26522] rounded-full"
-            style={{ width: `${Math.min(100, (600 / Math.max(totalWidth, 600)) * 100)}%` }}
-          />
         </div>
       </div>
     </div>
