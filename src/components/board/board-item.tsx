@@ -34,6 +34,7 @@ export function BoardItemCard({
 
   // Text editing state
   const [isEditingText, setIsEditingText] = useState(false);
+  const [editTextValue, setEditTextValue] = useState("");
 
   // Build CSS filter string from editState
   const filterStyle = item.editState
@@ -90,6 +91,7 @@ export function BoardItemCard({
 
   const handleDoubleClick = () => {
     if (item.type === "text") {
+      setEditTextValue(item.text || "");
       setIsEditingText(true);
     } else {
       onDoubleClick();
@@ -210,22 +212,29 @@ export function BoardItemCard({
             }}
           >
             {isEditingText ? (
-              <div
-                contentEditable
-                suppressContentEditableWarning
-                className="outline-none cursor-text min-h-[1em]"
-                onBlur={(e) => {
-                  useAppStore.getState().updateItem(item.id, { text: e.currentTarget.textContent || "" });
+              <textarea
+                className="outline-none cursor-text min-h-[1em] w-full bg-transparent resize-none border-none p-0 m-0"
+                style={{
+                  fontSize: "inherit",
+                  fontFamily: "inherit",
+                  color: "inherit",
+                  fontWeight: "inherit",
+                  textAlign: item.textAlign || "left",
+                }}
+                value={editTextValue}
+                onChange={(e) => setEditTextValue(e.target.value)}
+                onBlur={() => {
+                  useAppStore.getState().updateItem(item.id, { text: editTextValue });
                   setIsEditingText(false);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
-                    (e.target as HTMLElement).blur();
+                    useAppStore.getState().updateItem(item.id, { text: editTextValue });
+                    setIsEditingText(false);
                   }
                   e.stopPropagation();
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                dangerouslySetInnerHTML={{ __html: item.text || "" }}
                 autoFocus
               />
             ) : (
