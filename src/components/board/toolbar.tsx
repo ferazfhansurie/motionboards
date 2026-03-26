@@ -365,7 +365,8 @@ export function Toolbar() {
 
         <button
           className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
-          title="Help"
+          title="Tutorials & Help"
+          onClick={() => window.open("/tutorials", "_blank")}
         >
           <HelpCircle className="h-3.5 w-3.5" />
         </button>

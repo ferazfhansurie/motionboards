@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -299,16 +299,26 @@ export function BoardItemCard({
         } ${item.type === "text" || item.type === "drawing" ? "bg-transparent border-dashed" : isDark ? "bg-[#161b22]" : "bg-white"}`}
       >
         {/* Media wrapper with overflow hidden */}
-        <div className="overflow-hidden rounded-md">
+        <div className="overflow-hidden rounded-md relative">
         {/* Media content */}
         {(item.type === "image" || item.type === "psd-layer") && (
-          <img
-            src={item.outputUrl || item.src}
-            alt={item.fileName || item.psdLayerName || "Image"}
-            className="w-full pointer-events-none"
-            style={{ height: item.height, objectFit: "contain", ...filterStyle, ...cropStyle }}
-            draggable={false}
-          />
+          <>
+            <img
+              src={item.outputUrl || item.src}
+              alt={item.fileName || item.psdLayerName || "Image"}
+              className="w-full pointer-events-none block"
+              style={{ ...filterStyle, ...cropStyle }}
+              draggable={false}
+            />
+            {/* Zoom button on hover */}
+            <button
+              className="absolute top-1.5 right-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              onClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+              title="Zoom preview"
+            >
+              <ZoomIn className="h-3 w-3" />
+            </button>
+          </>
         )}
 
         {item.type === "video" && (
@@ -409,14 +419,14 @@ export function BoardItemCard({
         )}
 
         {item.type === "generation" && (
-          <div style={{ height: item.height }}>
+          <>
             {item.status === "processing" ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2">
+              <div className="flex flex-col items-center justify-center gap-2" style={{ height: item.height }}>
                 <Loader2 className="h-6 w-6 animate-spin text-[#f26522]" />
                 <p className="text-[10px] text-gray-400">Generating...</p>
               </div>
             ) : item.status === "failed" ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-3">
+              <div className="flex flex-col items-center justify-center gap-2 p-3" style={{ height: item.height }}>
                 <AlertCircle className="h-5 w-5 text-red-400" />
                 <p className="text-[10px] text-red-400 text-center line-clamp-3">
                   {item.error || "Failed"}
@@ -424,10 +434,10 @@ export function BoardItemCard({
               </div>
             ) : item.outputUrl ? (
               item.outputType === "video" ? (
-                <div className="relative h-full">
+                <div className="relative">
                   <video
                     src={item.outputUrl}
-                    className="h-full w-full object-contain"
+                    className="w-full block"
                     muted
                     loop
                     playsInline
@@ -438,23 +448,32 @@ export function BoardItemCard({
                   </div>
                 </div>
               ) : item.outputType === "audio" ? (
-                <div className="flex h-full items-center justify-center p-4">
+                <div className="flex items-center justify-center p-4" style={{ height: item.height }}>
                   <audio src={item.outputUrl} controls className="w-full" />
                 </div>
               ) : (
-                <img
-                  src={item.outputUrl}
-                  alt="Generated"
-                  className="h-full w-full object-contain pointer-events-none"
-                  draggable={false}
-                />
+                <div className="relative">
+                  <img
+                    src={item.outputUrl}
+                    alt="Generated"
+                    className="w-full block pointer-events-none"
+                    draggable={false}
+                  />
+                  <button
+                    className="absolute top-1.5 right-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+                    title="Zoom preview"
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                  </button>
+                </div>
               )
             ) : (
-              <div className="flex h-full items-center justify-center">
+              <div className="flex items-center justify-center" style={{ height: item.height }}>
                 <p className="text-xs text-gray-400">Ready to generate</p>
               </div>
             )}
-          </div>
+          </>
         )}
 
         </div>{/* end media wrapper */}
@@ -582,23 +601,30 @@ export function BoardItemCard({
       )}
 
       {/* Info below card */}
-      <div className="mt-1.5 px-0.5">
+      <div className="mt-2 px-0.5">
         {item.psdLayerName && (
-          <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide truncate">
+          <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider truncate">
             {item.psdLayerName}
           </p>
         )}
         {item.modelName && (
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-            {item.modelName}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[11px] font-bold tracking-wide ${isDark ? "text-gray-200" : "text-[#0d1117]"}`}>
+              {item.modelName}
+            </span>
+            {item.cost && (
+              <span className="text-[9px] font-semibold text-[#f26522] bg-[#f26522]/10 px-1.5 py-0.5 rounded-full">
+                {item.cost}
+              </span>
+            )}
+          </div>
         )}
         {item.prompt && (
-          <p className={`mt-0.5 text-[11px] leading-snug line-clamp-3 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+          <p className={`mt-1 text-[11px] leading-relaxed line-clamp-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
             {item.prompt}
           </p>
         )}
-        {item.cost && (
+        {!item.modelName && item.cost && (
           <div className="mt-1 inline-flex rounded bg-emerald-500/20 px-1.5 py-0.5">
             <span className="text-[10px] font-medium text-emerald-400">
               {item.cost}
