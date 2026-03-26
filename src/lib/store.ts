@@ -259,7 +259,7 @@ export const useAppStore = create<AppState>((set) => {
   panY: startBoard.panY || 0,
   zoom: startBoard.zoom || 1,
   boardName: startBoard.name || "Board 1",
-  selectedModelId: saved?.selectedModelId || null,
+  selectedModelId: saved?.selectedModelId || "fal-ai/nano-banana/v2",
   isModelPanelOpen: false,
   isTemplatesOpen: false,
   isDashboardOpen: false,

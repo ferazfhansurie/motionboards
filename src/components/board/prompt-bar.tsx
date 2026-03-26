@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   WandSparkles,
   Loader2,
@@ -18,11 +18,11 @@ import {
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { getModelById } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
-import { useEffect } from "react";
 
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const {
     selectedModelId,
     setModelPanelOpen,
@@ -215,6 +215,152 @@ export function PromptBar() {
   const endItem = endFrameId ? items.find((i) => i.id === endFrameId) : null;
 
   const hasAnyInputs = refItems.length > 0 || startItem || endItem;
+  const isCanvasEmpty = items.length === 0;
+
+  // Auto-focus prompt on empty canvas
+  useEffect(() => {
+    if (isCanvasEmpty && promptRef.current) {
+      setTimeout(() => promptRef.current?.focus(), 300);
+    }
+  }, [isCanvasEmpty]);
+
+  // Centered hero prompt for empty canvas
+  if (isCanvasEmpty) {
+    return (
+      <>
+        {/* Centered prompt */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <div className="pointer-events-auto w-full max-w-xl px-4">
+            <div className="text-center mb-6">
+              <h2 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-[#0d1117]"}`}>
+                What do you want to create?
+              </h2>
+              <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                Describe your scene and {selectedModel?.name || "AI"} will generate it
+              </p>
+            </div>
+            <div className="relative">
+              <textarea
+                ref={promptRef}
+                placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "Select a model first"}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleGenerate();
+                  }
+                }}
+                className={`w-full backdrop-blur-md text-sm placeholder-gray-400 border-2 rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] focus:ring-4 focus:ring-[#f26522]/10 shadow-xl px-5 pt-4 pb-14 resize-none leading-5 ${isDark ? "bg-[#161b22] text-white border-gray-700" : "bg-white text-[#0d1117] border-gray-200"}`}
+                style={{ height: 120 }}
+              />
+              {/* Bottom row inside textarea */}
+              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {selectedModel && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
+                      {selectedModel.name} &middot; {selectedModel.cost}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={isGenerating || !selectedModel}
+                  onClick={handleGenerate}
+                  className={`flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-semibold transition-all ${
+                    isGenerating || !selectedModel
+                      ? "bg-gray-300 text-gray-400 cursor-not-allowed"
+                      : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer hover:scale-105"
+                  }`}
+                  title="Generate (Ctrl+Enter)"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <WandSparkles className="h-3.5 w-3.5" />
+                  )}
+                  Generate
+                </button>
+              </div>
+            </div>
+            {/* Quick suggestions */}
+            <div className="flex flex-wrap gap-2 mt-3 justify-center">
+              {[
+                "Cinematic drone shot of a city at golden hour",
+                "Slow motion coffee pour, macro lens",
+                "Anime fight scene with speed lines",
+              ].map((s) => (
+                <button
+                  key={s}
+                  className={`text-[10px] px-3 py-1.5 rounded-full border transition-colors ${isDark ? "text-gray-400 border-gray-700 hover:border-[#f26522] hover:text-[#f26522]" : "text-gray-500 border-gray-200 hover:border-[#f26522] hover:text-[#f26522]"}`}
+                  onClick={() => setPrompt(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom toolbar — always visible */}
+        <div className="absolute bottom-0 left-0 right-0 flex flex-col pointer-events-none">
+          <div className={`pointer-events-auto relative flex h-full w-full items-center backdrop-blur-md px-2.5 py-1 border-t shadow-[0_-2px_10px_rgba(0,0,0,0.04)] ${isDark ? "bg-[#161b22]/95 border-gray-700" : "bg-white/95 border-gray-200"}`}>
+            {/* Left: Board selector */}
+            <div className="relative">
+              <button
+                className={`flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-lg transition-colors min-w-0 ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-100"}`}
+                onClick={() => setBoardMenuOpen(!boardMenuOpen)}
+              >
+                <span className="flex items-center gap-1 min-w-0">
+                  <LayoutGrid className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
+                  <span className={`truncate max-w-[120px] ${isDark ? "text-white" : "text-[#0d1117]"}`}>{boardName}</span>
+                </span>
+                <ChevronDown className="w-2.5 h-2.5 flex-shrink-0 text-gray-400" />
+              </button>
+            </div>
+
+            {/* Center */}
+            <div className="flex-1 flex justify-center">
+              <span className="text-[9px] text-gray-300 flex items-center gap-1">
+                Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm inline-block" /> <span className="font-semibold text-gray-400">Adletic</span> &copy; 2026
+              </span>
+            </div>
+
+            {/* Right: Toggle buttons */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center gap-1 rounded-lg p-1.5 border ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-gray-50 border-gray-100"}`}>
+                <button
+                  className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
+                    isModelPanelOpen
+                      ? "bg-[#f26522] text-white border border-[#f26522]"
+                      : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+                  }`}
+                  onClick={() => setModelPanelOpen(!isModelPanelOpen)}
+                  title="Models"
+                >
+                  <FileImage className="w-3.5 h-3.5 shrink-0" />
+                  <span className="flex items-center gap-1 truncate max-w-[12rem]">
+                    <span className="truncate">{selectedModel?.name || "None"}</span>
+                  </span>
+                </button>
+                <button
+                  className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
+                    isProfileOpen
+                      ? "bg-[#f26522] text-white border border-[#f26522]"
+                      : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+                  }`}
+                  title="Profile & Credits"
+                  onClick={() => setProfileOpen(!isProfileOpen)}
+                >
+                  <User className="w-3.5 h-3.5 shrink-0" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="absolute bottom-0 left-0 right-0 flex flex-col pointer-events-none">
@@ -366,6 +512,7 @@ export function PromptBar() {
           )}
           <div className="relative">
             <textarea
+              ref={promptRef}
               placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "No prompt required"}
               disabled={!selectedModel}
               value={prompt}
