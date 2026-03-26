@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { prompt, model: modelId, mode, inputImage, startFrame, endFrame } = body;
+    const { prompt, model: modelId, mode, inputImage, startFrame, endFrame, generationOptions } = body;
 
     const modelInfo = models.find((m) => m.id === modelId);
     if (!modelInfo) {
@@ -73,6 +73,15 @@ export async function POST(req: NextRequest) {
 
         const input: Record<string, unknown> = {};
         if (prompt && prompt.trim()) input.prompt = prompt.trim();
+
+        // Apply generation options (aspect_ratio, duration, resolution, generate_audio, etc.)
+        if (generationOptions && typeof generationOptions === "object") {
+          for (const [key, value] of Object.entries(generationOptions)) {
+            if (value !== undefined && value !== null && value !== "") {
+              input[key] = value;
+            }
+          }
+        }
 
         if (IMAGE_INPUT_TYPES.includes(modelInfo.type) && inputImage) {
           input.image_url = inputImage;

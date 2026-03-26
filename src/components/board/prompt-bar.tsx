@@ -16,7 +16,7 @@ import {
   History,
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
-import { getModelById } from "@/lib/models";
+import { getModelById, type ModelOptions } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
 
 export function PromptBar() {
@@ -52,6 +52,8 @@ export function PromptBar() {
     setHistoryOpen,
     isAIPromptOpen,
     setAIPromptOpen,
+    generationOptions,
+    setGenerationOption,
     boards,
     activeBoardId,
     addBoard,
@@ -60,6 +62,87 @@ export function PromptBar() {
     theme,
   } = useAppStore();
   const isDark = theme === "dark";
+
+  // Render model-specific option pills
+  const renderOptionPills = () => {
+    if (!selectedModel?.options) return null;
+    const opts = selectedModel.options;
+    const keys = Object.keys(opts) as (keyof ModelOptions)[];
+    if (keys.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+        {keys.map((key) => {
+          const opt = opts[key];
+          if (!opt) return null;
+
+          // Boolean option (generate_audio)
+          if ("default" in opt && typeof opt.default === "boolean") {
+            const boolOpt = opt as { default: boolean; label: string };
+            const currentVal = generationOptions[key] !== undefined ? !!generationOptions[key] : boolOpt.default;
+            return (
+              <button
+                key={key}
+                className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${
+                  currentVal
+                    ? "bg-[#f26522] text-white border-[#f26522]"
+                    : isDark
+                    ? "text-gray-400 border-gray-600 hover:border-[#f26522] hover:text-[#f26522]"
+                    : "text-gray-500 border-gray-300 hover:border-[#f26522] hover:text-[#f26522]"
+                }`}
+                onClick={() => setGenerationOption(key, !currentVal)}
+                title={boolOpt.label}
+              >
+                {boolOpt.label}
+              </button>
+            );
+          }
+
+          // Select option (aspect_ratio, duration, resolution)
+          const selectOpt = opt as { values: string[]; default: string; label: string };
+          const currentVal = (generationOptions[key] as string) || selectOpt.default;
+
+          return (
+            <div key={key} className="relative group/opt">
+              <button
+                className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1 ${
+                  isDark
+                    ? "text-gray-300 border-gray-600 hover:border-[#f26522]"
+                    : "text-gray-600 border-gray-300 hover:border-[#f26522]"
+                }`}
+                title={selectOpt.label}
+              >
+                <span className="text-gray-400">{selectOpt.label.replace("Aspect Ratio", "AR").replace("Duration", "Dur").replace("Resolution", "Res")}:</span>
+                <span className="font-medium">{currentVal}</span>
+                <ChevronDown className="w-2 h-2" />
+              </button>
+              <div className={`absolute bottom-full left-0 mb-1 rounded-lg border shadow-xl overflow-hidden z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-opacity ${
+                isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"
+              }`}>
+                <div className="p-1 flex flex-col gap-0.5 min-w-[80px]">
+                  {selectOpt.values.map((v) => (
+                    <button
+                      key={v}
+                      className={`text-[9px] px-2 py-1 rounded text-left transition-colors whitespace-nowrap ${
+                        currentVal === v
+                          ? "bg-[#f26522]/15 text-[#f26522] font-semibold"
+                          : isDark
+                          ? "text-gray-300 hover:bg-white/10"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                      onClick={() => setGenerationOption(key, v)}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   // Consume pending prompt from templates panel
   useEffect(() => {
@@ -153,6 +236,7 @@ export function PromptBar() {
           inputImage: refItems[0]?.src || startItem?.src || null,
           startFrame: startItem?.src || null,
           endFrame: endItem?.src || null,
+          generationOptions: Object.keys(generationOptions).length > 0 ? generationOptions : undefined,
         }),
       });
 
@@ -325,6 +409,10 @@ export function PromptBar() {
                   Generate
                 </button>
               </div>
+            </div>
+            {/* Model generation options */}
+            <div className="flex justify-center">
+              {renderOptionPills()}
             </div>
             {/* Quick suggestions */}
             <div className="flex flex-wrap gap-2 mt-3 justify-center">
@@ -553,6 +641,8 @@ export function PromptBar() {
               ))}
             </div>
           )}
+          {/* Model generation options */}
+          {renderOptionPills()}
           <div className="relative">
             <textarea
               ref={promptRef}

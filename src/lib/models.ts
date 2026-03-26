@@ -12,6 +12,24 @@ export interface ModelInput {
   description: string;
 }
 
+export interface ModelOption {
+  values: string[];
+  default: string;
+  label: string;
+}
+
+export interface ModelOptionBool {
+  default: boolean;
+  label: string;
+}
+
+export interface ModelOptions {
+  aspect_ratio?: ModelOption;
+  duration?: ModelOption;
+  resolution?: ModelOption;
+  generate_audio?: ModelOptionBool;
+}
+
 export interface AIModel {
   id: string;
   name: string;
@@ -24,6 +42,7 @@ export interface AIModel {
   speed: string;
   inputs: ModelInput[];
   stable: boolean;
+  options?: ModelOptions;
 }
 
 // Rate: 1 USD = 3.7 RM. Margin: +RM0.03 photo/audio, +RM0.05 video
@@ -34,17 +53,22 @@ export const models: AIModel[] = [
 
   // T2V — text only, no image needed
   {
-    id: "fal-ai/veo3",
+    id: "fal-ai/veo3.1/fast",
     name: "Veo 3.1 Fast T2V",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "Veo 3.1 Fast text-to-video with native synchronized audio and cinematic motion.",
     cost: "~RM0.35", creditCost: 35, speed: "~3m", stable: true,
     inputs: [{ name: "prompt", type: "text", required: true, description: "Video description" }],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "6s", label: "Duration" },
+      resolution: { values: ["720p", "1080p"], default: "720p", label: "Resolution" },
+    },
   },
 
   // S2E — prompt required, start/end frames required
   {
-    id: "fal-ai/veo3/s2e",
+    id: "fal-ai/veo3.1/first-last-frame-to-video",
     name: "Veo 3.1 Fast S2E",
     provider: "fal", type: "s2e", category: "Cinematic Video Gen",
     description: "Veo 3.1 start-to-end video. Requires Start Frame and End Frame images.",
@@ -54,11 +78,16 @@ export const models: AIModel[] = [
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
       { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
     ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "6s", label: "Duration" },
+      resolution: { values: ["720p", "1080p"], default: "720p", label: "Resolution" },
+    },
   },
 
   // I2V — prompt + image required
   {
-    id: "fal-ai/veo3/i2v",
+    id: "fal-ai/veo3.1/fast/image-to-video",
     name: "Veo 3.1 Fast I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "Veo 3.1 image-to-video. Requires a reference image.",
@@ -67,26 +96,39 @@ export const models: AIModel[] = [
       { name: "prompt", type: "text", required: true, description: "Motion description" },
       { name: "image_url", type: "image", required: true, description: "Reference image" },
     ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "6s", label: "Duration" },
+      resolution: { values: ["720p", "1080p"], default: "720p", label: "Resolution" },
+    },
   },
 
   // T2V — text only
   {
-    id: "fal-ai/sora/v2",
+    id: "fal-ai/sora-2/text-to-video",
     name: "Sora 2 T2V",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "OpenAI Sora 2 text-to-video. 720p, native audio.",
     cost: "~RM0.42", creditCost: 42, speed: "~3m", stable: true,
     inputs: [{ name: "prompt", type: "text", required: true, description: "Video description" }],
+    options: {
+      aspect_ratio: { values: ["auto", "9:16", "16:9"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["4", "8", "12", "16", "20"], default: "8", label: "Duration (sec)" },
+    },
   },
 
   // T2V — text only
   {
-    id: "fal-ai/sora/v2/pro",
+    id: "fal-ai/sora-2/text-to-video/pro",
     name: "Sora 2 Pro",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "Sora 2 Pro up to 1080p. 4-20 sec duration.",
     cost: "~RM0.79", creditCost: 79, speed: "~5m", stable: true,
     inputs: [{ name: "prompt", type: "text", required: true, description: "Video description" }],
+    options: {
+      aspect_ratio: { values: ["auto", "9:16", "16:9"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["4", "8", "12", "16", "20"], default: "8", label: "Duration (sec)" },
+    },
   },
 
   // T2V — text only
@@ -97,6 +139,11 @@ export const models: AIModel[] = [
     description: "Kling 3.0 Pro text-to-video with native audio and voice control.",
     cost: "~RM2.64", creditCost: 264, speed: "~4m", stable: true,
     inputs: [{ name: "prompt", type: "text", required: true, description: "Video description" }],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["5", "10"], default: "5", label: "Duration (sec)" },
+      generate_audio: { default: false, label: "Generate Audio" },
+    },
   },
 
   // I2V — image required, prompt optional but recommended
@@ -110,6 +157,11 @@ export const models: AIModel[] = [
       { name: "prompt", type: "text", required: false, description: "Motion description (recommended)" },
       { name: "start_image_url", type: "image", required: true, description: "Source image" },
     ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["5", "10"], default: "5", label: "Duration (sec)" },
+      generate_audio: { default: false, label: "Generate Audio" },
+    },
   },
 
   // T2V — text only
@@ -124,8 +176,8 @@ export const models: AIModel[] = [
 
   // I2V — image + prompt required
   {
-    id: "fal-ai/wan/v2.1/14b/image-to-video",
-    name: "Wan 2.1 I2V (14B)",
+    id: "fal-ai/wan/v2.2-a14b/image-to-video",
+    name: "Wan 2.2 I2V (A14B)",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "High quality image-to-video. Requires an image input.",
     cost: "~RM0.35", creditCost: 35, speed: "~2m", stable: true,
@@ -147,7 +199,7 @@ export const models: AIModel[] = [
 
   // T2V — text only
   {
-    id: "fal-ai/ltx-video/v2.3/pro/text-to-video",
+    id: "fal-ai/ltx-2.3/text-to-video",
     name: "LTX 2.3 Pro T2V",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "Great value. Up to 4K. Audio.",
@@ -157,7 +209,7 @@ export const models: AIModel[] = [
 
   // T2V — text only
   {
-    id: "fal-ai/ltx-video/v2.3/fast/text-to-video",
+    id: "fal-ai/ltx-2.3/text-to-video/fast",
     name: "LTX 2.3 Fast T2V",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "Cheapest fast video with audio.",
@@ -167,8 +219,8 @@ export const models: AIModel[] = [
 
   // I2V — prompt + image required
   {
-    id: "fal-ai/hailuo/video-02/pro/image-to-video",
-    name: "Hailuo-02 Pro I2V",
+    id: "fal-ai/minimax/hailuo-02/standard/image-to-video",
+    name: "Hailuo-02 Standard I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "1080p. Physics simulation. Requires an image input.",
     cost: "~RM0.42", creditCost: 42, speed: "~8m", stable: true,
@@ -178,23 +230,10 @@ export const models: AIModel[] = [
     ],
   },
 
-  // I2V — image + prompt required
-  {
-    id: "fal-ai/seedance/v1/pro",
-    name: "Seedance 1.0 Pro",
-    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Dance/motion specialized. Requires a character image.",
-    cost: "~RM0.42", creditCost: 42, speed: "~3m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Motion description" },
-      { name: "image_url", type: "image", required: true, description: "Character image" },
-    ],
-  },
-
   // I2V — prompt + image required
   {
-    id: "fal-ai/pixverse/v5.5/image-to-video",
-    name: "PixVerse v5.5 I2V",
+    id: "fal-ai/pixverse/v5/image-to-video",
+    name: "PixVerse v5 I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "Style presets. Requires an image input.",
     cost: "~RM0.35", creditCost: 35, speed: "~2m", stable: true,
@@ -235,7 +274,7 @@ export const models: AIModel[] = [
 
   // V2V — video required, prompt optional
   {
-    id: "fal-ai/ltx-video/v2.3/pro/extend",
+    id: "fal-ai/ltx-2.3/extend-video",
     name: "LTX 2.3 Extend",
     provider: "fal", type: "v2v", category: "Video Editing",
     description: "Extend video duration seamlessly. Requires a video input.",
@@ -250,7 +289,7 @@ export const models: AIModel[] = [
 
   // Upscale — video required, NO prompt
   {
-    id: "fal-ai/topaz/video",
+    id: "fal-ai/topaz/upscale/video",
     name: "Topaz Video Upscale",
     provider: "fal", type: "upscale", category: "Upscale & Restoration",
     description: "Best video upscaler. Frame interpolation to 60fps. Requires video input.",
@@ -260,7 +299,7 @@ export const models: AIModel[] = [
 
   // Upscale — image required, NO prompt
   {
-    id: "fal-ai/topaz/image",
+    id: "fal-ai/topaz/upscale/image",
     name: "Topaz Image Upscale",
     provider: "fal", type: "upscale", category: "Upscale & Restoration",
     description: "Face enhancement, denoising, sharpening. Requires image input.",
@@ -270,8 +309,8 @@ export const models: AIModel[] = [
 
   // Upscale — image required, NO prompt
   {
-    id: "fal-ai/seedvr2",
-    name: "SeedVR2 Upscale",
+    id: "fal-ai/seedvr/upscale/image",
+    name: "SeedVR Upscale",
     provider: "fal", type: "upscale", category: "Upscale & Restoration",
     description: "Extremely cheap. Up to 10x upscale. Requires image input.",
     cost: "~RM0.07", creditCost: 7, speed: "~20s", stable: true,
@@ -290,6 +329,10 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
     ],
+    options: {
+      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"], default: "auto", label: "Aspect Ratio" },
+      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
+    },
   },
 
   // I2I — Nano Banana 2 Edit
@@ -315,6 +358,10 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
     ],
+    options: {
+      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"], default: "auto", label: "Aspect Ratio" },
+      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
+    },
   },
 
   // T2I — prompt only
@@ -325,6 +372,9 @@ export const models: AIModel[] = [
     description: "High quality image generation. Prompt only.",
     cost: "~RM0.12", creditCost: 12, speed: "~10s", stable: true,
     inputs: [{ name: "prompt", type: "text", required: true, description: "Image description" }],
+    options: {
+      aspect_ratio: { values: ["21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"], default: "16:9", label: "Aspect Ratio" },
+    },
   },
 
   // I2I — prompt + image BOTH required
@@ -342,7 +392,7 @@ export const models: AIModel[] = [
 
   // T2I — prompt only
   {
-    id: "fal-ai/recraft/v4/pro",
+    id: "fal-ai/recraft/v4/pro/text-to-image",
     name: "Recraft V4 Pro",
     provider: "fal", type: "t2i", category: "Concept Art & Style",
     description: "Best quality for illustrations and design. Prompt only.",
@@ -352,8 +402,8 @@ export const models: AIModel[] = [
 
   // T2I — prompt only
   {
-    id: "fal-ai/gpt-image/v1.5/high",
-    name: "GPT Image 1.5 High",
+    id: "fal-ai/gpt-image-1.5/edit",
+    name: "GPT Image 1.5 Edit",
     provider: "fal", type: "t2i", category: "Concept Art & Style",
     description: "GPT-powered image generation. Prompt only.",
     cost: "~RM0.22", creditCost: 22, speed: "~20s", stable: true,
@@ -377,10 +427,10 @@ export const models: AIModel[] = [
 
   // I2I — prompt + image BOTH required
   {
-    id: "fal-ai/flux-pro/kontext/max",
-    name: "FLUX Kontext Max",
+    id: "fal-ai/flux-pro/kontext",
+    name: "FLUX Kontext Pro (Character)",
     provider: "fal", type: "i2i", category: "Character & Fashion",
-    description: "Max quality character editing. Requires prompt + image.",
+    description: "Character-consistent editing. Requires prompt + image.",
     cost: "~RM0.25", creditCost: 25, speed: "~15s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Edit instruction" },
@@ -405,7 +455,7 @@ export const models: AIModel[] = [
 
   // Lipsync — video + audio BOTH required
   {
-    id: "fal-ai/sync/lipsync/v2",
+    id: "fal-ai/sync-lipsync/v2",
     name: "Sync Lipsync 2.0",
     provider: "fal", type: "lipsync", category: "Lip Sync",
     description: "Standard lip sync. Requires video + audio input.",
@@ -418,7 +468,7 @@ export const models: AIModel[] = [
 
   // Lipsync — image + audio BOTH required (not video!)
   {
-    id: "fal-ai/omnihuman/v1.5",
+    id: "fal-ai/bytedance/omnihuman/v1.5",
     name: "OmniHuman v1.5",
     provider: "fal", type: "lipsync", category: "Lip Sync",
     description: "Full-body animation from audio. Requires image + audio.",
@@ -433,8 +483,8 @@ export const models: AIModel[] = [
 
   // Audio — text required (uses "text" param not "prompt"), audio optional for voice cloning
   {
-    id: "fal-ai/minimax/speech-02",
-    name: "MiniMax Speech-02",
+    id: "fal-ai/minimax/speech-02-hd",
+    name: "MiniMax Speech-02 HD",
     provider: "fal", type: "audio", category: "Audio & Music",
     description: "Text-to-speech with voice cloning. Optional audio for voice reference.",
     cost: "~RM0.07", creditCost: 7, speed: "~10s", stable: true,

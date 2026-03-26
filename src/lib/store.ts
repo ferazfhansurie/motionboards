@@ -164,6 +164,7 @@ export interface AppState {
 
   // Generation
   isGenerating: boolean;
+  generationOptions: Record<string, unknown>; // per-generation options (aspect_ratio, duration, etc.)
 
   // Edit mode
   isEditMode: boolean;
@@ -207,6 +208,8 @@ export interface AppState {
   toggleInputRef: (id: string) => void;
   clearRefs: () => void;
   setIsGenerating: (v: boolean) => void;
+  setGenerationOptions: (opts: Record<string, unknown>) => void;
+  setGenerationOption: (key: string, value: unknown) => void;
   setEditMode: (v: boolean) => void;
   setCropMode: (v: boolean) => void;
   updateEditState: (id: string, edits: Partial<ImageEditState>) => void;
@@ -271,6 +274,7 @@ export const useAppStore = create<AppState>((set) => {
   endFrameId: null,
   inputRefs: [],
   isGenerating: false,
+  generationOptions: {},
   isEditMode: false,
   isCropMode: false,
   activeCanvasTool: null,
@@ -360,7 +364,7 @@ export const useAppStore = create<AppState>((set) => {
   setPan: (panX, panY) => set({ panX, panY }),
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(3, zoom)) }),
   setBoardName: (boardName) => set({ boardName }),
-  setSelectedModel: (selectedModelId) => set({ selectedModelId }),
+  setSelectedModel: (selectedModelId) => set({ selectedModelId, generationOptions: {} }),
   setModelPanelOpen: (isModelPanelOpen) => set({ isModelPanelOpen }),
   setTemplatesOpen: (isTemplatesOpen) => set({ isTemplatesOpen }),
   setPendingPrompt: (pendingPrompt) => set({ pendingPrompt }),
@@ -378,6 +382,8 @@ export const useAppStore = create<AppState>((set) => {
     })),
   clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [] }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
+  setGenerationOptions: (generationOptions) => set({ generationOptions }),
+  setGenerationOption: (key, value) => set((s) => ({ generationOptions: { ...s.generationOptions, [key]: value } })),
   setEditMode: (isEditMode) => set({ isEditMode, isCropMode: false }),
   setCropMode: (isCropMode) => set({ isCropMode }),
   updateEditState: (id, edits) =>
