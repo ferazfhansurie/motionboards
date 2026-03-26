@@ -24,7 +24,8 @@ const categoryIcons: Record<string, React.ReactNode> = {
 import { useAppStore } from "@/lib/store";
 
 export function TemplatesPanel() {
-  const { isTemplatesOpen: isOpen, setTemplatesOpen, setPendingPrompt } = useAppStore();
+  const { isTemplatesOpen: isOpen, setTemplatesOpen, setPendingPrompt, theme } = useAppStore();
+  const isDark = theme === "dark";
   const onClose = () => setTemplatesOpen(false);
   const onUsePrompt = (prompt: string) => setPendingPrompt(prompt);
   const [search, setSearch] = useState("");
@@ -86,20 +87,20 @@ export function TemplatesPanel() {
 
   return (
     <div className="absolute left-2 bottom-10 z-40 w-[480px] pointer-events-auto">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+      <div className={`rounded-2xl border shadow-2xl overflow-hidden ${isDark ? "border-gray-700 bg-[#161b22]" : "border-gray-200 bg-white"}`}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
+        <div className={`flex items-center justify-between border-b px-4 py-2.5 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
           <div className="flex items-center gap-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#f26522] text-white">
               <BookOpen className="h-3 w-3" />
             </div>
-            <h3 className="text-xs font-bold text-[#0d1117]">Prompt Templates</h3>
-            <span className="text-[10px] text-gray-400 font-medium bg-gray-100 px-2 py-0.5 rounded-full">
+            <h3 className={`text-xs font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>Prompt Templates</h3>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${isDark ? "text-gray-400 bg-gray-800" : "text-gray-400 bg-gray-100"}`}>
               76 prompts
             </span>
           </div>
           <button
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#0d1117] transition-colors"
+            className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
             onClick={onClose}
           >
             <X className="h-4 w-4" />
@@ -107,26 +108,26 @@ export function TemplatesPanel() {
         </div>
 
         {/* Search */}
-        <div className="border-b border-gray-100 px-4 py-2">
+        <div className={`border-b px-4 py-2 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-300" />
+            <Search className={`absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDark ? "text-gray-500" : "text-gray-300"}`} />
             <input
               placeholder="Search prompts..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg bg-gray-50 border border-gray-200 py-1.5 pl-8 pr-3 text-xs text-[#0d1117] outline-none placeholder:text-gray-400 focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+              className={`w-full rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none placeholder:text-gray-400 focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
             />
           </div>
         </div>
 
         <div className="flex" style={{ maxHeight: "380px" }}>
           {/* Categories sidebar */}
-          <div className="w-36 shrink-0 border-r border-gray-100 overflow-y-auto py-2 px-1.5">
+          <div className={`w-36 shrink-0 border-r overflow-y-auto py-2 px-1.5 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
             <button
               className={`mb-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-medium transition-all ${
                 activeCategory === "all"
                   ? "bg-[#f26522] text-white shadow-sm"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-[#0d1117]"
+                  : isDark ? "text-gray-400 hover:bg-white/5 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-[#0d1117]"
               }`}
               onClick={() => setActiveCategory("all")}
             >
@@ -136,7 +137,7 @@ export function TemplatesPanel() {
             </button>
 
             <div className="my-2 px-2.5">
-              <p className="text-[8px] font-bold uppercase tracking-widest text-gray-300">Categories</p>
+              <p className={`text-[8px] font-bold uppercase tracking-widest ${isDark ? "text-gray-600" : "text-gray-300"}`}>Categories</p>
             </div>
 
             {categories.map((cat) => (
@@ -145,7 +146,7 @@ export function TemplatesPanel() {
                 className={`mb-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[10px] font-medium transition-all ${
                   activeCategory === cat.id
                     ? "bg-[#f26522] text-white shadow-sm"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-[#0d1117]"
+                    : isDark ? "text-gray-400 hover:bg-white/5 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-[#0d1117]"
                 }`}
                 onClick={() => setActiveCategory(cat.id)}
               >
@@ -170,8 +171,12 @@ export function TemplatesPanel() {
                   key={template.name}
                   className={`rounded-lg border transition-all duration-200 ${
                     isExpanded
-                      ? "border-[#f26522]/30 bg-[#f26522]/[0.02] shadow-sm"
-                      : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+                      ? isDark
+                        ? "border-[#f26522]/30 bg-[#f26522]/[0.05] shadow-sm"
+                        : "border-[#f26522]/30 bg-[#f26522]/[0.02] shadow-sm"
+                      : isDark
+                        ? "border-gray-700 bg-[#0d1117] hover:border-gray-600 hover:bg-gradient-to-r hover:from-white/[0.03] hover:to-transparent hover:shadow-sm"
+                        : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
                   }`}
                 >
                   {/* Template header */}
@@ -182,25 +187,25 @@ export function TemplatesPanel() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <h4 className="text-[11px] font-bold text-[#0d1117] truncate">{template.name}</h4>
-                          <span className="text-[8px] font-medium text-[#f26522] bg-[#f26522]/8 px-1.5 py-0.5 rounded shrink-0">
+                          <h4 className={`text-[11px] font-bold truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>{template.name}</h4>
+                          <span className={`text-[8px] font-medium px-1.5 py-0.5 rounded shrink-0 ${isDark ? "text-[#f26522] bg-[#f26522]/15" : "text-[#f26522] bg-[#f26522]/8"}`}>
                             {template.categoryName}
                           </span>
                         </div>
-                        <p className="mt-0.5 text-[9px] text-gray-400 line-clamp-1">{template.description}</p>
+                        <p className={`mt-0.5 text-[9px] line-clamp-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>{template.description}</p>
                       </div>
                     </div>
                   </button>
 
                   {/* Expanded: variables + prompt */}
                   {isExpanded && (
-                    <div className="px-3 pb-2.5 space-y-2 border-t border-gray-100 pt-2">
+                    <div className={`px-3 pb-2.5 space-y-2 border-t pt-2 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
                       {/* Variable inputs */}
                       {template.variables.length > 0 && (
                         <div className="grid grid-cols-2 gap-1.5">
                           {template.variables.map((v) => (
                             <div key={v}>
-                              <label className="text-[8px] font-bold uppercase tracking-wider text-gray-400 mb-0.5 block">
+                              <label className={`text-[8px] font-bold uppercase tracking-wider mb-0.5 block ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                                 {v.replace(/_/g, " ")}
                               </label>
                               <input
@@ -208,7 +213,7 @@ export function TemplatesPanel() {
                                 value={vals[v] || ""}
                                 onChange={(e) => updateVariable(template.name, v, e.target.value)}
                                 placeholder={v.replace(/_/g, " ")}
-                                className="w-full rounded-md bg-gray-50 border border-gray-200 px-2 py-1 text-[10px] text-[#0d1117] outline-none placeholder:text-gray-300 focus:border-[#f26522] focus:ring-1 focus:ring-[#f26522]/10"
+                                className={`w-full rounded-md border px-2 py-1 text-[10px] outline-none focus:border-[#f26522] focus:ring-1 focus:ring-[#f26522]/10 ${isDark ? "bg-[#0d1117] border-gray-700 text-white placeholder:text-gray-600" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder:text-gray-300"}`}
                               />
                             </div>
                           ))}
@@ -216,8 +221,8 @@ export function TemplatesPanel() {
                       )}
 
                       {/* Preview prompt */}
-                      <div className="rounded-md bg-gray-50 border border-gray-200 p-2">
-                        <p className="text-[9px] leading-relaxed text-gray-600 whitespace-pre-wrap">
+                      <div className={`rounded-md border p-2 ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                        <p className={`text-[9px] leading-relaxed whitespace-pre-wrap ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                           {getFilledPrompt(template.name, template.prompt, template.variables)}
                         </p>
                       </div>
@@ -232,7 +237,7 @@ export function TemplatesPanel() {
                         </button>
                         <button
                           onClick={() => handleCopy(template.name, template.prompt, template.variables)}
-                          className="flex items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white text-gray-500 px-3 py-1.5 text-[10px] font-medium hover:bg-gray-50 transition-colors"
+                          className={`flex items-center justify-center gap-1 rounded-lg border px-3 py-1.5 text-[10px] font-medium transition-colors ${isDark ? "border-gray-700 bg-[#0d1117] text-gray-400 hover:bg-white/5" : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"}`}
                         >
                           {isCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                           {isCopied ? "Copied" : "Copy"}
