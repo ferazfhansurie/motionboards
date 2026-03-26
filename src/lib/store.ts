@@ -28,7 +28,7 @@ function saveState(state: AppState) {
     // Save current board items into boards array
     const boards = state.boards.map((b) =>
       b.id === state.activeBoardId
-        ? { ...b, items: state.items, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
+        ? { ...b, items: state.items, connections: state.connections, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
         : b
     );
     const data: SavedState = {
@@ -66,7 +66,7 @@ export const defaultEditState: ImageEditState = {
 
 export interface BoardItem {
   id: string;
-  type: "image" | "video" | "audio" | "generation" | "psd-layer";
+  type: "image" | "video" | "audio" | "generation" | "psd-layer" | "text" | "drawing";
   x: number;
   y: number;
   width: number;
@@ -91,6 +91,18 @@ export interface BoardItem {
   psdHidden?: boolean;
   // Image editing state (non-destructive)
   editState?: ImageEditState;
+  // Text item fields
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  fontColor?: string;
+  fontWeight?: string;
+  textAlign?: "left" | "center" | "right";
+  backgroundColor?: string;
+  // Drawing item fields
+  drawingPaths?: string; // SVG path data
+  strokeColor?: string;
+  strokeWidth?: number;
 }
 
 export interface Board {
@@ -100,6 +112,13 @@ export interface Board {
   panX: number;
   panY: number;
   zoom: number;
+  connections: Connection[];
+}
+
+export interface Connection {
+  id: string;
+  fromId: string;
+  toId: string;
 }
 
 export interface AppState {
@@ -141,6 +160,18 @@ export interface AppState {
   isEditMode: boolean;
   isCropMode: boolean;
 
+  // Canvas tool mode
+  activeCanvasTool: "select" | "text" | "draw" | "connect" | null;
+  drawingColor: string;
+  drawingStrokeWidth: number;
+  connections: Connection[];
+  theme: "light" | "dark";
+  connectingFromId: string | null;
+
+  // Undo/Redo
+  undoStack: BoardItem[][];
+  redoStack: BoardItem[][];
+
   // Actions
   addItem: (item: BoardItem) => void;
   updateItem: (id: string, updates: Partial<BoardItem>) => void;
@@ -172,12 +203,23 @@ export interface AppState {
   switchBoard: (boardId: string) => void;
   deleteBoard: (boardId: string) => void;
   renameBoard: (boardId: string, name: string) => void;
+  setActiveCanvasTool: (tool: "select" | "text" | "draw" | "connect" | null) => void;
+  setDrawingColor: (color: string) => void;
+  setDrawingStrokeWidth: (width: number) => void;
+  addConnection: (fromId: string, toId: string) => void;
+  removeConnection: (id: string) => void;
+  setTheme: (theme: "light" | "dark") => void;
+  setConnectingFromId: (id: string | null) => void;
+  pushUndo: () => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 const initialBoard: Board = {
   id: "board_1",
   name: "Board 1",
   items: [],
+  connections: [],
   panX: 0,
   panY: 0,
   zoom: 1,
@@ -213,15 +255,67 @@ export const useAppStore = create<AppState>((set) => {
   isGenerating: false,
   isEditMode: false,
   isCropMode: false,
+  activeCanvasTool: null,
+  drawingColor: "#000000",
+  drawingStrokeWidth: 3,
+  connections: startBoard.connections || [],
+  theme: (typeof window !== "undefined" && localStorage.getItem("motionboards_theme") as "light" | "dark") || "light",
+  connectingFromId: null,
+  undoStack: [],
+  redoStack: [],
 
-  addItem: (item) => set((s) => ({ items: [...s.items, item] })),
+  pushUndo: () => set((s) => ({
+    undoStack: [...s.undoStack.slice(-49), s.items],
+    redoStack: [],
+  })),
+  undo: () => set((s) => {
+    if (s.undoStack.length === 0) return s;
+    const prev = s.undoStack[s.undoStack.length - 1];
+    return {
+      undoStack: s.undoStack.slice(0, -1),
+      redoStack: [...s.redoStack, s.items],
+      items: prev,
+    };
+  }),
+  redo: () => set((s) => {
+    if (s.redoStack.length === 0) return s;
+    const next = s.redoStack[s.redoStack.length - 1];
+    return {
+      redoStack: s.redoStack.slice(0, -1),
+      undoStack: [...s.undoStack, s.items],
+      items: next,
+    };
+  }),
+  setActiveCanvasTool: (activeCanvasTool) => set({ activeCanvasTool }),
+  setDrawingColor: (drawingColor) => set({ drawingColor }),
+  setDrawingStrokeWidth: (drawingStrokeWidth) => set({ drawingStrokeWidth }),
+  addConnection: (fromId, toId) => set((s) => ({
+    connections: [...s.connections, { id: `conn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, fromId, toId }],
+  })),
+  removeConnection: (id) => set((s) => ({
+    connections: s.connections.filter((c) => c.id !== id),
+  })),
+  setTheme: (theme) => {
+    if (typeof window !== "undefined") localStorage.setItem("motionboards_theme", theme);
+    set({ theme });
+  },
+  setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
+
+  addItem: (item) => set((s) => ({
+    undoStack: [...s.undoStack.slice(-49), s.items],
+    redoStack: [],
+    items: [...s.items, item],
+  })),
   updateItem: (id, updates) =>
     set((s) => ({
       items: s.items.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     })),
   removeItem: (id) =>
     set((s) => ({
+      undoStack: [...s.undoStack.slice(-49), s.items],
+      redoStack: [],
       items: s.items.filter((i) => i.id !== id),
+      connections: s.connections.filter((c) => c.fromId !== id && c.toId !== id),
       selectedItemId: s.selectedItemId === id ? null : s.selectedItemId,
       startFrameId: s.startFrameId === id ? null : s.startFrameId,
       endFrameId: s.endFrameId === id ? null : s.endFrameId,
@@ -280,7 +374,7 @@ export const useAppStore = create<AppState>((set) => {
       // Save current board state
       const updatedBoards = s.boards.map((b) =>
         b.id === s.activeBoardId
-          ? { ...b, items: s.items, panX: s.panX, panY: s.panY, zoom: s.zoom }
+          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom }
           : b
       );
       const newId = `board_${Date.now()}`;
@@ -288,6 +382,7 @@ export const useAppStore = create<AppState>((set) => {
         id: newId,
         name: `Board ${updatedBoards.length + 1}`,
         items: [],
+        connections: [],
         panX: 0,
         panY: 0,
         zoom: 1,
@@ -296,6 +391,7 @@ export const useAppStore = create<AppState>((set) => {
         boards: [...updatedBoards, newBoard],
         activeBoardId: newId,
         items: [],
+        connections: [],
         selectedItemId: null,
         panX: 0,
         panY: 0,
@@ -312,7 +408,7 @@ export const useAppStore = create<AppState>((set) => {
       // Save current board
       const updatedBoards = s.boards.map((b) =>
         b.id === s.activeBoardId
-          ? { ...b, items: s.items, panX: s.panX, panY: s.panY, zoom: s.zoom }
+          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom }
           : b
       );
       const target = updatedBoards.find((b) => b.id === boardId);
@@ -321,6 +417,7 @@ export const useAppStore = create<AppState>((set) => {
         boards: updatedBoards,
         activeBoardId: boardId,
         items: target.items,
+        connections: target.connections || [],
         selectedItemId: null,
         panX: target.panX,
         panY: target.panY,
@@ -341,6 +438,7 @@ export const useAppStore = create<AppState>((set) => {
           boards: remaining,
           activeBoardId: target.id,
           items: target.items,
+          connections: target.connections || [],
           selectedItemId: null,
           panX: target.panX,
           panY: target.panY,
@@ -370,7 +468,7 @@ useAppStore.subscribe((state) => {
     // Also save to DB
     const boards = state.boards.map((b) =>
       b.id === state.activeBoardId
-        ? { ...b, items: state.items, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
+        ? { ...b, items: state.items, connections: state.connections, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
         : b
     );
     fetch("/api/boards", {
@@ -396,7 +494,7 @@ if (typeof window !== "undefined") {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.setItem("motionboards_user", userId);
         useAppStore.setState({
-          boards: [{ id: "board_1", name: "Board 1", items: [], panX: 0, panY: 0, zoom: 1 }],
+          boards: [{ id: "board_1", name: "Board 1", items: [], connections: [], panX: 0, panY: 0, zoom: 1 }],
           activeBoardId: "board_1",
           items: [],
           panX: 0, panY: 0, zoom: 1,
@@ -415,6 +513,7 @@ if (typeof window !== "undefined") {
               boards: data.boards,
               activeBoardId: data.activeBoardId || data.boards[0].id,
               items: board.items || [],
+              connections: board.connections || [],
               panX: board.panX || 0,
               panY: board.panY || 0,
               zoom: board.zoom || 1,

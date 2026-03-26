@@ -88,8 +88,8 @@ export default function LoginPage() {
           <a href="/signup" className="text-[#f26522] font-medium hover:underline">Sign up</a>
         </p>
 
-        <p className="text-[10px] text-gray-300 text-center mt-8">
-          Powered by Adletic Digital Marketing Agency &copy; 2026
+        <p className="text-[10px] text-gray-300 text-center mt-8 flex items-center justify-center gap-1">
+          Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm inline-block" /> <span className="font-semibold text-gray-400">Adletic</span> &copy; 2026
         </p>
       </div>
     </div>

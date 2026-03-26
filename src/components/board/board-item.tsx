@@ -10,6 +10,7 @@ import { CropOverlay } from "./crop-overlay";
 interface BoardItemCardProps {
   item: BoardItem;
   isSelected: boolean;
+  isConnecting?: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onResizeStart: (e: React.MouseEvent, edge: string) => void;
@@ -18,16 +19,21 @@ interface BoardItemCardProps {
 export function BoardItemCard({
   item,
   isSelected,
+  isConnecting,
   onMouseDown,
   onDoubleClick,
   onResizeStart,
 }: BoardItemCardProps) {
-  const { startFrameId, endFrameId, inputRefs, isEditMode, setEditMode, selectItem } = useAppStore();
+  const { startFrameId, endFrameId, inputRefs, isEditMode, setEditMode, selectItem, theme } = useAppStore();
+  const isDark = theme === "dark";
 
   const isStartFrame = startFrameId === item.id;
   const isEndFrame = endFrameId === item.id;
   const isInputRef = inputRefs.includes(item.id);
   const inputIndex = inputRefs.indexOf(item.id);
+
+  // Text editing state
+  const [isEditingText, setIsEditingText] = useState(false);
 
   // Build CSS filter string from editState
   const filterStyle = item.editState
@@ -46,6 +52,7 @@ export function BoardItemCard({
 
   const isImageType = item.type === "image" || item.type === "psd-layer";
   const isMediaType = isImageType || item.type === "video" || (item.type === "generation" && item.outputUrl);
+  const isResizable = item.type === "image" || item.type === "video" || item.type === "generation" || item.type === "psd-layer" || item.type === "text" || item.type === "drawing";
 
   // Right-click context menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -81,6 +88,14 @@ export function BoardItemCard({
     }
   };
 
+  const handleDoubleClick = () => {
+    if (item.type === "text") {
+      setIsEditingText(true);
+    } else {
+      onDoubleClick();
+    }
+  };
+
   return (
     <div
       className="absolute select-none group"
@@ -92,7 +107,7 @@ export function BoardItemCard({
         zIndex: isSelected ? 50 : 1,
       }}
       onMouseDown={onMouseDown}
-      onDoubleClick={onDoubleClick}
+      onDoubleClick={handleDoubleClick}
     >
       {/* Reference badges */}
       <div className="absolute -top-7 left-0 z-10 flex gap-1">
@@ -123,12 +138,16 @@ export function BoardItemCard({
       {/* Card */}
       <div
         className={`relative rounded-lg border-2 transition-all ${
-          isSelected
+          isConnecting
+            ? "border-[#f26522] shadow-[0_0_20px_rgba(242,101,34,0.5)] ring-2 ring-[#f26522]/30"
+            : isSelected
             ? "border-[#f26522] shadow-[0_0_15px_rgba(242,101,34,0.3)]"
             : isStartFrame || isEndFrame || isInputRef
             ? "border-emerald-500/70"
+            : isDark
+            ? "border-gray-700 hover:border-gray-600 shadow-sm hover:shadow-md"
             : "border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md"
-        } bg-white`}
+        } ${item.type === "text" || item.type === "drawing" ? "bg-transparent border-dashed" : isDark ? "bg-[#161b22]" : "bg-white"}`}
       >
         {/* Media wrapper with overflow hidden */}
         <div className="overflow-hidden rounded-md">
@@ -168,12 +187,65 @@ export function BoardItemCard({
               <Music className="h-5 w-5 text-[#f26522]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="truncate text-xs font-medium text-white">
+              <p className={`truncate text-xs font-medium ${isDark ? "text-white" : "text-gray-700"}`}>
                 {item.fileName || "Audio"}
               </p>
-              <p className="text-[10px] text-white/40">Audio file</p>
+              <p className={`text-[10px] ${isDark ? "text-white/40" : "text-gray-400"}`}>Audio file</p>
             </div>
           </div>
+        )}
+
+        {/* Text item */}
+        {item.type === "text" && (
+          <div
+            className="p-2 w-full outline-none"
+            style={{
+              minHeight: 30,
+              fontSize: item.fontSize || 16,
+              fontFamily: item.fontFamily || "Inter, sans-serif",
+              color: item.fontColor || (isDark ? "#ffffff" : "#000000"),
+              fontWeight: (item.fontWeight as React.CSSProperties["fontWeight"]) || "normal",
+              textAlign: item.textAlign || "left",
+              backgroundColor: item.backgroundColor || "transparent",
+            }}
+          >
+            {isEditingText ? (
+              <div
+                contentEditable
+                suppressContentEditableWarning
+                className="outline-none cursor-text min-h-[1em]"
+                onBlur={(e) => {
+                  useAppStore.getState().updateItem(item.id, { text: e.currentTarget.textContent || "" });
+                  setIsEditingText(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    (e.target as HTMLElement).blur();
+                  }
+                  e.stopPropagation();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                dangerouslySetInnerHTML={{ __html: item.text || "" }}
+                autoFocus
+              />
+            ) : (
+              <span className="whitespace-pre-wrap">{item.text || "Double-click to edit"}</span>
+            )}
+          </div>
+        )}
+
+        {/* Drawing item */}
+        {item.type === "drawing" && (
+          <svg width={item.width} height={item.height} className="pointer-events-none">
+            <path
+              d={item.drawingPaths || ""}
+              fill="none"
+              stroke={item.strokeColor || (isDark ? "#ffffff" : "#000000")}
+              strokeWidth={item.strokeWidth || 3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         )}
 
         {item.type === "generation" && (
@@ -233,7 +305,7 @@ export function BoardItemCard({
         )}
 
         {/* Resize handles — edges and corners, visible on hover or selected */}
-        {(item.type === "image" || item.type === "video" || item.type === "generation" || item.type === "psd-layer") && (
+        {isResizable && (
           <>
             {/* Right edge */}
             <div
@@ -289,13 +361,13 @@ export function BoardItemCard({
         <>
           <div className="fixed inset-0 z-[100]" onClick={closeContextMenu} onContextMenu={(e) => { e.preventDefault(); closeContextMenu(); }} />
           <div
-            className="absolute z-[101] bg-white rounded-xl border border-gray-200 shadow-xl py-1 min-w-[160px] overflow-hidden"
+            className={`absolute z-[101] rounded-xl border shadow-xl py-1 min-w-[160px] overflow-hidden ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             {isMediaType && (
               <button
                 type="button"
-                className="flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium text-[#0d1117] hover:bg-gray-50 transition-colors"
+                className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
                 onClick={handleDownload}
               >
                 <Download className="h-3.5 w-3.5 text-gray-400" />
@@ -305,14 +377,14 @@ export function BoardItemCard({
             {isImageType && (
               <button
                 type="button"
-                className="flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium text-[#0d1117] hover:bg-gray-50 transition-colors"
+                className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
                 onClick={() => { closeContextMenu(); selectItem(item.id); setEditMode(true); }}
               >
                 <Pencil className="h-3.5 w-3.5 text-gray-400" />
                 Edit
               </button>
             )}
-            <div className="h-px bg-gray-100 my-0.5" />
+            <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />
             <button
               type="button"
               className="flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium text-red-500 hover:bg-red-50 transition-colors"
@@ -338,7 +410,7 @@ export function BoardItemCard({
           </p>
         )}
         {item.prompt && (
-          <p className="mt-0.5 text-[11px] leading-snug text-gray-500 line-clamp-3">
+          <p className={`mt-0.5 text-[11px] leading-snug line-clamp-3 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
             {item.prompt}
           </p>
         )}

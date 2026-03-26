@@ -21,9 +21,11 @@ const TOPUP_PACKAGES = [
 
 // ============ PROFILE PANEL ============
 export function ProfilePanel() {
-  const { isProfileOpen, setProfileOpen } = useAppStore();
+  const { isProfileOpen, setProfileOpen, theme } = useAppStore();
+  const isDark = theme === "dark";
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [topupLoading, setTopupLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -36,8 +38,6 @@ export function ProfilePanel() {
   }, [isProfileOpen]);
 
   if (!isProfileOpen) return null;
-
-  const [topupLoading, setTopupLoading] = useState<string | null>(null);
 
   const handleTopup = async (pkg: (typeof TOPUP_PACKAGES)[number]) => {
     setTopupLoading(pkg.plan);
@@ -66,18 +66,18 @@ export function ProfilePanel() {
   };
 
   return (
-    <div className="absolute right-2 bottom-10 z-50 w-[340px]">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+    <div className="absolute right-2 bottom-12 z-[60] w-[340px]">
+      <div className={`rounded-2xl border shadow-2xl overflow-hidden ${isDark ? "border-gray-700 bg-[#161b22]" : "border-gray-200 bg-white"}`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+        <div className={`flex items-center justify-between px-4 py-2.5 border-b ${isDark ? "border-gray-700" : "border-gray-100"}`}>
           <div className="flex items-center gap-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#f26522] text-white">
               <Zap className="h-3 w-3" />
             </div>
-            <h3 className="text-xs font-bold text-[#0d1117]">Profile</h3>
+            <h3 className={`text-xs font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>Profile</h3>
           </div>
           <button
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#0d1117] transition-colors"
+            className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
             onClick={() => setProfileOpen(false)}
           >
             <X className="h-4 w-4" />
@@ -97,7 +97,7 @@ export function ProfilePanel() {
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[#0d1117]">{user.name}</p>
+                  <p className={`text-sm font-semibold ${isDark ? "text-white" : "text-[#0d1117]"}`}>{user.name}</p>
                   <p className="text-[10px] text-gray-400">{user.email}</p>
                 </div>
               </div>
@@ -115,7 +115,7 @@ export function ProfilePanel() {
 
               {/* Top Up */}
               <div>
-                <p className="text-[11px] font-bold text-[#0d1117] mb-2">Top Up</p>
+                <p className={`text-[11px] font-bold mb-2 ${isDark ? "text-white" : "text-[#0d1117]"}`}>Top Up</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {TOPUP_PACKAGES.map((pkg) => (
                     <button
@@ -123,7 +123,9 @@ export function ProfilePanel() {
                       onClick={() => handleTopup(pkg)}
                       disabled={topupLoading !== null}
                       className={`relative text-left rounded-lg border p-2.5 transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
-                        pkg.popular ? "border-[#f26522] bg-[#f26522]/5" : "border-gray-200 bg-white"
+                        pkg.popular
+                          ? "border-[#f26522] bg-[#f26522]/5"
+                          : isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-200 bg-white"
                       }`}
                     >
                       {pkg.popular && (
@@ -135,7 +137,7 @@ export function ProfilePanel() {
                         <Loader2 className="h-4 w-4 animate-spin text-[#f26522] mx-auto" />
                       ) : (
                         <>
-                          <p className="text-sm font-bold text-[#0d1117]">{pkg.price}</p>
+                          <p className={`text-sm font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>{pkg.price}</p>
                           <p className="text-[9px] text-gray-400">{pkg.description}</p>
                         </>
                       )}
@@ -147,7 +149,7 @@ export function ProfilePanel() {
               {/* Logout */}
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors py-2 border border-gray-100 rounded-lg hover:border-red-200"
+                className={`w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors py-2 border rounded-lg hover:border-red-200 ${isDark ? "border-gray-700" : "border-gray-100"}`}
               >
                 <LogOut className="h-3.5 w-3.5" />
                 Logout
@@ -164,7 +166,8 @@ export function ProfilePanel() {
 
 // ============ HISTORY PANEL ============
 export function HistoryPanel() {
-  const { isHistoryOpen, setHistoryOpen } = useAppStore();
+  const { isHistoryOpen, setHistoryOpen, theme } = useAppStore();
+  const isDark = theme === "dark";
   const [generations, setGenerations] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
 
@@ -181,21 +184,21 @@ export function HistoryPanel() {
   if (!isHistoryOpen) return null;
 
   return (
-    <div className="absolute right-2 bottom-10 z-50 w-[380px]">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+    <div className="absolute right-2 bottom-12 z-[60] w-[380px]">
+      <div className={`rounded-2xl border shadow-2xl overflow-hidden ${isDark ? "border-gray-700 bg-[#161b22]" : "border-gray-200 bg-white"}`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+        <div className={`flex items-center justify-between px-4 py-2.5 border-b ${isDark ? "border-gray-700" : "border-gray-100"}`}>
           <div className="flex items-center gap-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#f26522] text-white">
               <History className="h-3 w-3" />
             </div>
-            <h3 className="text-xs font-bold text-[#0d1117]">Recent Generations</h3>
-            <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+            <h3 className={`text-xs font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>Recent Generations</h3>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? "text-gray-400 bg-gray-800" : "text-gray-400 bg-gray-100"}`}>
               {generations.length}
             </span>
           </div>
           <button
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-[#0d1117] transition-colors"
+            className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
             onClick={() => setHistoryOpen(false)}
           >
             <X className="h-4 w-4" />
@@ -213,25 +216,25 @@ export function HistoryPanel() {
               <p className="text-xs text-gray-400">No generations yet</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
+            <div className={`divide-y ${isDark ? "divide-gray-800" : "divide-gray-50"}`}>
               {generations.map((gen) => (
-                <div key={gen.id as string} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                <div key={gen.id as string} className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}>
                   {/* Thumbnail */}
                   {gen.outputUrl ? (
                     <img
                       src={gen.outputUrl as string}
                       alt=""
-                      className="h-9 w-9 rounded-md object-cover border border-gray-100 shrink-0"
+                      className={`h-9 w-9 rounded-md object-cover border shrink-0 ${isDark ? "border-gray-700" : "border-gray-100"}`}
                     />
                   ) : (
-                    <div className="h-9 w-9 rounded-md bg-gray-100 flex items-center justify-center shrink-0">
+                    <div className={`h-9 w-9 rounded-md flex items-center justify-center shrink-0 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
                       <Clock className="h-3.5 w-3.5 text-gray-300" />
                     </div>
                   )}
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-[#0d1117] truncate">
+                    <p className={`text-[11px] font-medium truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
                       {(gen.model as string)?.split("/").pop()}
                     </p>
                     <p className="text-[10px] text-gray-400 truncate">{gen.prompt as string || "No prompt"}</p>

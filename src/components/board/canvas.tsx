@@ -42,7 +42,16 @@ export function Canvas() {
     addItem,
     selectItem,
     selectedItemId,
+    activeCanvasTool,
+    setActiveCanvasTool,
+    drawingColor,
+    drawingStrokeWidth,
+    connections,
+    theme,
+    connectingFromId,
   } = useAppStore();
+
+  const isDark = theme === "dark";
 
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -59,12 +68,46 @@ export function Canvas() {
   // Space held for pan mode
   const [spaceHeld, setSpaceHeld] = useState(false);
 
-  // Space key tracking
+  // Drawing state
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
+  const [drawOrigin, setDrawOrigin] = useState({ x: 0, y: 0 });
+
+  // Space key tracking + keyboard shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "Space" && e.target === document.body) {
         e.preventDefault();
         setSpaceHeld(true);
+      }
+      // Undo: Ctrl+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        useAppStore.getState().undo();
+      }
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        useAppStore.getState().redo();
+      }
+      // Tool shortcuts (only when not typing in an input)
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      if (e.key === "v" || e.key === "V") useAppStore.getState().setActiveCanvasTool("select");
+      if (e.key === "t" || e.key === "T") useAppStore.getState().setActiveCanvasTool("text");
+      if (e.key === "d" || e.key === "D") useAppStore.getState().setActiveCanvasTool("draw");
+      if (e.key === "l" || e.key === "L") useAppStore.getState().setActiveCanvasTool("connect");
+      // Escape: back to select, cancel connecting
+      if (e.key === "Escape") {
+        useAppStore.getState().setActiveCanvasTool("select");
+        useAppStore.getState().setConnectingFromId(null);
+      }
+      // Delete selected item
+      if ((e.key === "Delete" || e.key === "Backspace") && tag !== "INPUT" && tag !== "TEXTAREA") {
+        const state = useAppStore.getState();
+        if (state.selectedItemId) {
+          state.removeItem(state.selectedItemId);
+        }
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -78,7 +121,7 @@ export function Canvas() {
     };
   }, []);
 
-  // Left-click on empty canvas = pan. Click on item = handled by item.
+  // Left-click on empty canvas
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -86,27 +129,74 @@ export function Canvas() {
 
       if (isCanvas) {
         selectItem(null);
+        // Cancel connecting if clicking empty canvas
+        if (connectingFromId) {
+          useAppStore.getState().setConnectingFromId(null);
+        }
       }
 
-      // Pan: middle-click, alt+click, space+click, or left-click on empty canvas
+      // Text tool: click on canvas to add text
+      if (e.button === 0 && isCanvas && activeCanvasTool === "text" && !spaceHeld && !e.altKey) {
+        e.preventDefault();
+        const canvasX = (e.clientX - panX) / zoom;
+        const canvasY = (e.clientY - panY) / zoom;
+        useAppStore.getState().addItem({
+          id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          type: "text",
+          x: canvasX,
+          y: canvasY,
+          width: 200,
+          height: 40,
+          src: "",
+          text: "Double-click to edit",
+          fontSize: 16,
+          fontFamily: "Inter, sans-serif",
+          fontColor: isDark ? "#ffffff" : "#000000",
+          fontWeight: "normal",
+          textAlign: "left",
+          backgroundColor: "transparent",
+          createdAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      // Draw tool: start drawing
+      if (e.button === 0 && isCanvas && activeCanvasTool === "draw" && !spaceHeld && !e.altKey) {
+        e.preventDefault();
+        const canvasX = (e.clientX - panX) / zoom;
+        const canvasY = (e.clientY - panY) / zoom;
+        setIsDrawing(true);
+        setDrawOrigin({ x: canvasX, y: canvasY });
+        setDrawPoints([{ x: canvasX, y: canvasY }]);
+        return;
+      }
+
+      // Pan: middle-click, alt+click, space+click, or left-click on empty canvas (select/connect tool)
       if (
         e.button === 1 ||
         (e.button === 0 && e.altKey) ||
         (e.button === 0 && spaceHeld) ||
-        (e.button === 0 && isCanvas)
+        (e.button === 0 && isCanvas && (!activeCanvasTool || activeCanvasTool === "select" || activeCanvasTool === "connect"))
       ) {
         setIsPanning(true);
         setPanStart({ x: e.clientX - panX, y: e.clientY - panY });
         e.preventDefault();
       }
     },
-    [panX, panY, selectItem, spaceHeld]
+    [panX, panY, selectItem, spaceHeld, activeCanvasTool, zoom, connectingFromId, isDark]
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (isPanning) {
         setPan(e.clientX - panStart.x, e.clientY - panStart.y);
+        return;
+      }
+      // Drawing in progress
+      if (isDrawing) {
+        const canvasX = (e.clientX - panX) / zoom;
+        const canvasY = (e.clientY - panY) / zoom;
+        setDrawPoints((prev) => [...prev, { x: canvasX, y: canvasY }]);
         return;
       }
       if (resizeId) {
@@ -153,14 +243,46 @@ export function Canvas() {
         useAppStore.getState().moveItem(dragId, x, y);
       }
     },
-    [isPanning, panStart, dragId, dragOffset, resizeId, resizeStart, panX, panY, zoom, setPan]
+    [isPanning, panStart, dragId, dragOffset, resizeId, resizeStart, panX, panY, zoom, setPan, isDrawing]
   );
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     setDragId(null);
     setResizeId(null);
-  }, []);
+
+    // Finalize drawing
+    if (isDrawing && drawPoints.length > 1) {
+      const { drawingColor: color, drawingStrokeWidth: sw } = useAppStore.getState();
+      const xs = drawPoints.map((p) => p.x);
+      const ys = drawPoints.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
+      const padding = sw + 2;
+
+      const pathData = drawPoints
+        .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x - minX + padding} ${p.y - minY + padding}`)
+        .join(" ");
+
+      useAppStore.getState().addItem({
+        id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: "drawing",
+        x: minX - padding,
+        y: minY - padding,
+        width: Math.max(maxX - minX + padding * 2, 20),
+        height: Math.max(maxY - minY + padding * 2, 20),
+        src: "",
+        drawingPaths: pathData,
+        strokeColor: color,
+        strokeWidth: sw,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    setIsDrawing(false);
+    setDrawPoints([]);
+  }, [isDrawing, drawPoints]);
 
   // Zoom with scroll
   const handleWheel = useCallback(
@@ -172,15 +294,33 @@ export function Canvas() {
     [zoom, setZoom]
   );
 
-  // Item drag start
+  // Item drag start (or connect)
   const handleItemDragStart = useCallback(
     (id: string, e: React.MouseEvent) => {
       // If space is held, pan instead of drag
       if (spaceHeld) return;
 
+      // Connect tool: handle connection creation
+      if (activeCanvasTool === "connect") {
+        e.stopPropagation();
+        const { connectingFromId: fromId } = useAppStore.getState();
+        if (fromId) {
+          if (fromId !== id) {
+            useAppStore.getState().addConnection(fromId, id);
+          }
+          useAppStore.getState().setConnectingFromId(null);
+        } else {
+          useAppStore.getState().setConnectingFromId(id);
+        }
+        selectItem(id);
+        return;
+      }
+
       const item = items.find((i) => i.id === id);
       if (!item) return;
       e.stopPropagation();
+      // Push undo before drag so undo restores pre-drag position
+      useAppStore.getState().pushUndo();
       selectItem(id);
       setDragId(id);
       setDragOffset({
@@ -188,7 +328,7 @@ export function Canvas() {
         y: e.clientY - panY - item.y * zoom,
       });
     },
-    [items, panX, panY, zoom, selectItem, spaceHeld]
+    [items, panX, panY, zoom, selectItem, spaceHeld, activeCanvasTool]
   );
 
   // Item resize start
@@ -200,6 +340,8 @@ export function Canvas() {
       e.preventDefault();
       const item = items.find((i) => i.id === id);
       if (!item) return;
+      // Push undo before resize
+      useAppStore.getState().pushUndo();
       setResizeId(id);
       setResizeEdge(edge);
       setResizeStart({ x: e.clientX, y: e.clientY, w: item.width, h: item.height });
@@ -208,11 +350,14 @@ export function Canvas() {
     [items]
   );
 
-  // Item double-click => zoom preview
+  // Item double-click => zoom preview (or edit text)
   const handleItemDoubleClick = useCallback(
     (id: string) => {
       const item = items.find((i) => i.id === id);
-      if (item) setPreviewItem(item);
+      if (!item) return;
+      // Text items: don't open zoom preview (editing is handled in BoardItemCard)
+      if (item.type === "text") return;
+      setPreviewItem(item);
     },
     [items]
   );
@@ -385,10 +530,13 @@ export function Canvas() {
 
   const cursorClass = spaceHeld || isPanning
     ? "cursor-grabbing"
-    : "cursor-crosshair";
+    : activeCanvasTool === "draw" ? "cursor-crosshair"
+    : activeCanvasTool === "text" ? "cursor-text"
+    : activeCanvasTool === "connect" ? "cursor-crosshair"
+    : "cursor-default";
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-white">
+    <div className={`relative h-screen w-screen overflow-hidden ${isDark ? "bg-[#0d1117]" : "bg-white"}`}>
       {/* Canvas area */}
       <div
         ref={canvasRef}
@@ -448,7 +596,7 @@ export function Canvas() {
           className="absolute inset-0"
           data-canvas="true"
           style={{
-            backgroundImage: `radial-gradient(circle, rgba(13,17,23,0.12) 1.2px, transparent 1.2px)`,
+            backgroundImage: `radial-gradient(circle, ${isDark ? "rgba(255,255,255,0.08)" : "rgba(13,17,23,0.12)"} 1.2px, transparent 1.2px)`,
             backgroundSize: `${30 * zoom}px ${30 * zoom}px`,
             backgroundPosition: `${panX}px ${panY}px`,
           }}
@@ -458,7 +606,9 @@ export function Canvas() {
           className="absolute inset-0 pointer-events-none"
           data-canvas="true"
           style={{
-            background: `radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(8,19,31,0.04) 100%)`,
+            background: isDark
+              ? `radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0,0,0,0.3) 100%)`
+              : `radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(8,19,31,0.04) 100%)`,
           }}
         />
 
@@ -470,11 +620,52 @@ export function Canvas() {
             transformOrigin: "0 0",
           }}
         >
+          {/* Connection lines */}
+          <svg className="absolute pointer-events-none" style={{ overflow: "visible", left: 0, top: 0, width: 1, height: 1 }}>
+            {connections.map((conn) => {
+              const fromItem = items.find((i) => i.id === conn.fromId);
+              const toItem = items.find((i) => i.id === conn.toId);
+              if (!fromItem || !toItem) return null;
+              const x1 = fromItem.x + fromItem.width / 2;
+              const y1 = fromItem.y + fromItem.height / 2;
+              const x2 = toItem.x + toItem.width / 2;
+              const y2 = toItem.y + toItem.height / 2;
+              return (
+                <g
+                  key={conn.id}
+                  onClick={(e) => { e.stopPropagation(); useAppStore.getState().removeConnection(conn.id); }}
+                  style={{ cursor: "pointer", pointerEvents: "stroke" }}
+                >
+                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={isDark ? "#f26522" : "#f26522"} strokeWidth={2} strokeDasharray="8 4" opacity={0.7} />
+                  {/* Wider invisible hit area for clicking */}
+                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={12} />
+                  {/* Small dot at midpoint */}
+                  <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r={4} fill="#f26522" opacity={0.5} />
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Active drawing preview */}
+          {isDrawing && drawPoints.length > 1 && (
+            <svg className="absolute pointer-events-none" style={{ overflow: "visible", left: 0, top: 0, width: 1, height: 1 }}>
+              <path
+                d={drawPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ")}
+                fill="none"
+                stroke={drawingColor}
+                strokeWidth={drawingStrokeWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+
           {items.map((item) => (
             <BoardItemCard
               key={item.id}
               item={item}
               isSelected={item.id === selectedItemId}
+              isConnecting={activeCanvasTool === "connect" && connectingFromId === item.id}
               onMouseDown={(e) => handleItemDragStart(item.id, e)}
               onDoubleClick={() => handleItemDoubleClick(item.id)}
               onResizeStart={(e, edge) => handleResizeStart(item.id, e, edge)}

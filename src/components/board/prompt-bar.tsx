@@ -56,7 +56,9 @@ export function PromptBar() {
     addBoard,
     switchBoard,
     deleteBoard,
+    theme,
   } = useAppStore();
+  const isDark = theme === "dark";
 
   // Consume pending prompt from templates panel
   useEffect(() => {
@@ -372,7 +374,7 @@ export function PromptBar() {
                   handleGenerate();
                 }
               }}
-              className="w-full bg-white backdrop-blur-md text-xs text-[#0d1117] placeholder-gray-400 border border-gray-200 rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] shadow-lg px-3 pt-1.5 pb-8 resize-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent leading-4 overflow-hidden"
+              className={`w-full backdrop-blur-md text-xs placeholder-gray-400 border rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] shadow-lg px-3 pt-1.5 pb-8 resize-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent leading-4 overflow-hidden ${isDark ? "bg-[#161b22] text-white border-gray-700" : "bg-white text-[#0d1117] border-gray-200"}`}
               style={{ height: 70 }}
             />
             {/* Generate button */}
@@ -406,23 +408,23 @@ export function PromptBar() {
       </div>
 
       {/* Bottom toolbar */}
-      <div className="pointer-events-auto relative flex h-full w-full items-center bg-white/95 backdrop-blur-md px-2.5 py-1 border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+      <div className={`pointer-events-auto relative flex h-full w-full items-center backdrop-blur-md px-2.5 py-1 border-t shadow-[0_-2px_10px_rgba(0,0,0,0.04)] ${isDark ? "bg-[#161b22]/95 border-gray-700" : "bg-white/95 border-gray-200"}`}>
         {/* Left: Board selector */}
         <div className="relative">
           <button
-            className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-[#0d1117] hover:bg-gray-100 rounded-lg transition-colors min-w-0"
+            className={`flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-lg transition-colors min-w-0 ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-100"}`}
             onClick={() => setBoardMenuOpen(!boardMenuOpen)}
           >
             <span className="flex items-center gap-1 min-w-0">
               <LayoutGrid className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
-              <span className="truncate max-w-[120px] text-[#0d1117]">{boardName}</span>
+              <span className={`truncate max-w-[120px] ${isDark ? "text-white" : "text-[#0d1117]"}`}>{boardName}</span>
             </span>
             <ChevronDown className="w-2.5 h-2.5 flex-shrink-0 text-gray-400" />
           </button>
 
           {/* Board dropdown */}
           {boardMenuOpen && (
-            <div className="absolute bottom-full left-0 mb-1 w-52 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden z-50">
+            <div className={`absolute bottom-full left-0 mb-1 w-52 rounded-xl border shadow-xl overflow-hidden z-50 ${isDark ? "border-gray-700 bg-[#161b22]" : "border-gray-200 bg-white"}`}>
               <div className="p-1.5 space-y-0.5 max-h-48 overflow-y-auto">
                 {boards.map((board) => (
                   <div
@@ -461,22 +463,22 @@ export function PromptBar() {
           )}
         </div>
 
-        {/* Center: Powered by */}
+        {/* Center: Developed by Adletic */}
         <div className="flex-1 flex justify-center">
-          <span className="text-[9px] text-gray-300">
-            Powered by <span className="font-semibold text-gray-400">Adletic</span> Digital Marketing Agency &copy; 2026
+          <span className="text-[9px] text-gray-300 flex items-center gap-1">
+            Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm inline-block" /> <span className="font-semibold text-gray-400">Adletic</span> &copy; 2026
           </span>
         </div>
 
         {/* Right: Toggle buttons */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1.5 border border-gray-100">
+          <div className={`flex items-center gap-1 rounded-lg p-1.5 border ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-gray-50 border-gray-100"}`}>
             {/* Models */}
             <button
               className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isModelPanelOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
-                  : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+                  : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
               }`}
               onClick={() => setModelPanelOpen(!isModelPanelOpen)}
               title="Models"
@@ -492,7 +494,7 @@ export function PromptBar() {
               className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isTemplatesOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
-                  : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+                  : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
               }`}
               onClick={() => setTemplatesOpen(!isTemplatesOpen)}
               title="Prompt Templates"
@@ -506,7 +508,7 @@ export function PromptBar() {
               className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isAIPromptOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
-                  : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+                  : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
               }`}
               title="AI Prompt Generator"
               onClick={() => setAIPromptOpen(!isAIPromptOpen)}
@@ -520,7 +522,7 @@ export function PromptBar() {
               className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isHistoryOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
-                  : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+                  : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
               }`}
               title="Recent Generations"
               onClick={() => setHistoryOpen(!isHistoryOpen)}
@@ -533,7 +535,7 @@ export function PromptBar() {
               className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isProfileOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
-                  : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
+                  : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
               }`}
               title="Profile & Credits"
               onClick={() => setProfileOpen(!isProfileOpen)}
