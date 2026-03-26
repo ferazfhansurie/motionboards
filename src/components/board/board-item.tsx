@@ -306,7 +306,7 @@ export function BoardItemCard({
             src={item.outputUrl || item.src}
             alt={item.fileName || item.psdLayerName || "Image"}
             className="w-full pointer-events-none"
-            style={{ height: item.height, objectFit: "cover", ...filterStyle, ...cropStyle }}
+            style={{ height: item.height, objectFit: "contain", ...filterStyle, ...cropStyle }}
             draggable={false}
           />
         )}
@@ -427,7 +427,7 @@ export function BoardItemCard({
                 <div className="relative h-full">
                   <video
                     src={item.outputUrl}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     muted
                     loop
                     playsInline
@@ -445,7 +445,7 @@ export function BoardItemCard({
                 <img
                   src={item.outputUrl}
                   alt="Generated"
-                  className="h-full w-full object-cover pointer-events-none"
+                  className="h-full w-full object-contain pointer-events-none"
                   draggable={false}
                 />
               )

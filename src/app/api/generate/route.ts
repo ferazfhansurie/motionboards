@@ -32,8 +32,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid model" }, { status: 400 });
     }
 
-    // Check credits (but don't deduct yet)
+    // Check credits — NEVER proceed if insufficient
     const creditCost = modelInfo.creditCost;
+    if (!user.credits || user.credits <= 0) {
+      return NextResponse.json(
+        { error: "No credits. Please top up before generating." },
+        { status: 402 }
+      );
+    }
     if (user.credits < creditCost) {
       const rmCost = (creditCost / 100).toFixed(2);
       const rmBalance = (user.credits / 100).toFixed(2);
@@ -64,6 +70,13 @@ export async function POST(req: NextRequest) {
     let outputUrl: string | null = null;
 
     try {
+      // Double-check credits right before calling AI provider (race condition guard)
+      const freshUser = await getUserFromToken(token);
+      if (!freshUser || freshUser.credits < creditCost) {
+        await updateGeneration(generation.id, { status: "failed", error: "Insufficient credits", duration: 0 });
+        return NextResponse.json({ error: "Insufficient credits. Please top up." }, { status: 402 });
+      }
+
       if (modelInfo.provider === "fal") {
         if (!settings.falApiKey) {
           throw new Error("fal.ai API key not configured.");

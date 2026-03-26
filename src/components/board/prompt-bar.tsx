@@ -172,6 +172,23 @@ export function PromptBar() {
     if (!selectedModel) return;
     if (!prompt.trim() && selectedModel.inputs.some((i) => i.type === "text" && i.required)) return;
 
+    // Pre-check credits client-side before wasting time
+    try {
+      const authRes = await fetch("/api/auth/me");
+      const authData = await authRes.json();
+      if (!authData.user) { window.location.href = "/signup"; return; }
+      if (!authData.user.credits || authData.user.credits <= 0) {
+        alert("No credits. Please top up before generating.");
+        return;
+      }
+      if (authData.user.credits < selectedModel.creditCost) {
+        const rmCost = (selectedModel.creditCost / 100).toFixed(2);
+        const rmBalance = (authData.user.credits / 100).toFixed(2);
+        alert(`Insufficient credits. ${selectedModel.name} costs RM${rmCost}. You have RM${rmBalance}. Please top up.`);
+        return;
+      }
+    } catch {}
+
     // Check required inputs
     const needsImage = selectedModel.inputs.some((i) => (i.type === "image") && i.required);
     const needsVideo = selectedModel.inputs.some((i) => i.type === "video" && i.required);
