@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2 } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -111,8 +111,147 @@ export function BoardItemCard({
       onMouseDown={onMouseDown}
       onDoubleClick={handleDoubleClick}
     >
+      {/* Text formatting toolbar — shown when text item is selected */}
+      {item.type === "text" && isSelected && (
+        <div
+          className={`absolute left-0 right-0 z-20 flex flex-wrap items-center gap-1 px-1.5 py-1 rounded-lg border shadow-lg ${isDark ? "bg-[#1c2128] border-gray-700" : "bg-white border-gray-200"}`}
+          style={{ bottom: "calc(100% + 8px)" }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Style presets */}
+          {[
+            { label: "H1", size: 36, weight: "bold", family: "Inter, sans-serif" },
+            { label: "H2", size: 28, weight: "bold", family: "Inter, sans-serif" },
+            { label: "H3", size: 22, weight: "600", family: "Inter, sans-serif" },
+            { label: "Body", size: 16, weight: "normal", family: "Inter, sans-serif" },
+            { label: "Small", size: 12, weight: "normal", family: "Inter, sans-serif" },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+                item.fontSize === preset.size && item.fontWeight === preset.weight
+                  ? "bg-[#f26522] text-white"
+                  : isDark ? "text-gray-300 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100"
+              }`}
+              onClick={() => useAppStore.getState().updateItem(item.id, { fontSize: preset.size, fontWeight: preset.weight, fontFamily: preset.family })}
+            >
+              {preset.label}
+            </button>
+          ))}
+
+          <div className={`w-px h-4 mx-0.5 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+
+          {/* Font family */}
+          <select
+            value={item.fontFamily || "Inter, sans-serif"}
+            onChange={(e) => useAppStore.getState().updateItem(item.id, { fontFamily: e.target.value })}
+            className={`text-[9px] rounded px-1 py-0.5 border max-w-[80px] ${isDark ? "bg-[#0d1117] text-white border-gray-700" : "bg-white text-gray-700 border-gray-200"}`}
+          >
+            <option value="Inter, sans-serif">Inter</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', serif">Times</option>
+            <option value="'Courier New', monospace">Courier</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+            <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+            <option value="Impact, sans-serif">Impact</option>
+            <option value="'Comic Sans MS', cursive">Comic Sans</option>
+          </select>
+
+          {/* Font size */}
+          <select
+            value={item.fontSize || 16}
+            onChange={(e) => useAppStore.getState().updateItem(item.id, { fontSize: Number(e.target.value) })}
+            className={`text-[9px] rounded px-1 py-0.5 border w-[42px] ${isDark ? "bg-[#0d1117] text-white border-gray-700" : "bg-white text-gray-700 border-gray-200"}`}
+          >
+            {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 42, 48, 56, 64, 72, 96].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <div className={`w-px h-4 mx-0.5 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+
+          {/* Bold */}
+          <button
+            className={`p-0.5 rounded transition-colors ${
+              item.fontWeight === "bold" || item.fontWeight === "700"
+                ? "bg-[#f26522]/20 text-[#f26522]"
+                : isDark ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"
+            }`}
+            onClick={() => useAppStore.getState().updateItem(item.id, { fontWeight: item.fontWeight === "bold" ? "normal" : "bold" })}
+          >
+            <Bold className="h-3 w-3" />
+          </button>
+
+          {/* Italic */}
+          <button
+            className={`p-0.5 rounded transition-colors ${
+              item.fontStyle === "italic"
+                ? "bg-[#f26522]/20 text-[#f26522]"
+                : isDark ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"
+            }`}
+            onClick={() => useAppStore.getState().updateItem(item.id, { fontStyle: item.fontStyle === "italic" ? "normal" : "italic" })}
+          >
+            <Italic className="h-3 w-3" />
+          </button>
+
+          <div className={`w-px h-4 mx-0.5 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+
+          {/* Alignment */}
+          <button
+            className={`p-0.5 rounded transition-colors ${item.textAlign === "left" || !item.textAlign ? "bg-[#f26522]/20 text-[#f26522]" : isDark ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"}`}
+            onClick={() => useAppStore.getState().updateItem(item.id, { textAlign: "left" })}
+          >
+            <AlignLeft className="h-3 w-3" />
+          </button>
+          <button
+            className={`p-0.5 rounded transition-colors ${item.textAlign === "center" ? "bg-[#f26522]/20 text-[#f26522]" : isDark ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"}`}
+            onClick={() => useAppStore.getState().updateItem(item.id, { textAlign: "center" })}
+          >
+            <AlignCenter className="h-3 w-3" />
+          </button>
+          <button
+            className={`p-0.5 rounded transition-colors ${item.textAlign === "right" ? "bg-[#f26522]/20 text-[#f26522]" : isDark ? "text-gray-400 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"}`}
+            onClick={() => useAppStore.getState().updateItem(item.id, { textAlign: "right" })}
+          >
+            <AlignRight className="h-3 w-3" />
+          </button>
+
+          <div className={`w-px h-4 mx-0.5 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+
+          {/* Text color */}
+          <input
+            type="color"
+            value={item.fontColor || (isDark ? "#ffffff" : "#000000")}
+            onChange={(e) => useAppStore.getState().updateItem(item.id, { fontColor: e.target.value })}
+            className="w-5 h-5 rounded cursor-pointer border-0 p-0"
+            title="Text color"
+          />
+
+          {/* Background color */}
+          <div className="relative">
+            <input
+              type="color"
+              value={item.backgroundColor && item.backgroundColor !== "transparent" ? item.backgroundColor : "#ffffff"}
+              onChange={(e) => useAppStore.getState().updateItem(item.id, { backgroundColor: e.target.value })}
+              className="w-5 h-5 rounded cursor-pointer border-0 p-0 opacity-60"
+              title="Background color"
+            />
+            {item.backgroundColor && item.backgroundColor !== "transparent" && (
+              <button
+                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-2.5 h-2.5 flex items-center justify-center text-[6px] leading-none"
+                onClick={() => useAppStore.getState().updateItem(item.id, { backgroundColor: "transparent" })}
+                title="Remove background"
+              >
+                x
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Reference badges */}
-      <div className="absolute -top-7 left-0 z-10 flex gap-1">
+      <div className={`absolute left-0 z-10 flex gap-1 ${item.type === "text" && isSelected ? "-top-[72px]" : "-top-7"}`}>
         {isStartFrame && (
           <Badge className="bg-green-600 text-white text-[10px] px-1.5 py-0 border-0">
             START FRAME
@@ -207,8 +346,10 @@ export function BoardItemCard({
               fontFamily: item.fontFamily || "Inter, sans-serif",
               color: item.fontColor || (isDark ? "#ffffff" : "#000000"),
               fontWeight: (item.fontWeight as React.CSSProperties["fontWeight"]) || "normal",
+              fontStyle: item.fontStyle || "normal",
               textAlign: item.textAlign || "left",
               backgroundColor: item.backgroundColor || "transparent",
+              lineHeight: 1.4,
             }}
           >
             {isEditingText ? (
@@ -219,7 +360,9 @@ export function BoardItemCard({
                   fontFamily: "inherit",
                   color: "inherit",
                   fontWeight: "inherit",
+                  fontStyle: "inherit",
                   textAlign: item.textAlign || "left",
+                  lineHeight: "inherit",
                 }}
                 value={editTextValue}
                 onChange={(e) => setEditTextValue(e.target.value)}

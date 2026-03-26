@@ -97,6 +97,7 @@ export interface BoardItem {
   fontFamily?: string;
   fontColor?: string;
   fontWeight?: string;
+  fontStyle?: "normal" | "italic";
   textAlign?: "left" | "center" | "right";
   backgroundColor?: string;
   // Drawing item fields
