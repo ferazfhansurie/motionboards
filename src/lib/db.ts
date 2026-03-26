@@ -22,12 +22,16 @@ export interface Settings {
 }
 
 export function getSettings(): Settings {
-  if (!existsSync(SETTINGS_FILE)) return { falApiKey: "", replicateApiKey: "" };
-  try {
-    return JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
-  } catch {
-    return { falApiKey: "", replicateApiKey: "" };
+  let settings: Settings = { falApiKey: "", replicateApiKey: "" };
+  if (existsSync(SETTINGS_FILE)) {
+    try {
+      settings = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
+    } catch {}
   }
+  // Fall back to environment variables (works on Vercel)
+  if (!settings.falApiKey) settings.falApiKey = process.env.FAL_KEY || "";
+  if (!settings.replicateApiKey) settings.replicateApiKey = process.env.REPLICATE_API_TOKEN || "";
+  return settings;
 }
 
 // --- Users ---
