@@ -478,44 +478,6 @@ export function BoardItemCard({
 
         </div>{/* end media wrapper */}
 
-        {/* Item details overlay — shown when selected */}
-        {isSelected && item.type !== "text" && item.type !== "drawing" && item.type !== "audio" && (
-          <div className={`absolute bottom-0 left-0 right-0 z-[5] rounded-b-md px-2 py-1.5 flex items-center gap-2 text-[9px] ${isDark ? "bg-black/70 text-gray-300" : "bg-black/60 text-white"}`} style={{ backdropFilter: "blur(6px)" }}>
-            {/* Type icon + label */}
-            <div className="flex items-center gap-1 shrink-0">
-              {item.type === "video" || (item.type === "generation" && item.outputType === "video") ? (
-                <VideoIcon className="h-3 w-3" />
-              ) : item.type === "psd-layer" ? (
-                <LayersIcon className="h-3 w-3" />
-              ) : item.type === "generation" ? (
-                <SparklesIcon className="h-3 w-3" />
-              ) : (
-                <ImageIcon className="h-3 w-3" />
-              )}
-              <span className="font-semibold uppercase tracking-wide">
-                {item.type === "generation"
-                  ? item.outputType === "video" ? "Video" : item.outputUrl ? "Generated" : "Gen"
-                  : item.type === "psd-layer" ? "PSD" : item.type === "image" ? "Image" : "Video"}
-              </span>
-            </div>
-
-            {/* Dimensions */}
-            <span className="opacity-70">{Math.round(item.width)}{item.height ? ` x ${Math.round(item.height)}` : ""}</span>
-
-            {/* File name */}
-            {item.fileName && (
-              <span className="truncate opacity-70 max-w-[80px]" title={item.fileName}>{item.fileName}</span>
-            )}
-
-            {/* Model + cost for generations */}
-            {item.modelName && (
-              <span className="ml-auto shrink-0 font-semibold text-[#f26522]">
-                {item.modelName}{item.cost ? ` ${item.cost}` : ""}
-              </span>
-            )}
-          </div>
-        )}
-
         {/* Crop overlay */}
         {isImageType && isSelected && (
           <CropOverlay item={item} />

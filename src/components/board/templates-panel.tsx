@@ -86,8 +86,9 @@ export function TemplatesPanel() {
   };
 
   return (
-    <div className="absolute left-2 bottom-10 z-40 w-[480px] pointer-events-auto">
-      <div className={`rounded-2xl border shadow-2xl overflow-hidden ${isDark ? "border-gray-700 bg-[#161b22]" : "border-gray-200 bg-white"}`}>
+    <div className="absolute left-2 bottom-12 z-[45] w-[500px] pointer-events-auto">
+      <div className={`rounded-2xl border overflow-hidden ${isDark ? "border-gray-800 bg-[#0d1117]" : "border-gray-200 bg-white"}`}
+        style={{ boxShadow: isDark ? "0 25px 60px rgba(0,0,0,0.6)" : "0 25px 60px rgba(0,0,0,0.15)" }}>
         {/* Header */}
         <div className={`flex items-center justify-between border-b px-4 py-2.5 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
           <div className="flex items-center gap-2">
