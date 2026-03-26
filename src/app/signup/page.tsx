@@ -217,6 +217,13 @@ export default function SignupPage() {
             <p className="text-[10px] text-gray-400 text-center">
               Secure payment powered by Stripe. Your card details never touch our servers.
             </p>
+
+            <p className="text-[10px] text-gray-400 text-center mt-2">
+              By continuing, you agree to our{" "}
+              <a href="/terms" className="text-[#f26522] hover:underline">Terms of Service</a>
+              {" & "}
+              <a href="/privacy" className="text-[#f26522] hover:underline">Privacy Policy</a>
+            </p>
           </form>
         )}
 
@@ -225,8 +232,8 @@ export default function SignupPage() {
           <a href="/login" className="text-[#f26522] font-medium hover:underline">Sign in</a>
         </p>
 
-        <p className="text-[10px] text-gray-300 text-center mt-8">
-          Powered by Adletic Digital Marketing Agency &copy; 2026
+        <p className="text-[10px] text-gray-300 text-center mt-8 flex items-center justify-center gap-1">
+          Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm inline-block" /> <span className="font-semibold text-gray-400">Adletic</span> &copy; 2026
         </p>
       </div>
     </div>
