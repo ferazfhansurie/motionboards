@@ -11,17 +11,12 @@ interface UserData {
   role: string;
 }
 
-const TOPUP_PACKAGES = [
-  { credits: 1000, price: "RM10", label: "Starter", description: "RM10 balance · ~10 video gens" },
-  { credits: 5000, price: "RM50", label: "Creator", description: "RM50 balance · ~50 video gens", popular: true },
-  { credits: 10000, price: "RM100", label: "Pro", description: "RM100 balance · ~100 video gens" },
-  { credits: 25000, price: "RM250", label: "Studio", description: "RM250 balance · ~250 video gens" },
-];
-
 export default function DashboardPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generations, setGenerations] = useState<Array<Record<string, unknown>>>([]);
+  const [topupAmount, setTopupAmount] = useState("10");
+  const [topupLoading, setTopupLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -44,9 +39,30 @@ export default function DashboardPage() {
     window.location.href = "/login";
   };
 
-  const handleTopup = (pkg: (typeof TOPUP_PACKAGES)[number]) => {
-    const msg = `Hi, I'd like to top up my MotionBoards account.\n\nPackage: ${pkg.label} (${pkg.price})\nCredits: ${pkg.credits}\nEmail: ${user?.email}\n\nPlease process my payment.`;
-    window.open(`https://wa.me/60112167672?text=${encodeURIComponent(msg)}`, "_blank");
+  const handleTopup = async () => {
+    const amount = parseFloat(topupAmount);
+    if (isNaN(amount) || amount < 10) {
+      alert("Minimum top-up is RM10");
+      return;
+    }
+    setTopupLoading(true);
+    try {
+      const res = await fetch("/api/stripe/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Failed to create checkout session");
+      }
+    } catch {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setTopupLoading(false);
+    }
   };
 
   if (loading) {
@@ -101,26 +117,33 @@ export default function DashboardPage() {
         {/* Top Up */}
         <div>
           <h2 className="text-sm font-bold text-[#0d1117] mb-1">Top Up Credits</h2>
-          <p className="text-xs text-gray-400 mb-4">Select a package and pay via WhatsApp. Credits added within minutes.</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {TOPUP_PACKAGES.map((pkg) => (
-              <button
-                key={pkg.credits}
-                onClick={() => handleTopup(pkg)}
-                className={`relative text-left rounded-xl border-2 p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg ${
-                  pkg.popular ? "border-[#f26522] bg-[#f26522]/5 shadow-md" : "border-gray-200 bg-white hover:border-[#f26522]/40"
-                }`}
-              >
-                {pkg.popular && (
-                  <span className="absolute -top-2.5 left-3 bg-[#f26522] text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-                    POPULAR
-                  </span>
-                )}
-                <p className="text-lg font-bold text-[#0d1117]">{pkg.price}</p>
-                <p className="text-xs font-semibold text-[#f26522] mt-1">RM{(pkg.credits / 100).toFixed(0)} balance</p>
-                <p className="text-[10px] text-gray-400 mt-1">{pkg.description}</p>
-              </button>
-            ))}
+          <p className="text-xs text-gray-400 mb-4">Enter any amount (minimum RM10). Pay securely via Stripe.</p>
+          <div className="flex items-center gap-3 max-w-md">
+            <div className="relative flex-1">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-gray-400">RM</span>
+              <input
+                type="number"
+                min="10"
+                step="1"
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleTopup(); }}
+                className="w-full pl-14 pr-4 py-3 text-lg font-bold text-[#0d1117] bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+                placeholder="10"
+              />
+            </div>
+            <button
+              onClick={handleTopup}
+              disabled={topupLoading}
+              className="px-6 py-3 bg-[#f26522] text-white text-sm font-bold rounded-xl hover:bg-[#d9541a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
+            >
+              {topupLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              Top Up
+            </button>
           </div>
         </div>
 

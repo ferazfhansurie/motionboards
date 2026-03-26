@@ -12,20 +12,14 @@ interface UserData {
   role: string;
 }
 
-const TOPUP_PACKAGES = [
-  { plan: "starter", credits: 1000, price: "RM10", label: "Starter", description: "~10 video gens" },
-  { plan: "creator", credits: 5000, price: "RM50", label: "Creator", description: "~50 video gens", popular: true },
-  { plan: "pro", credits: 10000, price: "RM100", label: "Pro", description: "~100 video gens" },
-  { plan: "studio", credits: 25000, price: "RM250", label: "Studio", description: "~250 video gens" },
-];
-
 // ============ PROFILE PANEL ============
 export function ProfilePanel() {
   const { isProfileOpen, setProfileOpen, theme } = useAppStore();
   const isDark = theme === "dark";
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [topupLoading, setTopupLoading] = useState<string | null>(null);
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("10");
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -39,13 +33,18 @@ export function ProfilePanel() {
 
   if (!isProfileOpen) return null;
 
-  const handleTopup = async (pkg: (typeof TOPUP_PACKAGES)[number]) => {
-    setTopupLoading(pkg.plan);
+  const handleTopup = async () => {
+    const amount = parseFloat(topupAmount);
+    if (isNaN(amount) || amount < 10) {
+      alert("Minimum top-up is RM10");
+      return;
+    }
+    setTopupLoading(true);
     try {
       const res = await fetch("/api/stripe/topup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: pkg.plan }),
+        body: JSON.stringify({ amount }),
       });
       const data = await res.json();
       if (data.url) {
@@ -56,7 +55,7 @@ export function ProfilePanel() {
     } catch {
       alert("Something went wrong. Please try again.");
     } finally {
-      setTopupLoading(null);
+      setTopupLoading(false);
     }
   };
 
@@ -116,34 +115,36 @@ export function ProfilePanel() {
               {/* Top Up */}
               <div>
                 <p className={`text-[11px] font-bold mb-2 ${isDark ? "text-white" : "text-[#0d1117]"}`}>Top Up</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {TOPUP_PACKAGES.map((pkg) => (
-                    <button
-                      key={pkg.credits}
-                      onClick={() => handleTopup(pkg)}
-                      disabled={topupLoading !== null}
-                      className={`relative text-left rounded-lg border p-2.5 transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
-                        pkg.popular
-                          ? "border-[#f26522] bg-[#f26522]/5"
-                          : isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-200 bg-white"
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${isDark ? "text-gray-400" : "text-gray-500"}`}>RM</span>
+                    <input
+                      type="number"
+                      min="10"
+                      step="1"
+                      value={topupAmount}
+                      onChange={(e) => setTopupAmount(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleTopup(); }}
+                      className={`w-full pl-10 pr-3 py-2.5 text-sm font-bold rounded-xl border transition-all focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 ${
+                        isDark ? "bg-[#0d1117] text-white border-gray-700" : "bg-gray-50 text-[#0d1117] border-gray-200"
                       }`}
-                    >
-                      {pkg.popular && (
-                        <span className="absolute -top-2 right-2 bg-[#f26522] text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full">
-                          POPULAR
-                        </span>
-                      )}
-                      {topupLoading === pkg.plan ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-[#f26522] mx-auto" />
-                      ) : (
-                        <>
-                          <p className={`text-sm font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>{pkg.price}</p>
-                          <p className="text-[9px] text-gray-400">{pkg.description}</p>
-                        </>
-                      )}
-                    </button>
-                  ))}
+                      placeholder="10"
+                    />
+                  </div>
+                  <button
+                    onClick={handleTopup}
+                    disabled={topupLoading}
+                    className="px-4 py-2.5 bg-[#f26522] text-white text-xs font-bold rounded-xl hover:bg-[#d9541a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                  >
+                    {topupLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="h-3.5 w-3.5" />
+                    )}
+                    Top Up
+                  </button>
                 </div>
+                <p className="text-[9px] text-gray-400 mt-1.5">Minimum RM10. Enter any amount.</p>
               </div>
 
               {/* Logout */}
