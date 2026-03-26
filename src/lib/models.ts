@@ -280,29 +280,28 @@ export const models: AIModel[] = [
 
   // === Concept Art & Style ===
 
-  // I2I — prompt required, image optional (for editing)
+  // T2I — text to image
   {
-    id: "fal-ai/nano-banana/v2",
-    name: "Nano Banana 2",
-    provider: "fal", type: "i2i", category: "Concept Art & Style",
-    description: "Image generation. Optional image input for editing mode.",
-    cost: "~RM0.18", creditCost: 18, speed: "~1m", stable: true,
+    id: "fal-ai/nano-banana",
+    name: "Nano Banana",
+    provider: "fal", type: "t2i", category: "Concept Art & Style",
+    description: "Fast image generation from text prompts.",
+    cost: "~RM0.18", creditCost: 18, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_url", type: "image", required: false, description: "Reference image (optional)" },
     ],
   },
 
-  // I2I — prompt required, image optional
+  // I2I — image editing with prompt
   {
-    id: "fal-ai/nano-banana/pro",
-    name: "Nano Banana Pro",
+    id: "fal-ai/nano-banana/edit",
+    name: "Nano Banana Edit",
     provider: "fal", type: "i2i", category: "Concept Art & Style",
-    description: "Higher quality image generation. Optional image for editing.",
-    cost: "~RM0.25", creditCost: 25, speed: "~1m", stable: true,
+    description: "Edit images with text prompts. Upload an image and describe changes.",
+    cost: "~RM0.25", creditCost: 25, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_url", type: "image", required: false, description: "Reference image (optional)" },
+      { name: "image_url", type: "image", required: true, description: "Image to edit" },
     ],
   },
 
