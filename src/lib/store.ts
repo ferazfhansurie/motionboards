@@ -122,6 +122,14 @@ export interface Connection {
   toId: string;
 }
 
+export interface TimelineClip {
+  id: string;
+  itemId: string; // references BoardItem.id
+  trimStart: number; // seconds
+  trimEnd: number; // seconds (0 = full duration)
+  duration: number; // total duration of source
+}
+
 export interface AppState {
   // Boards
   boards: Board[];
@@ -169,6 +177,10 @@ export interface AppState {
   theme: "light" | "dark";
   connectingFromId: string | null;
 
+  // Timeline
+  isTimelineOpen: boolean;
+  timelineClips: TimelineClip[];
+
   // Undo/Redo
   undoStack: BoardItem[][];
   redoStack: BoardItem[][];
@@ -211,6 +223,11 @@ export interface AppState {
   removeConnection: (id: string) => void;
   setTheme: (theme: "light" | "dark") => void;
   setConnectingFromId: (id: string | null) => void;
+  setTimelineOpen: (open: boolean) => void;
+  addTimelineClip: (clip: TimelineClip) => void;
+  removeTimelineClip: (id: string) => void;
+  reorderTimelineClips: (clips: TimelineClip[]) => void;
+  updateTimelineClip: (id: string, updates: Partial<TimelineClip>) => void;
   pushUndo: () => void;
   undo: () => void;
   redo: () => void;
@@ -262,6 +279,8 @@ export const useAppStore = create<AppState>((set) => {
   connections: startBoard.connections || [],
   theme: (typeof window !== "undefined" && localStorage.getItem("motionboards_theme") as "light" | "dark") || "light",
   connectingFromId: null,
+  isTimelineOpen: false,
+  timelineClips: [],
   undoStack: [],
   redoStack: [],
 
@@ -301,6 +320,17 @@ export const useAppStore = create<AppState>((set) => {
     set({ theme });
   },
   setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
+  setTimelineOpen: (isTimelineOpen) => set({ isTimelineOpen }),
+  addTimelineClip: (clip) => set((s) => ({
+    timelineClips: [...s.timelineClips, clip],
+  })),
+  removeTimelineClip: (id) => set((s) => ({
+    timelineClips: s.timelineClips.filter((c) => c.id !== id),
+  })),
+  reorderTimelineClips: (timelineClips) => set({ timelineClips }),
+  updateTimelineClip: (id, updates) => set((s) => ({
+    timelineClips: s.timelineClips.map((c) => c.id === id ? { ...c, ...updates } : c),
+  })),
 
   addItem: (item) => set((s) => ({
     undoStack: [...s.undoStack.slice(-49), s.items],

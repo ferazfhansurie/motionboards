@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef } from "react";
-import { ZoomIn, ZoomOut, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus, Type, PenTool, MousePointer, Link2, Sun, Moon } from "lucide-react";
+import { ZoomIn, ZoomOut, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus, Type, PenTool, MousePointer, Link2, Sun, Moon, Film } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { parsePsdBuffer, buildPsdFromItems, downloadPsd } from "@/lib/psd";
 
 export function Toolbar() {
-  const { zoom, setZoom, setPan, items, addItem, boardName, undo, redo, undoStack, redoStack, activeCanvasTool, setActiveCanvasTool, theme, setTheme, drawingColor, setDrawingColor, drawingStrokeWidth, setDrawingStrokeWidth } = useAppStore();
+  const { zoom, setZoom, setPan, items, addItem, boardName, undo, redo, undoStack, redoStack, activeCanvasTool, setActiveCanvasTool, theme, setTheme, drawingColor, setDrawingColor, drawingStrokeWidth, setDrawingStrokeWidth, isTimelineOpen, setTimelineOpen } = useAppStore();
   const isDark = theme === "dark";
   const psdInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -311,6 +311,13 @@ export function Toolbar() {
             title="Export as PSD"
           >
             <Download className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className={`${btnBase} ${isTimelineOpen ? btnAccent : btnInactive}`}
+            onClick={() => setTimelineOpen(!isTimelineOpen)}
+            title="Video Timeline"
+          >
+            <Film className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

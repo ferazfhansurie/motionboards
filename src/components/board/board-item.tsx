@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -534,6 +534,30 @@ export function BoardItemCard({
               >
                 <Pencil className="h-3.5 w-3.5 text-gray-400" />
                 Edit
+              </button>
+            )}
+            {isMediaType && (
+              <button
+                type="button"
+                className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+                onClick={() => {
+                  closeContextMenu();
+                  const store = useAppStore.getState();
+                  const alreadyAdded = store.timelineClips.some((c) => c.itemId === item.id);
+                  if (!alreadyAdded) {
+                    store.addTimelineClip({
+                      id: `clip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                      itemId: item.id,
+                      trimStart: 0,
+                      trimEnd: 0,
+                      duration: item.type === "image" || item.type === "psd-layer" ? 3 : 10,
+                    });
+                  }
+                  store.setTimelineOpen(true);
+                }}
+              >
+                <Film className="h-3.5 w-3.5 text-gray-400" />
+                Add to Timeline
               </button>
             )}
             <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />
