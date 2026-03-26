@@ -13,6 +13,7 @@ import { ProfilePanel, HistoryPanel } from "./dashboard-modal";
 import { AIPromptPanel } from "./ai-prompt-panel";
 import { TimelineWidget } from "./timeline-widget";
 import { parsePsdBuffer } from "@/lib/psd";
+import { requireAuth } from "@/lib/auth-gate";
 
 // Upload file to fal storage, returns URL. Falls back to data URI on failure.
 async function uploadFile(file: File): Promise<string> {
@@ -366,6 +367,7 @@ export function Canvas() {
   // Paste from clipboard
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
+      if (!requireAuth()) return;
       const clipboardItems = e.clipboardData?.items;
       if (!clipboardItems) return;
 
@@ -413,6 +415,7 @@ export function Canvas() {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      if (!requireAuth()) return;
       const files = Array.from(e.dataTransfer.files);
       const canvasRect = canvasRef.current?.getBoundingClientRect();
       if (!canvasRect) return;

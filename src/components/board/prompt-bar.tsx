@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { getModelById } from "@/lib/models";
+import { requireAuth } from "@/lib/auth-gate";
 import { useEffect } from "react";
 
 export function PromptBar() {
@@ -84,6 +85,7 @@ export function PromptBar() {
   };
 
   const handleGenerate = async () => {
+    if (!requireAuth()) return;
     if (!selectedModel) return;
     if (!prompt.trim() && selectedModel.inputs.some((i) => i.type === "text" && i.required)) return;
 

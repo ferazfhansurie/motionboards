@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { ZoomIn, ZoomOut, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus, Type, PenTool, MousePointer, Link2, Sun, Moon, Film } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { parsePsdBuffer, buildPsdFromItems, downloadPsd } from "@/lib/psd";
+import { requireAuth } from "@/lib/auth-gate";
 
 export function Toolbar() {
   const { zoom, setZoom, setPan, items, addItem, boardName, undo, redo, undoStack, redoStack, activeCanvasTool, setActiveCanvasTool, theme, setTheme, drawingColor, setDrawingColor, drawingStrokeWidth, setDrawingStrokeWidth, isTimelineOpen, setTimelineOpen } = useAppStore();
@@ -12,6 +13,7 @@ export function Toolbar() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!requireAuth()) return;
     const files = Array.from(e.target.files || []);
     const { panX, panY, zoom: z } = useAppStore.getState();
 
