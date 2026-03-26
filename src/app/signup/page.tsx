@@ -4,10 +4,10 @@ import { useState } from "react";
 import { Loader2, Check, Zap } from "lucide-react";
 
 const PLANS = [
-  { id: "starter", name: "Starter", price: "RM10", credits: "RM10 balance", gens: "~10 video gens" },
-  { id: "creator", name: "Creator", price: "RM50", credits: "RM50 balance", gens: "~50 video gens", popular: true },
-  { id: "pro", name: "Pro", price: "RM100", credits: "RM100 balance", gens: "~100 video gens" },
-  { id: "studio", name: "Studio", price: "RM250", credits: "RM250 balance", gens: "~250 video gens" },
+  { id: "starter", name: "Starter", price: "RM10", credits: "RM10 balance", gens: "Pay-per-use" },
+  { id: "creator", name: "Creator", price: "RM50", credits: "RM50 balance", gens: "Pay-per-use", popular: true },
+  { id: "pro", name: "Pro", price: "RM100", credits: "RM100 balance", gens: "Pay-per-use" },
+  { id: "studio", name: "Studio", price: "RM250", credits: "RM250 balance", gens: "Pay-per-use" },
 ];
 
 export default function SignupPage() {
