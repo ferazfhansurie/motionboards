@@ -54,7 +54,8 @@ export function BoardItemCard({
     e.preventDefault();
     e.stopPropagation();
     selectItem(item.id);
-    setContextMenu({ x: e.clientX, y: e.clientY });
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   };
 
   const closeContextMenu = () => setContextMenu(null);
@@ -288,7 +289,7 @@ export function BoardItemCard({
         <>
           <div className="fixed inset-0 z-[100]" onClick={closeContextMenu} onContextMenu={(e) => { e.preventDefault(); closeContextMenu(); }} />
           <div
-            className="fixed z-[101] bg-white rounded-xl border border-gray-200 shadow-xl py-1 min-w-[160px] overflow-hidden"
+            className="absolute z-[101] bg-white rounded-xl border border-gray-200 shadow-xl py-1 min-w-[160px] overflow-hidden"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             {isMediaType && (

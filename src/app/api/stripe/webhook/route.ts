@@ -35,31 +35,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const { name, email, password, credits } = session.metadata || {};
+    const metadata = session.metadata || {};
+    const creditAmount = parseInt(metadata.credits || "0", 10);
 
-    if (!name || !email || !password || !credits) {
-      console.error("Missing metadata in checkout session:", session.id);
-      return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
+    if (!creditAmount) {
+      console.error("Missing credits in checkout session:", session.id);
+      return NextResponse.json({ error: "Missing credits metadata" }, { status: 400 });
     }
 
-    const creditAmount = parseInt(credits, 10);
-
-    // Check if user already exists
-    const sql = getSql();
-    const existing = await sql`SELECT id FROM mb_users WHERE LOWER(email) = LOWER(${email})`;
-
-    if (existing.length > 0) {
-      // User exists — just add credits (topup case)
-      await addCredits(existing[0].id as string, creditAmount);
-      console.log(`Added ${creditAmount} credits to existing user ${email}`);
+    // Top-up flow: authenticated user adding credits
+    if (metadata.type === "topup") {
+      const { userId, email } = metadata;
+      if (!userId || !email) {
+        console.error("Missing topup metadata in session:", session.id);
+        return NextResponse.json({ error: "Missing topup metadata" }, { status: 400 });
+      }
+      await addCredits(userId, creditAmount);
+      console.log(`Topup: added ${creditAmount} credits to user ${email}`);
     } else {
-      // Create new user with credits
-      const user = await createUser(name, email, password);
-      if (user) {
-        await addCredits(user.id, creditAmount);
-        console.log(`Created user ${email} with ${creditAmount} credits`);
+      // Signup flow: new user registration
+      const { name, email, password } = metadata;
+
+      if (!name || !email || !password) {
+        console.error("Missing signup metadata in checkout session:", session.id);
+        return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
+      }
+
+      const sql = getSql();
+      const existing = await sql`SELECT id FROM mb_users WHERE LOWER(email) = LOWER(${email})`;
+
+      if (existing.length > 0) {
+        await addCredits(existing[0].id as string, creditAmount);
+        console.log(`Added ${creditAmount} credits to existing user ${email}`);
       } else {
-        console.error(`Failed to create user ${email}`);
+        const user = await createUser(name, email, password);
+        if (user) {
+          await addCredits(user.id, creditAmount);
+          console.log(`Created user ${email} with ${creditAmount} credits`);
+        } else {
+          console.error(`Failed to create user ${email}`);
+        }
       }
     }
   }

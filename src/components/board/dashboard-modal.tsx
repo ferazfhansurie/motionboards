@@ -13,10 +13,10 @@ interface UserData {
 }
 
 const TOPUP_PACKAGES = [
-  { credits: 1000, price: "RM10", label: "Starter", description: "~10 video gens" },
-  { credits: 5000, price: "RM50", label: "Creator", description: "~50 video gens", popular: true },
-  { credits: 10000, price: "RM100", label: "Pro", description: "~100 video gens" },
-  { credits: 25000, price: "RM250", label: "Studio", description: "~250 video gens" },
+  { plan: "starter", credits: 1000, price: "RM10", label: "Starter", description: "~10 video gens" },
+  { plan: "creator", credits: 5000, price: "RM50", label: "Creator", description: "~50 video gens", popular: true },
+  { plan: "pro", credits: 10000, price: "RM100", label: "Pro", description: "~100 video gens" },
+  { plan: "studio", credits: 25000, price: "RM250", label: "Studio", description: "~250 video gens" },
 ];
 
 // ============ PROFILE PANEL ============
@@ -37,9 +37,27 @@ export function ProfilePanel() {
 
   if (!isProfileOpen) return null;
 
-  const handleTopup = (pkg: (typeof TOPUP_PACKAGES)[number]) => {
-    const msg = `Hi, I'd like to top up my MotionBoards account.\n\nPackage: ${pkg.label} (${pkg.price})\nEmail: ${user?.email}\n\nPlease process my payment.`;
-    window.open(`https://wa.me/60112167672?text=${encodeURIComponent(msg)}`, "_blank");
+  const [topupLoading, setTopupLoading] = useState<string | null>(null);
+
+  const handleTopup = async (pkg: (typeof TOPUP_PACKAGES)[number]) => {
+    setTopupLoading(pkg.plan);
+    try {
+      const res = await fetch("/api/stripe/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: pkg.plan }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Failed to create checkout session");
+      }
+    } catch {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setTopupLoading(null);
+    }
   };
 
   const handleLogout = async () => {
@@ -97,13 +115,14 @@ export function ProfilePanel() {
 
               {/* Top Up */}
               <div>
-                <p className="text-[11px] font-bold text-[#0d1117] mb-2">Top Up via WhatsApp</p>
+                <p className="text-[11px] font-bold text-[#0d1117] mb-2">Top Up</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {TOPUP_PACKAGES.map((pkg) => (
                     <button
                       key={pkg.credits}
                       onClick={() => handleTopup(pkg)}
-                      className={`relative text-left rounded-lg border p-2.5 transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                      disabled={topupLoading !== null}
+                      className={`relative text-left rounded-lg border p-2.5 transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
                         pkg.popular ? "border-[#f26522] bg-[#f26522]/5" : "border-gray-200 bg-white"
                       }`}
                     >
@@ -112,8 +131,14 @@ export function ProfilePanel() {
                           POPULAR
                         </span>
                       )}
-                      <p className="text-sm font-bold text-[#0d1117]">{pkg.price}</p>
-                      <p className="text-[9px] text-gray-400">{pkg.description}</p>
+                      {topupLoading === pkg.plan ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#f26522] mx-auto" />
+                      ) : (
+                        <>
+                          <p className="text-sm font-bold text-[#0d1117]">{pkg.price}</p>
+                          <p className="text-[9px] text-gray-400">{pkg.description}</p>
+                        </>
+                      )}
                     </button>
                   ))}
                 </div>
