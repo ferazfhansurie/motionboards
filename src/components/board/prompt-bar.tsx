@@ -23,9 +23,6 @@ import { requireAuth } from "@/lib/auth-gate";
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
-  const [promptBoxWidth, setPromptBoxWidth] = useState(320);
-  const [promptBoxHeight, setPromptBoxHeight] = useState(70);
-  const resizingRef = useRef<{ axis: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const {
     selectedModelId,
@@ -69,28 +66,15 @@ export function PromptBar() {
   } = useAppStore();
   const isDark = theme === "dark";
 
-  // Prompt box resize — drag from bottom-left grip
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      const r = resizingRef.current;
-      if (!r) return;
-      const dx = e.clientX - r.startX;
-      const dy = e.clientY - r.startY;
-      // Dragging left = wider, dragging right = narrower (box anchored to right)
-      setPromptBoxWidth(Math.max(200, Math.min(900, r.startW - dx)));
-      // Dragging down = taller, dragging up = shorter (box anchored to bottom)
-      setPromptBoxHeight(Math.max(50, Math.min(500, r.startH + dy)));
-    };
-    const onMouseUp = () => { resizingRef.current = null; };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => { window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
-  }, []);
-
-  const startResize = (_axis: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    resizingRef.current = { axis: _axis, startX: e.clientX, startY: e.clientY, startW: promptBoxWidth, startH: promptBoxHeight };
+  // Auto-resize textarea as content grows
+  const autoResize = () => {
+    const el = promptRef.current;
+    if (!el) return;
+    el.style.height = "0";
+    el.style.height = Math.min(Math.max(el.scrollHeight, 40), 300) + "px";
   };
+
+  useEffect(() => { autoResize(); }, [prompt]);
 
   // Render model-specific option pills
   const renderOptionPills = () => {
@@ -693,7 +677,7 @@ export function PromptBar() {
       <div className="flex items-end justify-between gap-2 px-2 pb-1">
         <div className="pointer-events-auto" />
         <div className="flex-grow" />
-        <div className="pointer-events-auto relative" style={{ width: promptBoxWidth }}>
+        <div className="pointer-events-auto relative w-80">
           {/* Input previews above textarea */}
           {hasAnyInputs && (
             <div className="flex items-center gap-1.5 mb-1.5 px-1">
@@ -773,26 +757,66 @@ export function PromptBar() {
               )}
             </div>
           )}
-          {/* Model generation options */}
-          {renderOptionPills()}
-          <div className={`relative rounded-2xl border shadow-lg overflow-hidden ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`} style={{ height: promptBoxHeight + 32 }}>
+          <div className={`relative rounded-2xl border shadow-lg overflow-hidden ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
+            {/* Option pills inside the box */}
+            {selectedModel?.options && (() => {
+              const opts = selectedModel.options!;
+              const keys = Object.keys(opts) as (keyof typeof opts)[];
+              if (keys.length === 0) return null;
+              return (
+                <div className="flex items-center gap-1.5 px-3 pt-2 flex-wrap">
+                  {keys.map((key) => {
+                    const opt = opts[key];
+                    if (!opt) return null;
+                    if ("default" in opt && typeof (opt as { default: unknown }).default === "boolean") {
+                      const boolOpt = opt as { default: boolean; label: string };
+                      const currentVal = generationOptions[key] !== undefined ? !!generationOptions[key] : boolOpt.default;
+                      return (
+                        <button key={key} type="button" onClick={() => setGenerationOption(key, !currentVal)}
+                          className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${currentVal ? "bg-[#f26522]/10 border-[#f26522]/30 text-[#f26522]" : isDark ? "border-gray-700 text-gray-500" : "border-gray-200 text-gray-400"}`}>
+                          {boolOpt.label}: {currentVal ? "On" : "Off"}
+                        </button>
+                      );
+                    }
+                    const selOpt = opt as { values: string[]; default: string; label: string };
+                    const current = (generationOptions[key] as string) || selOpt.default;
+                    return (
+                      <div key={key} className="relative group/opt">
+                        <button type="button"
+                          className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isDark ? "border-gray-700 text-gray-400 hover:border-gray-500" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                          {selOpt.label}: {current}
+                        </button>
+                        <div className={`absolute bottom-full left-0 mb-1 rounded-lg border shadow-xl overflow-hidden z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-opacity ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
+                          {selOpt.values.map((v) => (
+                            <button key={v} type="button" onClick={() => setGenerationOption(key, v)}
+                              className={`block w-full text-left text-[9px] px-3 py-1 transition-colors ${v === current ? "text-[#f26522] font-semibold" : isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-500 hover:bg-gray-50"}`}>
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             <textarea
               ref={promptRef}
               placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "No prompt required"}
               disabled={!selectedModel}
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={(e) => { setPrompt(e.target.value); autoResize(); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
                   handleGenerate();
                 }
               }}
-              className={`w-full text-xs placeholder-gray-400 px-3 pt-2 pb-1 resize-none leading-4 overflow-auto bg-transparent focus:outline-none ${isDark ? "text-white" : "text-[#0d1117]"}`}
-              style={{ height: promptBoxHeight }}
+              className={`w-full text-xs placeholder-gray-400 px-3 pt-2 pb-1 resize-none leading-5 bg-transparent focus:outline-none ${isDark ? "text-white" : "text-[#0d1117]"}`}
+              style={{ minHeight: 40, maxHeight: 300 }}
             />
             {/* Bottom bar inside the box */}
-            <div className="flex items-center justify-between px-2 pb-1.5">
+            <div className="flex items-center justify-between px-2.5 pb-2">
               <div className="flex items-center gap-1.5">
                 {selectedModel && (
                   <span className="text-[9px] text-gray-400">{selectedModel.cost}</span>
@@ -815,18 +839,6 @@ export function PromptBar() {
                   <WandSparkles className="h-3.5 w-3.5" />
                 )}
               </button>
-            </div>
-            {/* Resize grip — bottom-left inside the box */}
-            <div
-              className={`absolute bottom-0 left-0 z-20 cursor-sw-resize flex items-center justify-center w-6 h-6 transition-colors ${isDark ? "text-gray-600 hover:text-gray-400" : "text-gray-300 hover:text-gray-500"}`}
-              onMouseDown={startResize("tl")}
-              title="Drag to resize"
-            >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
-                <circle cx="1.5" cy="6.5" r="1" />
-                <circle cx="1.5" cy="3" r="1" />
-                <circle cx="5" cy="6.5" r="1" />
-              </svg>
             </div>
           </div>
         </div>
