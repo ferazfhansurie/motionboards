@@ -111,7 +111,7 @@ export function PromptBar() {
     if (keys.length === 0) return null;
 
     return (
-      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      <div className="flex flex-wrap items-center gap-1 mb-1">
         {keys.map((key) => {
           const opt = opts[key];
           if (!opt) return null;
