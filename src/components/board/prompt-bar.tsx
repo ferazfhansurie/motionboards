@@ -290,96 +290,79 @@ export function PromptBar() {
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const data = await res.json();
         useAppStore.getState().removeItem(genItem.id);
         if (res.status === 401) { window.location.href = "/signup"; return; }
         alert(data.error || "Generation failed");
         return;
       }
 
-      // Read SSE stream for real-time progress
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let finalData: Record<string, unknown> | null = null;
+      // Poll for status — no timeout limit, works with any Vercel plan
+      const { requestId, modelId: actualModelId, generationId } = data;
+      useAppStore.getState().updateItem(genItem.id, { progressText: "Queued..." });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
+      const poll = async () => {
+        try {
+          const statusRes = await fetch(`/api/generate/status?requestId=${requestId}&modelId=${encodeURIComponent(actualModelId)}&generationId=${generationId}`);
+          const statusData = await statusRes.json();
 
-        for (const part of parts) {
-          const line = part.trim();
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === "queued") {
-              useAppStore.getState().updateItem(genItem.id, {
-                progressText: event.position != null ? `Queued #${event.position}` : "Queued...",
-              });
-            } else if (event.type === "processing" || event.type === "started") {
-              useAppStore.getState().updateItem(genItem.id, {
-                progressText: "Processing...",
-              });
-            } else if (event.type === "log") {
-              useAppStore.getState().updateItem(genItem.id, {
-                progressText: event.message || "Processing...",
-              });
-            } else if (event.type === "complete") {
-              finalData = event.data as Record<string, unknown>;
-            } else if (event.type === "error") {
-              useAppStore.getState().updateItem(genItem.id, {
-                status: "failed",
-                error: event.error || "Generation failed",
-                progressText: undefined,
-              });
-              return;
+          if (statusData.status === "completed") {
+            useAppStore.getState().updateItem(genItem.id, {
+              status: "completed",
+              outputUrl: statusData.outputUrl,
+              cost: selectedModel.cost,
+              progressText: undefined,
+            });
+
+            // Auto-resize card
+            if (statusData.outputUrl) {
+              if (outputType === "image") {
+                const img = new window.Image();
+                img.onload = () => {
+                  const maxW = 400;
+                  const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+                  useAppStore.getState().updateItem(genItem.id, { width: Math.round(img.naturalWidth * scale), height: Math.round(img.naturalHeight * scale) });
+                };
+                img.src = statusData.outputUrl;
+              } else if (outputType === "video") {
+                const vid = document.createElement("video");
+                vid.preload = "metadata";
+                vid.onloadedmetadata = () => {
+                  const maxW = 400;
+                  const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
+                  useAppStore.getState().updateItem(genItem.id, { width: Math.round(vid.videoWidth * scale), height: Math.round(vid.videoHeight * scale) });
+                };
+                vid.src = statusData.outputUrl;
+              }
             }
-          } catch {}
-        }
-      }
-
-      if (finalData) {
-        useAppStore.getState().updateItem(genItem.id, {
-          status: finalData.status === "completed" ? "completed" : "failed",
-          outputUrl: (finalData.outputUrl as string) || undefined,
-          error: (finalData.error as string) || undefined,
-          cost: (finalData.cost as string) || selectedModel.cost,
-          progressText: undefined,
-        });
-
-        // Auto-resize card to match actual output dimensions
-        if (finalData.outputUrl && finalData.status === "completed") {
-          const outUrl = finalData.outputUrl as string;
-          if (outputType === "image") {
-            const img = new window.Image();
-            img.onload = () => {
-              const maxW = 400;
-              const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
-              useAppStore.getState().updateItem(genItem.id, {
-                width: Math.round(img.naturalWidth * scale),
-                height: Math.round(img.naturalHeight * scale),
-              });
-            };
-            img.src = outUrl;
-          } else if (outputType === "video") {
-            const vid = document.createElement("video");
-            vid.preload = "metadata";
-            vid.onloadedmetadata = () => {
-              const maxW = 400;
-              const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
-              useAppStore.getState().updateItem(genItem.id, {
-                width: Math.round(vid.videoWidth * scale),
-                height: Math.round(vid.videoHeight * scale),
-              });
-            };
-            vid.src = outUrl;
+            setIsGenerating(false);
+            return;
           }
+
+          if (statusData.status === "failed") {
+            useAppStore.getState().updateItem(genItem.id, {
+              status: "failed",
+              error: statusData.error || "Generation failed",
+              progressText: undefined,
+            });
+            setIsGenerating(false);
+            return;
+          }
+
+          // Still processing — update progress text and poll again
+          const progressMsg = statusData.log || (statusData.position != null ? `Queued #${statusData.position}` : statusData.status === "queued" ? "Queued..." : "Processing...");
+          useAppStore.getState().updateItem(genItem.id, { progressText: progressMsg });
+          setTimeout(poll, 3000); // Poll every 3 seconds
+        } catch {
+          // Network error — retry
+          setTimeout(poll, 5000);
         }
-      }
+      };
+
+      poll();
+      return; // Don't hit the finally block yet — polling handles setIsGenerating
     } catch (err) {
       useAppStore.getState().updateItem(genItem.id, {
         status: "failed",
