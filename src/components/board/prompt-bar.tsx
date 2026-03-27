@@ -700,108 +700,69 @@ export function PromptBar() {
         </div>
       )}
 
-      {/* Prompt input (floating right) */}
-      <div className="flex items-end justify-between gap-2 px-2 pb-1">
-        <div className="pointer-events-auto" />
-        <div className="flex-grow" />
-        <div className="pointer-events-auto relative" style={{ width: boxW }}>
-          {/* Full-screen overlay while dragging to capture mouse everywhere */}
-          {isDragging && <div className="fixed inset-0 z-[100] cursor-nw-resize" />}
-          {/* Input previews above textarea */}
+      {/* Prompt chatbox (floating bottom-right) */}
+      <div className="flex items-end justify-end px-2 pb-1">
+        <div className="pointer-events-auto flex flex-col items-end" style={{ width: boxW }}>
+          {/* Drag overlay — covers entire screen while resizing so mouse is never lost */}
+          {isDragging && (
+            <div className="fixed inset-0 z-[9999] cursor-nw-resize" style={{ pointerEvents: "all" }} />
+          )}
+
+          {/* Input previews row */}
           {hasAnyInputs && (
-            <div className="flex items-center gap-1.5 mb-1.5 px-1">
+            <div className="flex items-center gap-1.5 mb-1.5 px-1 self-start">
               {startItem && (
                 <div className="relative group/thumb">
-                  <img
-                    src={startItem.outputUrl || startItem.src}
-                    alt="Start Frame"
-                    className="h-10 w-10 rounded-md object-cover border border-green-500/60"
-                  />
-                  <span className="absolute -top-1.5 -left-1 bg-green-600 text-white text-[7px] font-bold px-1 rounded leading-tight">
-                    S
-                  </span>
-                  <button
-                    className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    onClick={() => setStartFrame(null)}
-                  >
-                    <X className="h-2 w-2" />
-                  </button>
+                  <img src={startItem.outputUrl || startItem.src} alt="Start" className="h-10 w-10 rounded-md object-cover border border-green-500/60" />
+                  <span className="absolute -top-1.5 -left-1 bg-green-600 text-white text-[7px] font-bold px-1 rounded leading-tight">S</span>
+                  <button className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" onClick={() => setStartFrame(null)}><X className="h-2 w-2" /></button>
                 </div>
               )}
               {endItem && (
                 <div className="relative group/thumb">
-                  <img
-                    src={endItem.outputUrl || endItem.src}
-                    alt="End Frame"
-                    className="h-10 w-10 rounded-md object-cover border border-red-500/60"
-                  />
-                  <span className="absolute -top-1.5 -left-1 bg-red-600 text-white text-[7px] font-bold px-1 rounded leading-tight">
-                    E
-                  </span>
-                  <button
-                    className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    onClick={() => useAppStore.getState().setEndFrame(null)}
-                  >
-                    <X className="h-2 w-2" />
-                  </button>
+                  <img src={endItem.outputUrl || endItem.src} alt="End" className="h-10 w-10 rounded-md object-cover border border-red-500/60" />
+                  <span className="absolute -top-1.5 -left-1 bg-red-600 text-white text-[7px] font-bold px-1 rounded leading-tight">E</span>
+                  <button className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" onClick={() => useAppStore.getState().setEndFrame(null)}><X className="h-2 w-2" /></button>
                 </div>
               )}
               {refItems.map((item, i) => (
                 <div key={item.id} className="relative group/thumb">
-                  <img
-                    src={item.outputUrl || item.src}
-                    alt={`Input ${i + 1}`}
-                    className="h-10 w-10 rounded-md object-cover border border-emerald-500/60"
-                  />
-                  <span className="absolute -top-1.5 -left-1 bg-emerald-600 text-white text-[7px] font-bold px-1 rounded leading-tight">
-                    {i + 1}
-                  </span>
-                  <button
-                    className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    onClick={() => {
-                      // Remove this input and cascade
-                      const newRefs = inputRefs.slice(0, i);
-                      useAppStore.setState({ inputRefs: newRefs });
-                    }}
-                  >
-                    <X className="h-2 w-2" />
-                  </button>
+                  <img src={item.outputUrl || item.src} alt={`Input ${i + 1}`} className="h-10 w-10 rounded-md object-cover border border-emerald-500/60" />
+                  <span className="absolute -top-1.5 -left-1 bg-emerald-600 text-white text-[7px] font-bold px-1 rounded leading-tight">{i + 1}</span>
+                  <button className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" onClick={() => useAppStore.setState({ inputRefs: inputRefs.slice(0, i) })}><X className="h-2 w-2" /></button>
                 </div>
               ))}
               {audioItem && (
                 <div className="relative group/thumb">
-                  <div className="h-10 w-10 rounded-md border border-purple-500/60 bg-purple-500/10 flex items-center justify-center">
-                    <Music className="h-4 w-4 text-purple-400" />
-                  </div>
-                  <span className="absolute -top-1.5 -left-1 bg-purple-600 text-white text-[7px] font-bold px-1 rounded leading-tight">
-                    A
-                  </span>
-                  <button
-                    className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    onClick={() => setAudioInput(null)}
-                  >
-                    <X className="h-2 w-2" />
-                  </button>
+                  <div className="h-10 w-10 rounded-md border border-purple-500/60 bg-purple-500/10 flex items-center justify-center"><Music className="h-4 w-4 text-purple-400" /></div>
+                  <span className="absolute -top-1.5 -left-1 bg-purple-600 text-white text-[7px] font-bold px-1 rounded leading-tight">A</span>
+                  <button className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" onClick={() => setAudioInput(null)}><X className="h-2 w-2" /></button>
                 </div>
               )}
             </div>
           )}
-          <div className={`relative rounded-2xl border shadow-lg ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
-            {/* Drag handle — top-left corner */}
+
+          {/* The chatbox */}
+          <div className={`w-full rounded-2xl border shadow-lg flex flex-col ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
+            {/* Top resize bar — drag left/up to resize */}
             <div
-              className={`absolute top-1 left-1 z-30 cursor-nw-resize rounded-md p-1 transition-colors ${isDark ? "text-gray-600 hover:text-gray-300 hover:bg-white/10" : "text-gray-300 hover:text-gray-500 hover:bg-gray-100"}`}
+              className={`flex items-center justify-center h-5 cursor-nw-resize select-none shrink-0 rounded-t-2xl transition-colors ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
               onMouseDown={onDragStart}
-              title="Drag to resize"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-                <circle cx="2" cy="2" r="1.2" />
-                <circle cx="6" cy="2" r="1.2" />
-                <circle cx="2" cy="6" r="1.2" />
-                <circle cx="6" cy="6" r="1.2" />
-              </svg>
+              <div className={`flex gap-[3px] ${isDark ? "text-gray-600" : "text-gray-300"}`}>
+                <svg width="16" height="4" viewBox="0 0 16 4" fill="currentColor">
+                  <circle cx="2" cy="2" r="1.2" />
+                  <circle cx="6" cy="2" r="1.2" />
+                  <circle cx="10" cy="2" r="1.2" />
+                  <circle cx="14" cy="2" r="1.2" />
+                </svg>
+              </div>
             </div>
+
             {/* Option pills */}
             {renderOptionPills()}
+
+            {/* Textarea */}
             <textarea
               ref={promptRef}
               placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "No prompt required"}
@@ -809,21 +770,16 @@ export function PromptBar() {
               value={prompt}
               onChange={(e) => { setPrompt(e.target.value); autoResize(); }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault();
-                  handleGenerate();
-                }
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleGenerate(); }
               }}
-              className={`w-full text-xs placeholder-gray-400 px-3 pt-1 pb-1 resize-none leading-5 bg-transparent focus:outline-none ${isDark ? "text-white" : "text-[#0d1117]"}`}
+              className={`w-full text-xs placeholder-gray-400 px-3 pt-1 pb-1 resize-none leading-5 bg-transparent focus:outline-none flex-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}
               style={{ minHeight: boxMinH, maxHeight: 500 }}
             />
-            {/* Bottom bar */}
-            <div className="flex items-center justify-between px-2.5 pb-2">
-              <div className="flex items-center gap-1.5">
-                {selectedModel && (
-                  <span className="text-[9px] text-gray-400">{selectedModel.cost}</span>
-                )}
-              </div>
+
+            {/* Bottom bar — cost + generate */}
+            <div className="flex items-center justify-between px-2.5 pb-2 pt-1 shrink-0">
+              {selectedModel && <span className="text-[9px] text-gray-400">{selectedModel.cost}</span>}
+              {!selectedModel && <span />}
               <button
                 type="button"
                 disabled={isGenerating || !selectedModel}
@@ -835,11 +791,7 @@ export function PromptBar() {
                 }`}
                 title="Generate (Ctrl+Enter)"
               >
-                {isGenerating ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <WandSparkles className="h-3.5 w-3.5" />
-                )}
+                {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
