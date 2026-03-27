@@ -139,8 +139,19 @@ export async function POST(req: NextRequest) {
             } else {
               // Non-S2E: map images in order from inputRefs
               for (let idx = 0; idx < imageInputs.length; idx++) {
-                const src = allImages[idx] || (idx === 0 ? inputImage : null);
-                if (src) input[imageInputs[idx].name] = src;
+                const inp = imageInputs[idx];
+                const n = inp.name.toLowerCase();
+                // Handle array params (e.g. "image_urls" expects an array)
+                if (inp.name.endsWith("_urls") || inp.name.endsWith("_images")) {
+                  const urls = allImages.length > 0 ? allImages : (inputImage ? [inputImage] : []);
+                  if (urls.length > 0) input[inp.name] = urls;
+                } else if (n.includes("end") || n.includes("last")) {
+                  // Optional end frame (e.g. end_image_url)
+                  if (endFrame) input[inp.name] = endFrame;
+                } else {
+                  const src = allImages[idx] || (idx === 0 ? inputImage : null);
+                  if (src) input[inp.name] = src;
+                }
               }
             }
 

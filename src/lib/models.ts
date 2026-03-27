@@ -157,6 +157,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Motion description (recommended)" },
       { name: "start_image_url", type: "image", required: true, description: "Source image" },
+      { name: "end_image_url", type: "image", required: false, description: "End frame image (optional)" },
     ],
     options: {
       aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
@@ -165,10 +166,10 @@ export const models: AIModel[] = [
     },
   },
 
-  // T2V — text only
+  // T2V — text only (v2.2 replaces deprecated v2.1)
   {
-    id: "fal-ai/wan/v2.1/14b/text-to-video",
-    name: "Wan 2.1 (14B)",
+    id: "fal-ai/wan/v2.2-a14b/text-to-video",
+    name: "Wan 2.2 (A14B)",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "High quality text-to-video generation.",
     cost: "~RM0.35", creditCost: 35, speed: "~2m", stable: true,
@@ -188,10 +189,10 @@ export const models: AIModel[] = [
     ],
   },
 
-  // T2V — text only
+  // T2V — text only (v2.2 replaces deprecated v2.1)
   {
-    id: "fal-ai/wan/v2.1/1.3b/text-to-video",
-    name: "Wan 2.1 (1.3B) Fast",
+    id: "fal-ai/wan/v2.2-5b/text-to-video",
+    name: "Wan 2.2 (5B) Fast",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "Fast, lightweight video generation.",
     cost: "~RM0.79", creditCost: 79, speed: "~30s", stable: true,
@@ -228,6 +229,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Motion description" },
       { name: "image_url", type: "image", required: true, description: "Reference image" },
+      { name: "end_image_url", type: "image", required: false, description: "End frame image (optional)" },
     ],
   },
 
@@ -246,10 +248,10 @@ export const models: AIModel[] = [
 
   // === Video Editing ===
 
-  // V2V — video + prompt required
+  // V2V — video + prompt required (corrected endpoint)
   {
-    id: "fal-ai/kling-video/o3/v2v",
-    name: "Kling O3 V2V Edit",
+    id: "fal-ai/kling-video/o3/pro/video-to-video/edit",
+    name: "Kling O3 Pro V2V Edit",
     provider: "fal", type: "v2v", category: "Video Editing",
     description: "Edit any video with element replacement. Requires a video input.",
     cost: "~RM0.49", creditCost: 49, speed: "~4m", stable: true,
@@ -336,7 +338,7 @@ export const models: AIModel[] = [
     },
   },
 
-  // I2I — Nano Banana 2 Edit
+  // I2I — Nano Banana 2 Edit (uses image_urls array, not image_url)
   {
     id: "fal-ai/nano-banana-2/edit",
     name: "Nano Banana 2 Edit",
@@ -345,7 +347,7 @@ export const models: AIModel[] = [
     cost: "~RM0.20", creditCost: 20, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Edit description" },
-      { name: "image_url", type: "image", required: true, description: "Image to edit" },
+      { name: "image_urls", type: "image", required: true, description: "Images to edit (array)" },
     ],
   },
 
@@ -401,22 +403,25 @@ export const models: AIModel[] = [
     inputs: [{ name: "prompt", type: "text", required: true, description: "Image description" }],
   },
 
-  // T2I — prompt only
+  // I2I — prompt + image_urls (supports editing with reference images)
   {
     id: "fal-ai/gpt-image-1.5/edit",
     name: "GPT Image 1.5 Edit",
-    provider: "fal", type: "t2i", category: "Concept Art & Style",
-    description: "GPT-powered image generation. Prompt only.",
+    provider: "fal", type: "i2i", category: "Concept Art & Style",
+    description: "GPT-powered image editing. Optional reference image + mask.",
     cost: "~RM0.22", creditCost: 22, speed: "~20s", stable: true,
-    inputs: [{ name: "prompt", type: "text", required: true, description: "Image description" }],
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Image description or edit instruction" },
+      { name: "image_urls", type: "image", required: false, description: "Reference images (optional)" },
+    ],
   },
 
   // === Character & Fashion ===
 
-  // I2V — image required, prompt optional
+  // I2V — image required, prompt optional (corrected endpoint: v1.6 has elements, v3 does not)
   {
-    id: "fal-ai/kling-video/v3/pro/elements",
-    name: "Kling 3.0 Elements",
+    id: "fal-ai/kling-video/v1.6/pro/elements",
+    name: "Kling 1.6 Elements",
     provider: "fal", type: "i2v", category: "Character & Fashion",
     description: "Character-consistent video with element injection. Requires image.",
     cost: "~RM0.42", creditCost: 42, speed: "~4m", stable: true,
@@ -451,6 +456,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "video_url", type: "video", required: true, description: "Face video" },
       { name: "audio_url", type: "audio", required: false, description: "Audio/speech (or use text)" },
+      { name: "text", type: "text", required: false, description: "TTS text when no audio provided" },
     ],
   },
 
@@ -475,6 +481,7 @@ export const models: AIModel[] = [
     description: "Full-body animation from audio. Requires image + audio.",
     cost: "~RM0.61", creditCost: 61, speed: "~5m", stable: true,
     inputs: [
+      { name: "prompt", type: "text", required: false, description: "Video generation guidance (optional)" },
       { name: "image_url", type: "image", required: true, description: "Character image" },
       { name: "audio_url", type: "audio", required: true, description: "Driving audio" },
     ],
@@ -482,16 +489,15 @@ export const models: AIModel[] = [
 
   // === Audio & Music ===
 
-  // Audio — text required (uses "text" param not "prompt"), audio optional for voice cloning
+  // Audio — text required, uses voice_setting for predefined voices (NO audio upload for cloning)
   {
     id: "fal-ai/minimax/speech-02-hd",
     name: "MiniMax Speech-02 HD",
     provider: "fal", type: "audio", category: "Audio & Music",
-    description: "Text-to-speech with voice cloning. Optional audio for voice reference.",
+    description: "Text-to-speech with predefined voices. Use Chatterbox HD for voice cloning.",
     cost: "~RM0.07", creditCost: 7, speed: "~10s", stable: true,
     inputs: [
       { name: "text", type: "text", required: true, description: "Text to speak" },
-      { name: "audio_url", type: "audio", required: false, description: "Voice reference (optional)" },
     ],
   },
 
