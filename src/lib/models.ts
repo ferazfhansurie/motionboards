@@ -105,19 +105,6 @@ export const models: AIModel[] = [
     },
   },
 
-  // === Voice Clone ===
-
-  {
-    id: "fal-ai/qwen-3-tts/clone-voice/0.6b",
-    name: "Voice Clone (0.6B Fast)",
-    provider: "fal", type: "audio", category: "Audio & Music",
-    description: "Clone a voice from a sample clip. Fast, lightweight. Returns voice embedding.",
-    cost: "~RM0.02", creditCost: 2, speed: "~46s", stable: true,
-    inputs: [
-      { name: "audio_url", type: "audio", required: true, description: "Voice sample to clone" },
-      { name: "reference_text", type: "text", required: false, description: "Transcript of the audio (improves quality)" },
-    ],
-  },
 
   // === Seedance (ByteDance) ===
 
@@ -225,19 +212,6 @@ export const models: AIModel[] = [
     },
   },
 
-  // === Audio & Voice ===
-
-  {
-    id: "fal-ai/qwen-3-tts/clone-voice/1.7b",
-    name: "Voice Clone (Qwen3)",
-    provider: "fal", type: "audio", category: "Audio & Music",
-    description: "Clone a voice from a sample clip. Zero-shot cloning. Returns voice embedding for TTS.",
-    cost: "~RM0.08", creditCost: 8, speed: "~46s", stable: true,
-    inputs: [
-      { name: "audio_url", type: "audio", required: true, description: "Voice sample to clone" },
-      { name: "reference_text", type: "text", required: false, description: "Transcript of the audio (improves quality)" },
-    ],
-  },
 
   // === Image Editing ===
 
