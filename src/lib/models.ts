@@ -90,48 +90,10 @@ export const models: AIModel[] = [
   // === Lip Sync ===
 
   {
-    id: "fal-ai/pixverse/lipsync",
-    name: "PixVerse Lipsync",
-    provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Lip sync. Requires video input + audio or text.",
-    cost: "~RM0.27", creditCost: 27, speed: "~2m", stable: true,
-    inputs: [
-      { name: "video_url", type: "video", required: true, description: "Face video" },
-      { name: "audio_url", type: "audio", required: false, description: "Audio/speech (or use text)" },
-      { name: "text", type: "text", required: false, description: "TTS text when no audio provided" },
-    ],
-  },
-
-  {
-    id: "fal-ai/sync-lipsync/v2",
-    name: "Sync Lipsync 2.0",
-    provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Standard lip sync. Requires video + audio input.",
-    cost: "~RM0.35", creditCost: 35, speed: "~2m", stable: true,
-    inputs: [
-      { name: "video_url", type: "video", required: true, description: "Face video" },
-      { name: "audio_url", type: "audio", required: true, description: "Audio/speech" },
-    ],
-  },
-
-  {
-    id: "fal-ai/bytedance/omnihuman/v1.5",
-    name: "OmniHuman v1.5",
-    provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Full-body animation from audio. Requires image + audio.",
-    cost: "~RM0.61", creditCost: 61, speed: "~5m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: false, description: "Video generation guidance (optional)" },
-      { name: "image_url", type: "image", required: true, description: "Character image" },
-      { name: "audio_url", type: "audio", required: true, description: "Driving audio" },
-    ],
-  },
-
-  {
     id: "fal-ai/infinitalk",
     name: "InfiniteTalk (Image+Audio)",
     provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Image + audio → lip-synced video. Full-body animation with natural motion.",
+    description: "Image + audio to lip-synced video. Full-body animation with natural motion.",
     cost: "~RM0.85", creditCost: 85, speed: "~7m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
@@ -159,52 +121,36 @@ export const models: AIModel[] = [
     },
   },
 
-  // === Audio & Music ===
+  // === Audio & Voice ===
 
   {
-    id: "fal-ai/minimax/speech-02-hd",
-    name: "MiniMax Speech-02 HD",
+    id: "fal-ai/qwen-3-tts/clone-voice/1.7b",
+    name: "Voice Clone (Qwen3)",
     provider: "fal", type: "audio", category: "Audio & Music",
-    description: "Text-to-speech with predefined voices.",
-    cost: "~RM0.07", creditCost: 7, speed: "~10s", stable: true,
+    description: "Clone a voice from a sample clip. Zero-shot cloning. Returns voice embedding for TTS.",
+    cost: "~RM0.08", creditCost: 8, speed: "~46s", stable: true,
     inputs: [
-      { name: "text", type: "text", required: true, description: "Text to speak" },
+      { name: "audio_url", type: "audio", required: true, description: "Voice sample to clone" },
+      { name: "reference_text", type: "text", required: false, description: "Transcript of the audio (improves quality)" },
     ],
   },
 
-  {
-    id: "resemble-ai/chatterboxhd/text-to-speech",
-    name: "Chatterbox HD TTS",
-    provider: "fal", type: "audio", category: "Audio & Music",
-    description: "Text-to-speech with zero-shot voice cloning. Pass audio for custom voice.",
-    cost: "~RM0.10", creditCost: 10, speed: "~10s", stable: true,
-    inputs: [
-      { name: "text", type: "text", required: true, description: "Text to speak" },
-      { name: "audio_url", type: "audio", required: false, description: "Voice reference (optional)" },
-    ],
-  },
+  // === Image Editing ===
 
   {
-    id: "fal-ai/sam-audio/separate",
-    name: "Audio Separator",
-    provider: "fal", type: "a2a", category: "Audio & Music",
-    description: "Separate any sound from audio. Describe what to isolate (e.g. 'vocals', 'drums').",
-    cost: "~RM0.08", creditCost: 8, speed: "~15s", stable: true,
+    id: "fal-ai/gemini-3-pro-image-preview/edit",
+    name: "Nano Banana Pro Edit",
+    provider: "fal", type: "i2i", category: "Concept Art & Style",
+    description: "Edit images with Gemini 3 Pro (Nano Banana Pro). Upload images and describe changes.",
+    cost: "~RM0.25", creditCost: 25, speed: "~30s", stable: true,
     inputs: [
-      { name: "prompt", type: "text", required: true, description: "Sound to isolate (e.g. 'vocals')" },
-      { name: "audio_url", type: "audio", required: true, description: "Audio file" },
+      { name: "prompt", type: "text", required: true, description: "Edit description" },
+      { name: "image_urls", type: "image", required: true, description: "Images to edit" },
     ],
-  },
-
-  {
-    id: "fal-ai/elevenlabs/audio-isolation",
-    name: "Voice Isolation (ElevenLabs)",
-    provider: "fal", type: "a2a", category: "Audio & Music",
-    description: "Isolate voice from background noise in audio or video files.",
-    cost: "~RM0.05", creditCost: 5, speed: "~10s", stable: true,
-    inputs: [
-      { name: "audio_url", type: "audio", required: true, description: "Audio or video file" },
-    ],
+    options: {
+      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"], default: "auto", label: "Aspect Ratio" },
+      resolution: { values: ["1K", "2K", "4K"], default: "1K", label: "Resolution" },
+    },
   },
 ];
 
