@@ -464,7 +464,7 @@ export function BoardItemCard({
           >
             {isEditingText ? (
               <textarea
-                className="outline-none cursor-text min-h-[1em] w-full bg-transparent resize-none border-none p-0 m-0"
+                className="outline-none cursor-text w-full bg-transparent resize-none border-none p-0 m-0"
                 style={{
                   fontSize: "inherit",
                   fontFamily: "inherit",
@@ -473,6 +473,8 @@ export function BoardItemCard({
                   fontStyle: "inherit",
                   textAlign: item.textAlign || "left",
                   lineHeight: "inherit",
+                  minHeight: Math.max(30, item.height - 16),
+                  height: Math.max(30, item.height - 16),
                 }}
                 value={editTextValue}
                 onChange={(e) => setEditTextValue(e.target.value)}
@@ -488,10 +490,11 @@ export function BoardItemCard({
                   e.stopPropagation();
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 autoFocus
               />
             ) : (
-              <span className="whitespace-pre-wrap">{item.text || "Double-click to edit"}</span>
+              <span className="whitespace-pre-wrap" style={{ minHeight: Math.max(20, item.height - 16), display: "block" }}>{item.text || "Double-click to edit"}</span>
             )}
           </div>
         )}
