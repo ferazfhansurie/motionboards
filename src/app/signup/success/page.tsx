@@ -38,7 +38,7 @@ export default function SignupSuccessPage() {
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm text-center">
         <div className="flex justify-center mb-6">
-          <img src="/logo.jpg" alt="MotionBoards" className="h-14 rounded-lg" />
+          <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
         </div>
 
         {status === "verifying" && (

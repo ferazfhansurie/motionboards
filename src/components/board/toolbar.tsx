@@ -182,7 +182,7 @@ export function Toolbar() {
       {/* Top-left: Logo + actions */}
       <div className="absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto">
         <div className="flex items-center px-1 py-0.5 rounded-lg">
-          <img src="/logo.jpg" alt="MotionBoards" className="h-10 rounded" />
+          <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
         </div>
 
         {/* Undo/Redo */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Sparkles, Upload, Type, PenTool, Link2, Film, Wand2, Layers, Video, CreditCard, HelpCircle, Play } from "lucide-react";
+import { ArrowLeft, ChevronRight, Sparkles, Upload, Type, PenTool, Link2, Film, Wand2, Layers, Video, CreditCard, HelpCircle, Play, Mic } from "lucide-react";
 
 interface Step {
   title: string;
@@ -123,6 +123,23 @@ const tutorials: Tutorial[] = [
     ],
   },
   {
+    id: "lip-sync",
+    title: "Lip Sync: Image + Audio = Talking Video",
+    description: "Upload a photo and an audio file, and the AI animates the person to match the speech. Full-body motion, realistic lip movement.",
+    icon: <Mic className="h-5 w-5" />,
+    category: "Workflows",
+    difficulty: "Intermediate",
+    duration: "3 min",
+    steps: [
+      { title: "How Lip Sync Works", description: "You give the AI a still image of a person and an audio file (speech, voiceover, song). It generates a video where the person moves and speaks in sync with the audio. No video editing needed." },
+      { title: "Pick the Model", description: "Open the model panel and go to the Lip Sync category. Choose OmniHuman v1.5 for image + audio lip sync. It does full-body animation, not just the mouth. Cost is ~RM0.61 per generation.", image: "/tutorials/09-modelpanel.png" },
+      { title: "Upload Your Image", description: "Upload or generate a clear photo of a person. Front-facing works best. The AI needs to see the face clearly to animate it properly.", tip: "Waist-up or full-body shots work great. Avoid images where the face is too small or partially hidden." },
+      { title: "Upload Your Audio", description: "Drag an audio file onto the canvas (MP3, WAV, etc). This is the speech or voiceover that the person will lip sync to. Select it and set it as the audio input." },
+      { title: "Set Your Inputs", description: "Click the image and set it as INPUT 1. Click the audio and set it as the audio input. Both thumbnails should appear above the prompt. The AI now knows what face to animate and what audio to match." },
+      { title: "Generate", description: "Hit Generate or Ctrl+Enter. The AI creates a video where the person in your image speaks and moves in sync with your audio. Right-click to download. That's it, photo to talking video." },
+    ],
+  },
+  {
     id: "timeline-editor",
     title: "The Timeline: Edit & Export Videos",
     description: "Got multiple clips? Combine them into one video. Trim, reorder, export. All in the browser, no extra software needed.",
@@ -190,7 +207,11 @@ const tutorials: Tutorial[] = [
 ];
 
 const categories = ["All", "Basics", "Tools", "Workflows", "Editing", "Tips", "Account"];
-const difficultyColors = { Beginner: "bg-emerald-500/15 text-emerald-400", Intermediate: "bg-amber-500/15 text-amber-400", Advanced: "bg-red-500/15 text-red-400" };
+const difficultyColors = {
+  Beginner: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  Intermediate: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  Advanced: "bg-red-500/15 text-red-600 dark:text-red-400",
+};
 
 export default function TutorialsPage() {
   const [selectedTutorial, setSelectedTutorial] = useState<Tutorial | null>(null);
@@ -209,30 +230,30 @@ export default function TutorialsPage() {
     const pct = ((activeStep + 1) / selectedTutorial.steps.length) * 100;
 
     return (
-      <div className="min-h-screen bg-[#0d1117]">
+      <div className="min-h-screen bg-white dark:bg-[#0d1117] transition-colors">
         {/* Header */}
-        <div className="border-b border-gray-800 px-6 py-3 bg-[#161b22]">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-3 bg-gray-50 dark:bg-[#161b22]">
           <div className="max-w-4xl mx-auto flex items-center gap-3">
-            <button onClick={() => { setSelectedTutorial(null); setActiveStep(0); }} className="text-gray-500 hover:text-white transition-colors">
+            <button onClick={() => { setSelectedTutorial(null); setActiveStep(0); }} className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <img src="/logo.jpg" alt="MotionBoards" className="h-8 rounded" />
+            <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
             <div className="flex-1">
-              <h1 className="text-sm font-bold text-white">{selectedTutorial.title}</h1>
-              <p className="text-[10px] text-gray-500">Step {activeStep + 1} of {selectedTutorial.steps.length}</p>
+              <h1 className="text-sm font-bold text-gray-900 dark:text-white">{selectedTutorial.title}</h1>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500">Step {activeStep + 1} of {selectedTutorial.steps.length}</p>
             </div>
             <a href="/generate" className="text-xs text-[#f26522] font-semibold hover:underline">Open Canvas</a>
           </div>
         </div>
 
         {/* Progress */}
-        <div className="h-0.5 bg-gray-800"><div className="h-full bg-[#f26522] transition-all duration-300" style={{ width: `${pct}%` }} /></div>
+        <div className="h-0.5 bg-gray-200 dark:bg-gray-800"><div className="h-full bg-[#f26522] transition-all duration-300" style={{ width: `${pct}%` }} /></div>
 
         <div className="max-w-3xl mx-auto px-6 py-10">
           {/* Step dots */}
           <div className="flex items-center gap-1.5 mb-10 justify-center">
             {selectedTutorial.steps.map((_, i) => (
-              <button key={i} onClick={() => setActiveStep(i)} className={`h-2 rounded-full transition-all ${i === activeStep ? "w-8 bg-[#f26522]" : i < activeStep || isStepDone(selectedTutorial.id, i) ? "w-2 bg-[#f26522]/40" : "w-2 bg-gray-700"}`} />
+              <button key={i} onClick={() => setActiveStep(i)} className={`h-2 rounded-full transition-all ${i === activeStep ? "w-8 bg-[#f26522]" : i < activeStep || isStepDone(selectedTutorial.id, i) ? "w-2 bg-[#f26522]/40" : "w-2 bg-gray-300 dark:bg-gray-700"}`} />
             ))}
           </div>
 
@@ -240,12 +261,12 @@ export default function TutorialsPage() {
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-3 mb-6">
               <div className="h-10 w-10 rounded-xl bg-[#f26522]/10 text-[#f26522] flex items-center justify-center font-bold text-lg">{activeStep + 1}</div>
-              <h2 className="text-xl font-bold text-white">{step.title}</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{step.title}</h2>
             </div>
-            <p className="text-sm text-gray-400 leading-relaxed mb-6">{step.description}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6">{step.description}</p>
 
             {step.image && (
-              <div className="mb-6 rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+              <div className="mb-6 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-2xl">
                 <img src={step.image} alt={step.title} className="w-full" />
               </div>
             )}
@@ -253,15 +274,15 @@ export default function TutorialsPage() {
             {step.tip && (
               <div className="bg-[#f26522]/5 border border-[#f26522]/20 rounded-xl px-4 py-3 mb-6">
                 <p className="text-[11px] text-[#f26522] font-semibold mb-0.5">Pro Tip</p>
-                <p className="text-xs text-gray-400">{step.tip}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{step.tip}</p>
               </div>
             )}
           </div>
 
           {/* Nav */}
           <div className="flex items-center justify-between mt-10 max-w-2xl mx-auto">
-            <button onClick={() => setActiveStep(Math.max(0, activeStep - 1))} disabled={activeStep === 0} className="px-4 py-2 text-xs text-gray-500 hover:text-white disabled:opacity-30 transition-colors">Previous</button>
-            <button onClick={() => { markComplete(selectedTutorial.id, activeStep); if (activeStep < selectedTutorial.steps.length - 1) setActiveStep(activeStep + 1); }} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${isStepDone(selectedTutorial.id, activeStep) ? "bg-emerald-500/15 text-emerald-400" : "bg-gray-800 text-gray-400 hover:bg-[#f26522]/10 hover:text-[#f26522]"}`}>
+            <button onClick={() => setActiveStep(Math.max(0, activeStep - 1))} disabled={activeStep === 0} className="px-4 py-2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white disabled:opacity-30 transition-colors">Previous</button>
+            <button onClick={() => { markComplete(selectedTutorial.id, activeStep); if (activeStep < selectedTutorial.steps.length - 1) setActiveStep(activeStep + 1); }} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${isStepDone(selectedTutorial.id, activeStep) ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-[#f26522]/10 hover:text-[#f26522]"}`}>
               {isStepDone(selectedTutorial.id, activeStep) ? "Completed" : "Mark as done"}
             </button>
             {activeStep < selectedTutorial.steps.length - 1 ? (
@@ -277,26 +298,26 @@ export default function TutorialsPage() {
 
   // Tutorial list
   return (
-    <div className="min-h-screen bg-[#0d1117]">
+    <div className="min-h-screen bg-white dark:bg-[#0d1117] transition-colors">
       {/* Nav */}
-      <div className="border-b border-gray-800 px-6 py-3 bg-[#161b22]">
+      <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-3 bg-gray-50 dark:bg-[#161b22]">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <a href="/generate" className="text-gray-500 hover:text-white transition-colors"><ArrowLeft className="h-4 w-4" /></a>
-            <img src="/logo.jpg" alt="MotionBoards" className="h-10 rounded" />
+            <a href="/generate" className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"><ArrowLeft className="h-4 w-4" /></a>
+            <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
             <div>
-              <h1 className="text-sm font-bold text-white">Tutorials</h1>
-              <p className="text-[10px] text-gray-500">Learn how to use MotionBoards</p>
+              <h1 className="text-sm font-bold text-gray-900 dark:text-white">Tutorials</h1>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500">Learn how to use MotionBoards</p>
             </div>
           </div>
           <a href="/generate" className="px-4 py-2 bg-[#f26522] text-white text-xs font-semibold rounded-lg hover:bg-[#d9541a] transition-colors">Open Canvas</a>
         </div>
       </div>
 
-      {/* Hero - dark, matching motionboards landing */}
+      {/* Hero */}
       <div className="relative overflow-hidden py-20 px-6">
         {/* Floating images background */}
-        <div className="absolute inset-0 overflow-hidden opacity-15">
+        <div className="absolute inset-0 overflow-hidden opacity-10 dark:opacity-15">
           {["/hero/h1.jpg","/hero/h2.jpg","/hero/h3.jpg","/hero/h4.jpg","/hero/h5.jpg","/hero/h6.jpg"].map((src, i) => (
             <div key={i} className="absolute rounded-xl overflow-hidden" style={{
               left: `${10 + i * 15}%`, top: `${10 + (i % 3) * 25}%`,
@@ -315,13 +336,13 @@ export default function TutorialsPage() {
         `}</style>
 
         <div className="max-w-3xl mx-auto text-center relative z-10">
-          <h2 className="text-4xl font-black text-white mb-3 tracking-tight">
+          <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-3 tracking-tight">
             LEARN <span className="text-[#f26522]">MOTIONBOARDS</span>
           </h2>
-          <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
             Everything you need to know, from your first generation to advanced workflows. No fluff, just the good stuff.
           </p>
-          <div className="flex items-center justify-center gap-8 text-gray-500 text-xs">
+          <div className="flex items-center justify-center gap-8 text-gray-400 dark:text-gray-500 text-xs">
             <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#f26522]" />{tutorials.length} tutorials</span>
             <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#f26522]" />{tutorials.reduce((s, t) => s + t.steps.length, 0)} steps</span>
             <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#f26522]" />Beginner to Pro</span>
@@ -333,13 +354,13 @@ export default function TutorialsPage() {
         {/* Category tabs */}
         <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
           {categories.map((cat) => (
-            <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all ${activeCategory === cat ? "bg-[#f26522] text-white shadow-lg shadow-[#f26522]/20" : "bg-[#161b22] text-gray-500 border border-gray-800 hover:border-[#f26522]/40 hover:text-[#f26522]"}`}>
+            <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all ${activeCategory === cat ? "bg-[#f26522] text-white shadow-lg shadow-[#f26522]/20" : "bg-gray-100 dark:bg-[#161b22] text-gray-500 border border-gray-200 dark:border-gray-800 hover:border-[#f26522]/40 hover:text-[#f26522]"}`}>
               {cat}
             </button>
           ))}
         </div>
 
-        {/* Tutorial cards - visual grid */}
+        {/* Tutorial cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((tutorial) => {
             const prog = progress(tutorial);
@@ -347,13 +368,13 @@ export default function TutorialsPage() {
               <button
                 key={tutorial.id}
                 onClick={() => { setSelectedTutorial(tutorial); setActiveStep(0); }}
-                className="text-left bg-[#161b22] rounded-2xl border border-gray-800 overflow-hidden hover:border-[#f26522]/30 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#f26522]/5 transition-all group"
+                className="text-left bg-gray-50 dark:bg-[#161b22] rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden hover:border-[#f26522]/30 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#f26522]/5 transition-all group"
               >
                 {/* Cover image */}
                 {tutorial.coverImage && (
                   <div className="h-36 overflow-hidden relative">
-                    <img src={tutorial.coverImage} alt="" className="w-full h-full object-cover opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#161b22] via-transparent to-transparent" />
+                    <img src={tutorial.coverImage} alt="" className="w-full h-full object-cover opacity-70 dark:opacity-60 group-hover:opacity-90 dark:group-hover:opacity-80 group-hover:scale-105 transition-all duration-500" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-gray-50 dark:from-[#161b22] via-transparent to-transparent" />
                     <div className="absolute bottom-3 left-4">
                       <span className={`text-[9px] font-bold px-2 py-1 rounded-md ${difficultyColors[tutorial.difficulty]}`}>{tutorial.difficulty}</span>
                     </div>
@@ -365,20 +386,20 @@ export default function TutorialsPage() {
                       {tutorial.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold text-white mb-1">{tutorial.title}</h3>
-                      <p className="text-[10px] text-gray-500 line-clamp-2">{tutorial.description}</p>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">{tutorial.title}</h3>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 line-clamp-2">{tutorial.description}</p>
                       <div className="flex items-center gap-3 mt-2">
                         {!tutorial.coverImage && <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${difficultyColors[tutorial.difficulty]}`}>{tutorial.difficulty}</span>}
-                        <span className="text-[9px] text-gray-600">{tutorial.duration}</span>
-                        <span className="text-[9px] text-gray-600">{tutorial.steps.length} steps</span>
+                        <span className="text-[9px] text-gray-400 dark:text-gray-600">{tutorial.duration}</span>
+                        <span className="text-[9px] text-gray-400 dark:text-gray-600">{tutorial.steps.length} steps</span>
                       </div>
                       {prog > 0 && (
-                        <div className="mt-2 h-1 bg-gray-800 rounded-full overflow-hidden">
+                        <div className="mt-2 h-1 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                           <div className="h-full bg-[#f26522] rounded-full transition-all" style={{ width: `${prog}%` }} />
                         </div>
                       )}
                     </div>
-                    <ChevronRight className="h-4 w-4 text-gray-700 group-hover:text-[#f26522] transition-colors shrink-0 mt-1" />
+                    <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-700 group-hover:text-[#f26522] transition-colors shrink-0 mt-1" />
                   </div>
                 </div>
               </button>
@@ -388,15 +409,15 @@ export default function TutorialsPage() {
 
         {/* Bottom CTA */}
         <div className="text-center mt-16 mb-8">
-          <p className="text-xs text-gray-600 mb-4">Ready to create?</p>
+          <p className="text-xs text-gray-400 dark:text-gray-600 mb-4">Ready to create?</p>
           <a href="/generate" className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#f26522] to-[#d9541a] text-white text-sm font-bold rounded-xl hover:shadow-xl hover:shadow-[#f26522]/20 transition-all">
             <Sparkles className="h-4 w-4" />
             Open Canvas
           </a>
         </div>
 
-        <p className="text-[10px] text-gray-700 text-center pb-4 flex items-center justify-center gap-1">
-          Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm" /> <span className="font-semibold text-gray-600">Adletic</span> &copy; 2026
+        <p className="text-[10px] text-gray-400 dark:text-gray-700 text-center pb-4 flex items-center justify-center gap-1">
+          Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm" /> <span className="font-semibold text-gray-500 dark:text-gray-600">Adletic</span> &copy; 2026
         </p>
       </div>
     </div>

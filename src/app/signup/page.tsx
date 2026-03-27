@@ -63,7 +63,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-white flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-lg">
         <div className="flex justify-center mb-6">
-          <img src="/logo.jpg" alt="MotionBoards" className="h-14 rounded-lg" />
+          <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
         </div>
 
         <h1 className="text-2xl font-bold text-[#0d1117] text-center mb-1">

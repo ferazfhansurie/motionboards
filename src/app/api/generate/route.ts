@@ -9,6 +9,7 @@ export const maxDuration = 300;
 
 const IMAGE_INPUT_TYPES: ModelType[] = ["i2v", "i2i", "s2e", "upscale", "lipsync"];
 const VIDEO_INPUT_TYPES: ModelType[] = ["v2v", "lipsync"];
+const AUDIO_INPUT_TYPES: ModelType[] = ["lipsync", "a2a"];
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { prompt, model: modelId, mode, inputImage, startFrame, endFrame, generationOptions } = body;
+    const { prompt, model: modelId, mode, inputImage, startFrame, endFrame, inputAudio, generationOptions } = body;
 
     const modelInfo = models.find((m) => m.id === modelId);
     if (!modelInfo) {
@@ -110,6 +111,18 @@ export async function POST(req: NextRequest) {
           input.video_url = inputImage;
         }
 
+        // Audio input for lipsync and audio models
+        if (AUDIO_INPUT_TYPES.includes(modelInfo.type) && inputAudio) {
+          input.audio_url = inputAudio;
+        }
+
+        // For face swap — map second image input
+        if (modelId === "easel-ai/advanced-face-swap" && inputImage) {
+          input.face_image_0 = inputImage;
+          input.workflow_type = "user_hair";
+          input.gender_0 = "non-binary";
+        }
+
         const result = await fal.subscribe(modelId, { input, logs: true });
         const data = result.data as Record<string, unknown>;
 
@@ -125,6 +138,12 @@ export async function POST(req: NextRequest) {
           outputUrl = (data.audio as Record<string, unknown>).url as string;
         } else if (data.audio_url && typeof data.audio_url === "string") {
           outputUrl = data.audio_url;
+        } else if (data.target && typeof data.target === "object") {
+          // Sam Audio returns { target: { url }, residual: { url } }
+          outputUrl = (data.target as Record<string, unknown>).url as string;
+        } else if (data.model_mesh && typeof data.model_mesh === "object") {
+          // 3D models (Trellis/TripoSR)
+          outputUrl = (data.model_mesh as Record<string, unknown>).url as string;
         } else if (data.output && typeof data.output === "string") {
           outputUrl = data.output;
         } else if (data.url && typeof data.url === "string") {

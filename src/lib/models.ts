@@ -1,9 +1,10 @@
 export type ModelType =
-  | "t2v" | "i2v" | "s2e" | "t2i" | "i2i" | "v2v" | "upscale" | "lipsync" | "audio";
+  | "t2v" | "i2v" | "s2e" | "t2i" | "i2i" | "v2v" | "upscale" | "lipsync" | "audio" | "a2a";
 
 export type ModelCategory =
   | "Cinematic Video Gen" | "Video Editing" | "Upscale & Restoration"
-  | "Concept Art & Style" | "Character & Fashion" | "Lip Sync" | "Audio & Music";
+  | "Concept Art & Style" | "Character & Fashion" | "Lip Sync" | "Audio & Music"
+  | "Image Editing" | "Face & Body";
 
 export interface ModelInput {
   name: string;
@@ -493,11 +494,144 @@ export const models: AIModel[] = [
       { name: "audio_url", type: "audio", required: false, description: "Voice reference (optional)" },
     ],
   },
+
+  // === New fal.ai Models ===
+
+  // InfiniteTalk — image + audio + prompt → lip-synced video
+  {
+    id: "fal-ai/infinitalk",
+    name: "InfiniteTalk",
+    provider: "fal", type: "lipsync", category: "Lip Sync",
+    description: "Generate lip-synced video from image + audio. Full-body animation with natural motion.",
+    cost: "~RM0.80", creditCost: 80, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "image_url", type: "image", required: true, description: "Character image" },
+      { name: "audio_url", type: "audio", required: true, description: "Audio/speech file" },
+    ],
+    options: {
+      resolution: { values: ["480p", "720p"], default: "480p", label: "Resolution" },
+    },
+  },
+
+  // Face Swap — two images required
+  {
+    id: "easel-ai/advanced-face-swap",
+    name: "Face Swap (Easel AI)",
+    provider: "fal", type: "i2i", category: "Face & Body",
+    description: "Swap faces while preserving scene details, outfits, and lighting. Single or multi-person.",
+    cost: "~RM0.15", creditCost: 15, speed: "~15s", stable: true,
+    inputs: [
+      { name: "face_image_0", type: "image", required: true, description: "Face to swap in" },
+      { name: "target_image", type: "image", required: true, description: "Target scene image" },
+    ],
+  },
+
+  // Background Removal — image only
+  {
+    id: "fal-ai/rmbg-v2",
+    name: "Background Remove (BRIA)",
+    provider: "fal", type: "i2i", category: "Image Editing",
+    description: "One-click background removal. Returns transparent PNG.",
+    cost: "~RM0.05", creditCost: 5, speed: "~5s", stable: true,
+    inputs: [
+      { name: "image_url", type: "image", required: true, description: "Image to remove background from" },
+    ],
+  },
+
+  // Style Transfer — image + prompt
+  {
+    id: "fal-ai/image-editing/style-transfer",
+    name: "Style Transfer",
+    provider: "fal", type: "i2i", category: "Image Editing",
+    description: "Apply artistic styles to your image. Describe the style or let it auto-detect.",
+    cost: "~RM0.12", creditCost: 12, speed: "~10s", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: false, description: "Style description (e.g. 'Van Gogh's Starry Night')" },
+      { name: "image_url", type: "image", required: true, description: "Source image" },
+    ],
+  },
+
+  // Image Outpaint — image + optional prompt
+  {
+    id: "fal-ai/image-apps-v2/outpaint",
+    name: "Image Outpaint",
+    provider: "fal", type: "i2i", category: "Image Editing",
+    description: "Extend image beyond its borders. Choose which edges to expand.",
+    cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: false, description: "Guidance for expanded area (optional)" },
+      { name: "image_url", type: "image", required: true, description: "Image to extend" },
+    ],
+  },
+
+  // Creative Upscaler — image only
+  {
+    id: "fal-ai/creative-upscaler",
+    name: "Creative Upscaler",
+    provider: "fal", type: "upscale", category: "Upscale & Restoration",
+    description: "AI-powered creative upscale with detail enhancement. 2x default.",
+    cost: "~RM0.15", creditCost: 15, speed: "~20s", stable: true,
+    inputs: [
+      { name: "image_url", type: "image", required: true, description: "Image to upscale" },
+    ],
+  },
+
+  // Image to 3D — Trellis
+  {
+    id: "fal-ai/trellis",
+    name: "Trellis Image to 3D",
+    provider: "fal", type: "i2i", category: "Concept Art & Style",
+    description: "Generate a textured 3D model (GLB) from a single image.",
+    cost: "~RM0.30", creditCost: 30, speed: "~30s", stable: true,
+    inputs: [
+      { name: "image_url", type: "image", required: true, description: "Source image" },
+    ],
+  },
+
+  // Voice Clone TTS — text + optional audio reference
+  {
+    id: "resemble-ai/chatterboxhd/text-to-speech",
+    name: "Chatterbox HD TTS",
+    provider: "fal", type: "audio", category: "Audio & Music",
+    description: "Text-to-speech with zero-shot voice cloning. Pass audio for custom voice.",
+    cost: "~RM0.10", creditCost: 10, speed: "~10s", stable: true,
+    inputs: [
+      { name: "text", type: "text", required: true, description: "Text to speak" },
+      { name: "audio_url", type: "audio", required: false, description: "Voice reference (optional)" },
+    ],
+  },
+
+  // Audio Separation — audio + prompt
+  {
+    id: "fal-ai/sam-audio/separate",
+    name: "Audio Separator",
+    provider: "fal", type: "a2a", category: "Audio & Music",
+    description: "Separate any sound from audio. Describe what to isolate (e.g. 'vocals', 'drums').",
+    cost: "~RM0.08", creditCost: 8, speed: "~15s", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Sound to isolate (e.g. 'vocals')" },
+      { name: "audio_url", type: "audio", required: true, description: "Audio file" },
+    ],
+  },
+
+  // Voice Isolation — audio or video
+  {
+    id: "fal-ai/elevenlabs/audio-isolation",
+    name: "Voice Isolation (ElevenLabs)",
+    provider: "fal", type: "a2a", category: "Audio & Music",
+    description: "Isolate voice from background noise in audio or video files.",
+    cost: "~RM0.05", creditCost: 5, speed: "~10s", stable: true,
+    inputs: [
+      { name: "audio_url", type: "audio", required: true, description: "Audio or video file" },
+    ],
+  },
 ];
 
 export const modelCategories: ModelCategory[] = [
   "Cinematic Video Gen", "Video Editing", "Upscale & Restoration",
-  "Concept Art & Style", "Character & Fashion", "Lip Sync", "Audio & Music",
+  "Concept Art & Style", "Character & Fashion", "Image Editing",
+  "Face & Body", "Lip Sync", "Audio & Music",
 ];
 
 export function getModelsByCategory(category: ModelCategory) {
@@ -512,6 +646,7 @@ export function getTypeLabel(type: ModelType): string {
   const labels: Record<ModelType, string> = {
     t2v: "T→V", i2v: "I→V", s2e: "I→V", t2i: "T→I", i2i: "I→I",
     v2v: "V→V", upscale: "Upscale", lipsync: "Lip Sync", audio: "Audio",
+    a2a: "A→A",
   };
   return labels[type];
 }

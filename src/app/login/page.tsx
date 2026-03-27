@@ -36,7 +36,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
-          <img src="/logo.jpg" alt="MotionBoards" className="h-16 rounded-lg" />
+          <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 rounded-lg" />
         </div>
 
         <h1 className="text-2xl font-bold text-[#0d1117] text-center mb-1">Welcome back</h1>

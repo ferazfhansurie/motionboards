@@ -161,6 +161,7 @@ export interface AppState {
   startFrameId: string | null;
   endFrameId: string | null;
   inputRefs: string[]; // item IDs selected as INPUT
+  audioInputId: string | null; // item ID for audio input
 
   // Generation
   isGenerating: boolean;
@@ -206,6 +207,7 @@ export interface AppState {
   setStartFrame: (id: string | null) => void;
   setEndFrame: (id: string | null) => void;
   toggleInputRef: (id: string) => void;
+  setAudioInput: (id: string | null) => void;
   clearRefs: () => void;
   setIsGenerating: (v: boolean) => void;
   setGenerationOptions: (opts: Record<string, unknown>) => void;
@@ -273,6 +275,7 @@ export const useAppStore = create<AppState>((set) => {
   startFrameId: null,
   endFrameId: null,
   inputRefs: [],
+  audioInputId: null,
   isGenerating: false,
   generationOptions: {},
   isEditMode: false,
@@ -355,6 +358,7 @@ export const useAppStore = create<AppState>((set) => {
       startFrameId: s.startFrameId === id ? null : s.startFrameId,
       endFrameId: s.endFrameId === id ? null : s.endFrameId,
       inputRefs: s.inputRefs.filter((r) => r !== id),
+      audioInputId: s.audioInputId === id ? null : s.audioInputId,
     })),
   selectItem: (id) => set({ selectedItemId: id }),
   moveItem: (id, x, y) =>
@@ -380,7 +384,8 @@ export const useAppStore = create<AppState>((set) => {
         ? s.inputRefs.filter((r) => r !== id)
         : [...s.inputRefs, id],
     })),
-  clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [] }),
+  setAudioInput: (id) => set({ audioInputId: id }),
+  clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [], audioInputId: null }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setGenerationOptions: (generationOptions) => set({ generationOptions }),
   setGenerationOption: (key, value) => set((s) => ({ generationOptions: { ...s.generationOptions, [key]: value } })),
@@ -437,12 +442,12 @@ export const useAppStore = create<AppState>((set) => {
         startFrameId: null,
         endFrameId: null,
         inputRefs: [],
+        audioInputId: null,
       };
     }),
   switchBoard: (boardId) =>
     set((s) => {
       if (boardId === s.activeBoardId) return s;
-      // Save current board
       const updatedBoards = s.boards.map((b) =>
         b.id === s.activeBoardId
           ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom }
@@ -463,6 +468,7 @@ export const useAppStore = create<AppState>((set) => {
         startFrameId: null,
         endFrameId: null,
         inputRefs: [],
+        audioInputId: null,
       };
     }),
   deleteBoard: (boardId) =>
@@ -484,6 +490,7 @@ export const useAppStore = create<AppState>((set) => {
           startFrameId: null,
           endFrameId: null,
           inputRefs: [],
+          audioInputId: null,
         };
       }
       return { boards: remaining };

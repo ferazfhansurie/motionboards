@@ -84,7 +84,7 @@ export default function DashboardPage() {
             <a href="/generate" className="text-gray-400 hover:text-[#0d1117] transition-colors">
               <ArrowLeft className="h-4 w-4" />
             </a>
-            <img src="/logo.jpg" alt="MotionBoards" className="h-8 rounded" />
+            <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-8 rounded" />
             <div>
               <h1 className="text-sm font-bold text-[#0d1117]">Dashboard</h1>
               <p className="text-[10px] text-gray-400">Welcome, {user.name}</p>

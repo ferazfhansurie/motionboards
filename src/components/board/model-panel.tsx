@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Search, Sparkles, Film, Wand2, ArrowUpRight, Palette, User, Mic, Music, Zap, Check } from "lucide-react";
+import { X, Search, Sparkles, Film, Wand2, ArrowUpRight, Palette, User, Mic, Music, Zap, Check, PenTool, UserCheck, Layers } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { models, modelCategories, getModelsByCategory, getTypeLabel, type ModelCategory } from "@/lib/models";
 
@@ -11,6 +11,8 @@ const categoryIcons: Record<ModelCategory, React.ReactNode> = {
   "Upscale & Restoration": <ArrowUpRight className="h-3.5 w-3.5" />,
   "Concept Art & Style": <Palette className="h-3.5 w-3.5" />,
   "Character & Fashion": <User className="h-3.5 w-3.5" />,
+  "Image Editing": <PenTool className="h-3.5 w-3.5" />,
+  "Face & Body": <UserCheck className="h-3.5 w-3.5" />,
   "Lip Sync": <Mic className="h-3.5 w-3.5" />,
   "Audio & Music": <Music className="h-3.5 w-3.5" />,
 };
@@ -20,7 +22,7 @@ const typeBadge = (type: string) => {
   if (["t2i", "i2i"].includes(type)) return { bg: "bg-emerald-500/15 text-emerald-400", label: "Image" };
   if (type === "upscale") return { bg: "bg-amber-500/15 text-amber-400", label: "Upscale" };
   if (type === "lipsync") return { bg: "bg-pink-500/15 text-pink-400", label: "Lip Sync" };
-  if (type === "audio") return { bg: "bg-purple-500/15 text-purple-400", label: "Audio" };
+  if (type === "audio" || type === "a2a") return { bg: "bg-purple-500/15 text-purple-400", label: "Audio" };
   return { bg: "bg-gray-500/15 text-gray-400", label: type };
 };
 

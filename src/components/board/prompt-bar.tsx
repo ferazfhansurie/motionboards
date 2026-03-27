@@ -14,6 +14,7 @@ import {
   Plus,
   Trash2,
   History,
+  Music,
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { getModelById, type ModelOptions } from "@/lib/models";
@@ -60,6 +61,8 @@ export function PromptBar() {
     switchBoard,
     deleteBoard,
     theme,
+    audioInputId,
+    setAudioInput,
   } = useAppStore();
   const isDark = theme === "dark";
 
@@ -168,11 +171,10 @@ export function PromptBar() {
   };
 
   const handleGenerate = async () => {
-    if (!requireAuth()) return;
     if (!selectedModel) return;
     if (!prompt.trim() && selectedModel.inputs.some((i) => i.type === "text" && i.required)) return;
 
-    // Pre-check credits client-side before wasting time
+    // Pre-check auth + credits client-side before wasting time
     try {
       const authRes = await fetch("/api/auth/me");
       const authData = await authRes.json();
@@ -204,9 +206,10 @@ export function PromptBar() {
       alert(`${selectedModel.name} requires a video input. Select a video on the canvas and set it as INPUT.`);
       return;
     }
-    if (needsAudio) {
-      // Audio inputs not yet supported via canvas — warn
-      alert(`${selectedModel.name} requires an audio input. Audio input support coming soon.`);
+    const { audioInputId } = useAppStore.getState();
+    const audioItem = audioInputId ? items.find((i) => i.id === audioInputId) : null;
+    if (needsAudio && !audioItem) {
+      alert(`${selectedModel.name} requires an audio input. Select an audio file on the canvas and set it as AUDIO INPUT.`);
       return;
     }
 
@@ -265,6 +268,7 @@ export function PromptBar() {
           inputImage: refItems[0]?.src || startItem?.src || null,
           startFrame: startItem?.src || null,
           endFrame: endItem?.src || null,
+          inputAudio: audioItem?.src || null,
           generationOptions: Object.keys(generationOptions).length > 0 ? generationOptions : undefined,
         }),
       });
@@ -324,6 +328,7 @@ export function PromptBar() {
   const selectedItem = selectedItemId ? items.find((i) => i.id === selectedItemId) : null;
   const isSelectedImage = selectedItem && (selectedItem.type === "image" || selectedItem.type === "psd-layer" || (selectedItem.type === "generation" && selectedItem.outputType === "image"));
   const isSelectedVideo = selectedItem && (selectedItem.type === "video" || (selectedItem.type === "generation" && selectedItem.outputType === "video"));
+  const isSelectedAudio = selectedItem && (selectedItem.type === "audio" || (selectedItem.type === "generation" && selectedItem.outputType === "audio"));
 
   // Determine which reference types apply to current model
   const modelType = selectedModel?.type;
@@ -333,14 +338,16 @@ export function PromptBar() {
   // Check what input types the model needs
   const modelNeedsImage = selectedModel?.inputs.some((inp) => inp.type === "image");
   const modelNeedsVideo = selectedModel?.inputs.some((inp) => inp.type === "video");
+  const modelNeedsAudio = selectedModel?.inputs.some((inp) => inp.type === "audio");
 
   // Only show INPUT button if selected item matches what the model accepts
   const showInput = modelType && (
     (modelNeedsImage && isSelectedImage) ||
     (modelNeedsVideo && isSelectedVideo)
   );
-  const canSetAsRef = selectedItem && (isSelectedImage || isSelectedVideo);
-  const showAnyRef = showStartFrame || showEndFrame || showInput;
+  const showAudioInput = modelNeedsAudio && isSelectedAudio;
+  const canSetAsRef = selectedItem && (isSelectedImage || isSelectedVideo || isSelectedAudio);
+  const showAnyRef = showStartFrame || showEndFrame || showInput || showAudioInput;
 
   // Cascading input: figure out the next available input slot
   const currentInputIndex = selectedItem ? inputRefs.indexOf(selectedItem.id) : -1;
@@ -355,7 +362,8 @@ export function PromptBar() {
   const startItem = startFrameId ? items.find((i) => i.id === startFrameId) : null;
   const endItem = endFrameId ? items.find((i) => i.id === endFrameId) : null;
 
-  const hasAnyInputs = refItems.length > 0 || startItem || endItem;
+  const audioItem = audioInputId ? items.find((i) => i.id === audioInputId) : null;
+  const hasAnyInputs = refItems.length > 0 || startItem || endItem || audioItem;
   const isCanvasEmpty = items.length === 0;
 
   // Auto-focus prompt on empty canvas
@@ -627,6 +635,18 @@ export function PromptBar() {
               );
             });
           })()}
+          {showAudioInput && (
+            <button
+              className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                audioInputId === selectedItem!.id
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+              onClick={() => setAudioInput(audioInputId === selectedItem!.id ? null : selectedItem!.id)}
+            >
+              Audio
+            </button>
+          )}
         </div>
       )}
 
@@ -696,6 +716,22 @@ export function PromptBar() {
                   </button>
                 </div>
               ))}
+              {audioItem && (
+                <div className="relative group/thumb">
+                  <div className="h-10 w-10 rounded-md border border-purple-500/60 bg-purple-500/10 flex items-center justify-center">
+                    <Music className="h-4 w-4 text-purple-400" />
+                  </div>
+                  <span className="absolute -top-1.5 -left-1 bg-purple-600 text-white text-[7px] font-bold px-1 rounded leading-tight">
+                    A
+                  </span>
+                  <button
+                    className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-400 hover:text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                    onClick={() => setAudioInput(null)}
+                  >
+                    <X className="h-2 w-2" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {/* Model generation options */}
