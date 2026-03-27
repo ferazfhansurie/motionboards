@@ -23,6 +23,10 @@ import { requireAuth } from "@/lib/auth-gate";
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
+  const [boxW, setBoxW] = useState(320);
+  const [boxMinH, setBoxMinH] = useState(70);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const {
     selectedModelId,
@@ -66,15 +70,38 @@ export function PromptBar() {
   } = useAppStore();
   const isDark = theme === "dark";
 
-  // Auto-resize textarea as content grows
+  // Auto-resize textarea as content grows (respects manual minH)
   const autoResize = () => {
     const el = promptRef.current;
     if (!el) return;
     el.style.height = "0";
-    el.style.height = Math.min(Math.max(el.scrollHeight, 40), 300) + "px";
+    el.style.height = Math.max(el.scrollHeight, boxMinH) + "px";
   };
 
-  useEffect(() => { autoResize(); }, [prompt]);
+  useEffect(() => { autoResize(); }, [prompt, boxMinH]);
+
+  // Drag resize — attaches to document so it works even over canvas
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      e.preventDefault();
+      setBoxW(Math.max(250, Math.min(900, d.startW - (e.clientX - d.startX))));
+      setBoxMinH(Math.max(40, Math.min(500, d.startH - (e.clientY - d.startY))));
+    };
+    const onUp = () => { setIsDragging(false); dragRef.current = null; };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+  }, [isDragging]);
+
+  const onDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startW: boxW, startH: boxMinH };
+    setIsDragging(true);
+  };
 
   // Render model-specific option pills
   const renderOptionPills = () => {
@@ -677,7 +704,9 @@ export function PromptBar() {
       <div className="flex items-end justify-between gap-2 px-2 pb-1">
         <div className="pointer-events-auto" />
         <div className="flex-grow" />
-        <div className="pointer-events-auto relative w-80">
+        <div className="pointer-events-auto relative" style={{ width: boxW }}>
+          {/* Full-screen overlay while dragging to capture mouse everywhere */}
+          {isDragging && <div className="fixed inset-0 z-[100] cursor-nw-resize" />}
           {/* Input previews above textarea */}
           {hasAnyInputs && (
             <div className="flex items-center gap-1.5 mb-1.5 px-1">
@@ -757,49 +786,22 @@ export function PromptBar() {
               )}
             </div>
           )}
-          <div className={`relative rounded-2xl border shadow-lg overflow-hidden ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
-            {/* Option pills inside the box */}
-            {selectedModel?.options && (() => {
-              const opts = selectedModel.options!;
-              const keys = Object.keys(opts) as (keyof typeof opts)[];
-              if (keys.length === 0) return null;
-              return (
-                <div className="flex items-center gap-1.5 px-3 pt-2 flex-wrap">
-                  {keys.map((key) => {
-                    const opt = opts[key];
-                    if (!opt) return null;
-                    if ("default" in opt && typeof (opt as { default: unknown }).default === "boolean") {
-                      const boolOpt = opt as { default: boolean; label: string };
-                      const currentVal = generationOptions[key] !== undefined ? !!generationOptions[key] : boolOpt.default;
-                      return (
-                        <button key={key} type="button" onClick={() => setGenerationOption(key, !currentVal)}
-                          className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${currentVal ? "bg-[#f26522]/10 border-[#f26522]/30 text-[#f26522]" : isDark ? "border-gray-700 text-gray-500" : "border-gray-200 text-gray-400"}`}>
-                          {boolOpt.label}: {currentVal ? "On" : "Off"}
-                        </button>
-                      );
-                    }
-                    const selOpt = opt as { values: string[]; default: string; label: string };
-                    const current = (generationOptions[key] as string) || selOpt.default;
-                    return (
-                      <div key={key} className="relative group/opt">
-                        <button type="button"
-                          className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${isDark ? "border-gray-700 text-gray-400 hover:border-gray-500" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
-                          {selOpt.label}: {current}
-                        </button>
-                        <div className={`absolute bottom-full left-0 mb-1 rounded-lg border shadow-xl overflow-hidden z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-opacity ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
-                          {selOpt.values.map((v) => (
-                            <button key={v} type="button" onClick={() => setGenerationOption(key, v)}
-                              className={`block w-full text-left text-[9px] px-3 py-1 transition-colors ${v === current ? "text-[#f26522] font-semibold" : isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-500 hover:bg-gray-50"}`}>
-                              {v}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+          <div className={`relative rounded-2xl border shadow-lg ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
+            {/* Drag handle — top-left corner */}
+            <div
+              className={`absolute top-1 left-1 z-30 cursor-nw-resize rounded-md p-1 transition-colors ${isDark ? "text-gray-600 hover:text-gray-300 hover:bg-white/10" : "text-gray-300 hover:text-gray-500 hover:bg-gray-100"}`}
+              onMouseDown={onDragStart}
+              title="Drag to resize"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                <circle cx="2" cy="2" r="1.2" />
+                <circle cx="6" cy="2" r="1.2" />
+                <circle cx="2" cy="6" r="1.2" />
+                <circle cx="6" cy="6" r="1.2" />
+              </svg>
+            </div>
+            {/* Option pills */}
+            {renderOptionPills()}
             <textarea
               ref={promptRef}
               placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "No prompt required"}
@@ -812,10 +814,10 @@ export function PromptBar() {
                   handleGenerate();
                 }
               }}
-              className={`w-full text-xs placeholder-gray-400 px-3 pt-2 pb-1 resize-none leading-5 bg-transparent focus:outline-none ${isDark ? "text-white" : "text-[#0d1117]"}`}
-              style={{ minHeight: 40, maxHeight: 300 }}
+              className={`w-full text-xs placeholder-gray-400 px-3 pt-1 pb-1 resize-none leading-5 bg-transparent focus:outline-none ${isDark ? "text-white" : "text-[#0d1117]"}`}
+              style={{ minHeight: boxMinH, maxHeight: 500 }}
             />
-            {/* Bottom bar inside the box */}
+            {/* Bottom bar */}
             <div className="flex items-center justify-between px-2.5 pb-2">
               <div className="flex items-center gap-1.5">
                 {selectedModel && (
