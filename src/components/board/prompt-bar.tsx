@@ -23,6 +23,9 @@ import { requireAuth } from "@/lib/auth-gate";
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
+  const [promptBoxWidth, setPromptBoxWidth] = useState(320);
+  const [promptBoxHeight, setPromptBoxHeight] = useState(70);
+  const resizingRef = useRef<{ axis: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const {
     selectedModelId,
@@ -65,6 +68,29 @@ export function PromptBar() {
     setAudioInput,
   } = useAppStore();
   const isDark = theme === "dark";
+
+  // Prompt box resize — drag from bottom-left grip
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const r = resizingRef.current;
+      if (!r) return;
+      const dx = e.clientX - r.startX;
+      const dy = e.clientY - r.startY;
+      // Dragging left = wider, dragging right = narrower (box anchored to right)
+      setPromptBoxWidth(Math.max(200, Math.min(900, r.startW - dx)));
+      // Dragging down = taller, dragging up = shorter (box anchored to bottom)
+      setPromptBoxHeight(Math.max(50, Math.min(500, r.startH + dy)));
+    };
+    const onMouseUp = () => { resizingRef.current = null; };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => { window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
+  }, []);
+
+  const startResize = (_axis: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = { axis: _axis, startX: e.clientX, startY: e.clientY, startW: promptBoxWidth, startH: promptBoxHeight };
+  };
 
   // Render model-specific option pills
   const renderOptionPills = () => {
@@ -192,11 +218,25 @@ export function PromptBar() {
     } catch {}
 
     // Check required inputs
-    const needsImage = selectedModel.inputs.some((i) => (i.type === "image") && i.required);
+    const needsImage = selectedModel.inputs.some((i) => i.type === "image" && i.required);
     const needsVideo = selectedModel.inputs.some((i) => i.type === "video" && i.required);
     const needsAudio = selectedModel.inputs.some((i) => i.type === "audio" && i.required);
     const hasImageInput = inputRefs.length > 0 || startFrameId;
     const hasVideoInput = inputRefs.some((id) => items.find((i) => i.id === id)?.type === "video");
+    const { audioInputId } = useAppStore.getState();
+    const audioItem = audioInputId ? items.find((i) => i.id === audioInputId) : null;
+
+    // S2E requires BOTH start and end frames
+    if (selectedModel.type === "s2e") {
+      if (!startFrameId) {
+        alert(`${selectedModel.name} requires a Start Frame. Select an image and set it as Start Frame.`);
+        return;
+      }
+      if (!endFrameId) {
+        alert(`${selectedModel.name} requires an End Frame. Select a second image and set it as End Frame.`);
+        return;
+      }
+    }
 
     if (needsImage && !hasImageInput) {
       alert(`${selectedModel.name} requires an image input. Select an image on the canvas and set it as INPUT.`);
@@ -206,8 +246,6 @@ export function PromptBar() {
       alert(`${selectedModel.name} requires a video input. Select a video on the canvas and set it as INPUT.`);
       return;
     }
-    const { audioInputId } = useAppStore.getState();
-    const audioItem = audioInputId ? items.find((i) => i.id === audioInputId) : null;
     if (needsAudio && !audioItem) {
       alert(`${selectedModel.name} requires an audio input. Select an audio file on the canvas and set it as AUDIO INPUT.`);
       return;
@@ -217,7 +255,7 @@ export function PromptBar() {
     const pos = getNextPosition();
 
     const outputType =
-      selectedModel.type === "audio"
+      selectedModel.type === "audio" || selectedModel.type === "a2a"
         ? "audio"
         : ["t2i", "i2i", "upscale"].includes(selectedModel.type)
         ? "image"
@@ -266,6 +304,7 @@ export function PromptBar() {
           model: selectedModel.id,
           mode: selectedModel.type,
           inputImage: refItems[0]?.src || startItem?.src || null,
+          inputImages: refItems.map((r) => r?.src).filter(Boolean),
           startFrame: startItem?.src || null,
           endFrame: endItem?.src || null,
           inputAudio: audioItem?.src || null,
@@ -654,7 +693,7 @@ export function PromptBar() {
       <div className="flex items-end justify-between gap-2 px-2 pb-1">
         <div className="pointer-events-auto" />
         <div className="flex-grow" />
-        <div className="pointer-events-auto relative w-80">
+        <div className="pointer-events-auto relative" style={{ width: promptBoxWidth }}>
           {/* Input previews above textarea */}
           {hasAnyInputs && (
             <div className="flex items-center gap-1.5 mb-1.5 px-1">
@@ -736,7 +775,7 @@ export function PromptBar() {
           )}
           {/* Model generation options */}
           {renderOptionPills()}
-          <div className="relative">
+          <div className={`relative rounded-2xl border shadow-lg overflow-hidden ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`} style={{ height: promptBoxHeight + 32 }}>
             <textarea
               ref={promptRef}
               placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "No prompt required"}
@@ -749,11 +788,16 @@ export function PromptBar() {
                   handleGenerate();
                 }
               }}
-              className={`w-full backdrop-blur-md text-xs placeholder-gray-400 border rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] shadow-lg px-3 pt-1.5 pb-8 resize-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent leading-4 overflow-hidden ${isDark ? "bg-[#161b22] text-white border-gray-700" : "bg-white text-[#0d1117] border-gray-200"}`}
-              style={{ height: 70 }}
+              className={`w-full text-xs placeholder-gray-400 px-3 pt-2 pb-1 resize-none leading-4 overflow-auto bg-transparent focus:outline-none ${isDark ? "text-white" : "text-[#0d1117]"}`}
+              style={{ height: promptBoxHeight }}
             />
-            {/* Generate button */}
-            <div className="absolute bottom-3 right-1.5">
+            {/* Bottom bar inside the box */}
+            <div className="flex items-center justify-between px-2 pb-1.5">
+              <div className="flex items-center gap-1.5">
+                {selectedModel && (
+                  <span className="text-[9px] text-gray-400">{selectedModel.cost}</span>
+                )}
+              </div>
               <button
                 type="button"
                 disabled={isGenerating || !selectedModel}
@@ -772,11 +816,17 @@ export function PromptBar() {
                 )}
               </button>
             </div>
-            {/* Cost indicator */}
-            <div className="absolute bottom-3 left-2 flex items-center gap-1.5">
-              {selectedModel && (
-                <span className="text-[9px] text-gray-400">{selectedModel.cost}</span>
-              )}
+            {/* Resize grip — bottom-left inside the box */}
+            <div
+              className={`absolute bottom-0 left-0 z-20 cursor-sw-resize flex items-center justify-center w-6 h-6 transition-colors ${isDark ? "text-gray-600 hover:text-gray-400" : "text-gray-300 hover:text-gray-500"}`}
+              onMouseDown={startResize("tl")}
+              title="Drag to resize"
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
+                <circle cx="1.5" cy="6.5" r="1" />
+                <circle cx="1.5" cy="3" r="1" />
+                <circle cx="5" cy="6.5" r="1" />
+              </svg>
             </div>
           </div>
         </div>

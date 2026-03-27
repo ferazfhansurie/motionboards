@@ -3,13 +3,8 @@ import { getSettings, createGeneration, updateGeneration, getUserFromToken, dedu
 import { fal } from "@fal-ai/client";
 import Replicate from "replicate";
 import { models } from "@/lib/models";
-import type { ModelType } from "@/lib/models";
 
 export const maxDuration = 300;
-
-const IMAGE_INPUT_TYPES: ModelType[] = ["i2v", "i2i", "s2e", "upscale", "lipsync"];
-const VIDEO_INPUT_TYPES: ModelType[] = ["v2v", "lipsync"];
-const AUDIO_INPUT_TYPES: ModelType[] = ["lipsync", "a2a"];
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
@@ -26,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { prompt, model: modelId, mode, inputImage, startFrame, endFrame, inputAudio, generationOptions } = body;
+    const { prompt, model: modelId, mode, inputImage, inputImages, startFrame, endFrame, inputAudio, generationOptions } = body;
 
     const modelInfo = models.find((m) => m.id === modelId);
     if (!modelInfo) {
@@ -86,7 +81,6 @@ export async function POST(req: NextRequest) {
         fal.config({ credentials: settings.falApiKey });
 
         const input: Record<string, unknown> = {};
-        if (prompt && prompt.trim()) input.prompt = prompt.trim();
 
         // Apply generation options (aspect_ratio, duration, resolution, generate_audio, etc.)
         if (generationOptions && typeof generationOptions === "object") {
@@ -97,28 +91,53 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        if (IMAGE_INPUT_TYPES.includes(modelInfo.type) && inputImage) {
-          input.image_url = inputImage;
+        // Model-driven input mapping — each input's `name` becomes the API parameter key
+        const imageInputs = modelInfo.inputs.filter((i) => i.type === "image");
+        const videoInputs = modelInfo.inputs.filter((i) => i.type === "video");
+        const audioInputs = modelInfo.inputs.filter((i) => i.type === "audio");
+        const textInputs = modelInfo.inputs.filter((i) => i.type === "text");
+        const allImages = Array.isArray(inputImages) ? inputImages as string[] : [];
+
+        // Text inputs — use the model's parameter name (e.g. "prompt" or "text")
+        for (const inp of textInputs) {
+          if (prompt && prompt.trim()) {
+            input[inp.name] = prompt.trim();
+          }
         }
 
+        // Image inputs — map in order from inputRefs, with S2E start/end frame handling
         if (modelInfo.type === "s2e") {
-          if (startFrame) input.start_frame_url = startFrame;
-          if (endFrame) input.end_frame_url = endFrame;
-          if (startFrame) input.image_url = startFrame;
+          // S2E: map start/end frames by name convention
+          for (const inp of imageInputs) {
+            const n = inp.name.toLowerCase();
+            if (n.includes("first") || n.includes("start")) {
+              if (startFrame) input[inp.name] = startFrame;
+            } else if (n.includes("last") || n.includes("end")) {
+              if (endFrame) input[inp.name] = endFrame;
+            } else if (inputImage) {
+              input[inp.name] = inputImage;
+            }
+          }
+        } else {
+          // Non-S2E: map images in order from inputRefs
+          for (let idx = 0; idx < imageInputs.length; idx++) {
+            const src = allImages[idx] || (idx === 0 ? inputImage : null);
+            if (src) input[imageInputs[idx].name] = src;
+          }
         }
 
-        if (VIDEO_INPUT_TYPES.includes(modelInfo.type) && inputImage) {
-          input.video_url = inputImage;
+        // Video inputs — map from inputRefs (video items come through inputImage for first ref)
+        for (const inp of videoInputs) {
+          if (inputImage) input[inp.name] = inputImage;
         }
 
-        // Audio input for lipsync and audio models
-        if (AUDIO_INPUT_TYPES.includes(modelInfo.type) && inputAudio) {
-          input.audio_url = inputAudio;
+        // Audio inputs — map from audioInput
+        for (const inp of audioInputs) {
+          if (inputAudio) input[inp.name] = inputAudio;
         }
 
-        // For face swap — map second image input
-        if (modelId === "easel-ai/advanced-face-swap" && inputImage) {
-          input.face_image_0 = inputImage;
+        // Face swap special handling
+        if (modelId === "easel-ai/advanced-face-swap") {
           input.workflow_type = "user_hair";
           input.gender_0 = "non-binary";
         }

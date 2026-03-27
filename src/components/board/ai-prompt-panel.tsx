@@ -96,8 +96,8 @@ export function AIPromptPanel() {
   };
 
   return (
-    <div className="absolute left-2 bottom-12 z-[55] w-[420px]">
-      <div className={`rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${isDark ? "border-gray-700 bg-[#161b22]" : "border-gray-200 bg-white"}`} style={{ maxHeight: "560px" }}>
+    <div className="fixed left-3 bottom-14 z-[55] w-[380px]">
+      <div className={`rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${isDark ? "border-gray-700 bg-[#161b22]" : "border-gray-200 bg-white"}`} style={{ maxHeight: "min(560px, calc(100vh - 80px))" }}>
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${isDark ? "border-gray-700 bg-gradient-to-r from-[#161b22] to-[#1c2128]" : "border-gray-100 bg-gradient-to-r from-white to-gray-50"}`}>
           <div className="flex items-center gap-2.5">
