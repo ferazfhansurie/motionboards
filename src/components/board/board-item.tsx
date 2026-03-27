@@ -31,18 +31,34 @@ function getStageIndex(text?: string): number {
 
 function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean }) {
   const [elapsed, setElapsed] = useState(0);
+  const TIMEOUT = 600; // 10 minutes max
 
   useEffect(() => {
     const start = new Date(item.createdAt).getTime();
     setElapsed(Math.floor((Date.now() - start) / 1000));
     const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - start) / 1000));
+      const secs = Math.floor((Date.now() - start) / 1000);
+      setElapsed(secs);
+      // Auto-fail if stuck too long
+      if (secs >= TIMEOUT && item.status === "processing") {
+        useAppStore.getState().updateItem(item.id, {
+          status: "failed",
+          error: "Timed out. The AI provider didn't respond. Try again.",
+        });
+      }
     }, 1000);
     return () => clearInterval(interval);
-  }, [item.createdAt]);
+  }, [item.createdAt, item.id, item.status]);
 
   const stageIdx = getStageIndex(item.progressText);
   const displayText = item.progressText || "Queued...";
+
+  const handleCancel = () => {
+    useAppStore.getState().updateItem(item.id, {
+      status: "failed",
+      error: "Cancelled by user",
+    });
+  };
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-4" style={{ height: item.height }}>
@@ -86,6 +102,16 @@ function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean
           {formatTime(elapsed)} elapsed
         </p>
       </div>
+
+      {/* Cancel button — shows after 30s */}
+      {elapsed > 30 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); handleCancel(); }}
+          className={`text-[9px] px-3 py-1 rounded-lg transition-colors ${isDark ? "text-gray-500 hover:text-red-400 hover:bg-red-500/10" : "text-gray-400 hover:text-red-500 hover:bg-red-50"}`}
+        >
+          Cancel
+        </button>
+      )}
     </div>
   );
 }
