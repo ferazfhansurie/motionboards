@@ -4,7 +4,7 @@ import { fal } from "@fal-ai/client";
 import Replicate from "replicate";
 import { models } from "@/lib/models";
 
-export const maxDuration = 300;
+export const maxDuration = 600; // 10 min — requires Vercel Pro plan
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
