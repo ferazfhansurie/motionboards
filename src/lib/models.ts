@@ -87,6 +87,110 @@ export const models: AIModel[] = [
     },
   },
 
+  // === Nano Banana 2 Edit (image editing) ===
+
+  {
+    id: "fal-ai/nano-banana-2/edit",
+    name: "Nano Banana 2 Edit",
+    provider: "fal", type: "i2i", category: "Concept Art & Style",
+    description: "Edit images with text prompts. Upload images and describe changes.",
+    cost: "~RM0.20", creditCost: 20, speed: "~30s", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Edit description" },
+      { name: "image_urls", type: "image", required: true, description: "Images to edit" },
+    ],
+    options: {
+      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"], default: "auto", label: "Aspect Ratio" },
+      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
+    },
+  },
+
+  // === Voice Clone ===
+
+  {
+    id: "fal-ai/qwen-3-tts/clone-voice/0.6b",
+    name: "Voice Clone (0.6B Fast)",
+    provider: "fal", type: "audio", category: "Audio & Music",
+    description: "Clone a voice from a sample clip. Fast, lightweight. Returns voice embedding.",
+    cost: "~RM0.02", creditCost: 2, speed: "~46s", stable: true,
+    inputs: [
+      { name: "audio_url", type: "audio", required: true, description: "Voice sample to clone" },
+      { name: "reference_text", type: "text", required: false, description: "Transcript of the audio (improves quality)" },
+    ],
+  },
+
+  // === Seedance (ByteDance) ===
+
+  {
+    id: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+    name: "Seedance 1.5 Pro I2V",
+    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
+    description: "ByteDance Seedance 1.5 Pro. Image-to-video with audio generation.",
+    cost: "~RM0.85", creditCost: 85, speed: "~5m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "image_url", type: "image", required: true, description: "Starting image" },
+      { name: "end_image_url", type: "image", required: false, description: "End frame (optional)" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "auto"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Generate Audio" },
+    },
+  },
+
+  {
+    id: "fal-ai/bytedance/seedance/v1/pro/fast/image-to-video",
+    name: "Seedance 1.0 Pro Fast I2V",
+    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
+    description: "Seedance 1.0 Pro Fast. Quick image-to-video, up to 1080p.",
+    cost: "~RM0.50", creditCost: 50, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "image_url", type: "image", required: true, description: "Starting image" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "auto"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "1080p", label: "Resolution" },
+    },
+  },
+
+  {
+    id: "fal-ai/bytedance/seedance/v1/lite/image-to-video",
+    name: "Seedance 1.0 Lite I2V",
+    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
+    description: "Seedance 1.0 Lite. Fast, efficient image-to-video.",
+    cost: "~RM0.30", creditCost: 30, speed: "~2m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "image_url", type: "image", required: true, description: "Starting image" },
+      { name: "end_image_url", type: "image", required: false, description: "End frame (optional)" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "auto"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+    },
+  },
+
+  {
+    id: "fal-ai/bytedance/seedance/v1/lite/text-to-video",
+    name: "Seedance 1.0 Lite T2V",
+    provider: "fal", type: "t2v", category: "Cinematic Video Gen",
+    description: "Seedance 1.0 Lite text-to-video. Multiple aspect ratios and durations.",
+    cost: "~RM0.30", creditCost: 30, speed: "~2m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "9:21"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+    },
+  },
+
   // === Lip Sync ===
 
   {
