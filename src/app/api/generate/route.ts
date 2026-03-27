@@ -171,6 +171,22 @@ export async function POST(req: NextRequest) {
               input.gender_0 = "non-binary";
             }
 
+            // Voice Clone TTS: 2-step process — clone voice first, then TTS
+            if (modelId === "fal-ai/qwen-3-tts/text-to-speech/0.6b" && input.audio_url) {
+              send({ type: "log", message: "Cloning voice from reference..." });
+              const cloneResult = await fal.subscribe("fal-ai/qwen-3-tts/clone-voice/0.6b", {
+                input: { audio_url: input.audio_url },
+                logs: true,
+              });
+              const cloneData = cloneResult.data as Record<string, unknown>;
+              const embedding = cloneData.speaker_embedding as Record<string, unknown> | undefined;
+              if (embedding?.url) {
+                input.speaker_voice_embedding_file_url = embedding.url;
+                send({ type: "log", message: "Voice cloned. Generating speech..." });
+              }
+              delete input.audio_url; // TTS model doesn't accept audio_url directly
+            }
+
             const result = await fal.subscribe(modelId, {
               input,
               logs: true,

@@ -212,6 +212,19 @@ export const models: AIModel[] = [
     },
   },
 
+  // === Voice / TTS ===
+
+  {
+    id: "fal-ai/qwen-3-tts/text-to-speech/0.6b",
+    name: "Voice Clone TTS",
+    provider: "fal", type: "audio", category: "Audio & Music",
+    description: "Text-to-speech with voice cloning. Upload a voice reference audio and type what to say.",
+    cost: "~RM0.10", creditCost: 10, speed: "~30s", stable: true,
+    inputs: [
+      { name: "text", type: "text", required: true, description: "Text to speak" },
+      { name: "audio_url", type: "audio", required: true, description: "Voice reference audio (clone this voice)" },
+    ],
+  },
 
   // === Image Editing ===
 
