@@ -759,6 +759,11 @@ export function PromptBar() {
             </div>
           )}
 
+          {/* Option pills — outside the chatbox */}
+          <div className="flex justify-end mb-1">
+            {renderOptionPills()}
+          </div>
+
           {/* The chatbox */}
           <div className={`w-full rounded-2xl border shadow-lg flex flex-col ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
             {/* Top resize bar — drag left/up to resize */}
@@ -775,9 +780,6 @@ export function PromptBar() {
                 </svg>
               </div>
             </div>
-
-            {/* Option pills */}
-            {renderOptionPills()}
 
             {/* Textarea */}
             <textarea
