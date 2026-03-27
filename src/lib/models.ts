@@ -129,14 +129,30 @@ export const models: AIModel[] = [
 
   {
     id: "fal-ai/infinitalk",
-    name: "InfiniteTalk",
+    name: "InfiniteTalk (Image+Audio)",
     provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Lip-synced video from image + audio. Full-body animation with natural motion.",
-    cost: "~RM0.80", creditCost: 80, speed: "~3m", stable: true,
+    description: "Image + audio → lip-synced video. Full-body animation with natural motion.",
+    cost: "~RM0.85", creditCost: 85, speed: "~7m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "image_url", type: "image", required: true, description: "Character image" },
       { name: "audio_url", type: "audio", required: true, description: "Audio/speech file" },
+    ],
+    options: {
+      resolution: { values: ["480p", "720p"], default: "480p", label: "Resolution" },
+    },
+  },
+
+  {
+    id: "fal-ai/infinitalk/video-to-video",
+    name: "InfiniteTalk (Video Lip-Sync)",
+    provider: "fal", type: "lipsync", category: "Lip Sync",
+    description: "Sync a video with a new vocal track. Upload close-up video + audio clip.",
+    cost: "~RM0.83", creditCost: 83, speed: "~7m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "video_url", type: "video", required: true, description: "Close-up face video" },
+      { name: "audio_url", type: "audio", required: true, description: "New vocal track" },
     ],
     options: {
       resolution: { values: ["480p", "720p"], default: "480p", label: "Resolution" },
