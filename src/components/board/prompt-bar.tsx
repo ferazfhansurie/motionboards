@@ -194,76 +194,41 @@ export function PromptBar() {
 
   const selectedModel = selectedModelId ? getModelById(selectedModelId) : null;
 
-  const getNextPosition = () => {
-    if (items.length === 0) {
-      return {
-        x: (-panX + window.innerWidth / 2 - 150) / zoom,
-        y: (-panY + window.innerHeight / 2 - 100) / zoom,
-      };
-    }
-    const rightmost = items.reduce((max, item) =>
-      item.x + item.width > max.x + max.width ? item : max
-    );
-    return { x: rightmost.x + rightmost.width + 30, y: rightmost.y };
+  const getCenterPosition = (w: number, h: number) => ({
+    x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
+    y: (-panY + window.innerHeight / 2 - h / 2) / zoom,
+  });
+
+  const parseModelSpeed = (speed?: string): number => {
+    if (!speed) return 60;
+    const m = speed.match(/(\d+)\s*m/);
+    const s = speed.match(/(\d+)\s*s/);
+    return (m ? parseInt(m[1]) * 60 : 0) + (s ? parseInt(s[1]) : 0) || 60;
   };
 
   const handleGenerate = async () => {
     if (!selectedModel) return;
     if (!prompt.trim() && selectedModel.inputs.some((i) => i.type === "text" && i.required)) return;
 
-    // Pre-check auth + credits client-side before wasting time
-    try {
-      const authRes = await fetch("/api/auth/me");
-      const authData = await authRes.json();
-      if (!authData.user) { window.location.href = "/signup"; return; }
-      if (!authData.user.credits || authData.user.credits <= 0) {
-        alert("No credits. Please top up before generating.");
-        return;
-      }
-      if (authData.user.credits < selectedModel.creditCost) {
-        const rmCost = (selectedModel.creditCost / 100).toFixed(2);
-        const rmBalance = (authData.user.credits / 100).toFixed(2);
-        alert(`Insufficient credits. ${selectedModel.name} costs RM${rmCost}. You have RM${rmBalance}. Please top up.`);
-        return;
-      }
-    } catch {}
-
-    // Check required inputs
+    // Check required inputs (instant, no network calls)
     const needsImage = selectedModel.inputs.some((i) => i.type === "image" && i.required);
     const needsVideo = selectedModel.inputs.some((i) => i.type === "video" && i.required);
     const needsAudio = selectedModel.inputs.some((i) => i.type === "audio" && i.required);
     const hasImageInput = inputRefs.length > 0 || startFrameId;
     const hasVideoInput = inputRefs.some((id) => items.find((i) => i.id === id)?.type === "video");
-    const { audioInputId } = useAppStore.getState();
-    const audioItem = audioInputId ? items.find((i) => i.id === audioInputId) : null;
+    const { audioInputId: currentAudioId } = useAppStore.getState();
+    const audioItem = currentAudioId ? items.find((i) => i.id === currentAudioId) : null;
 
-    // S2E requires BOTH start and end frames
     if (selectedModel.type === "s2e") {
-      if (!startFrameId) {
-        alert(`${selectedModel.name} requires a Start Frame. Select an image and set it as Start Frame.`);
-        return;
-      }
-      if (!endFrameId) {
-        alert(`${selectedModel.name} requires an End Frame. Select a second image and set it as End Frame.`);
-        return;
-      }
+      if (!startFrameId) { alert(`${selectedModel.name} requires a Start Frame.`); return; }
+      if (!endFrameId) { alert(`${selectedModel.name} requires an End Frame.`); return; }
     }
+    if (needsImage && !hasImageInput) { alert(`${selectedModel.name} requires an image input.`); return; }
+    if (needsVideo && !hasVideoInput && !inputRefs.length) { alert(`${selectedModel.name} requires a video input.`); return; }
+    if (needsAudio && !audioItem) { alert(`${selectedModel.name} requires an audio input.`); return; }
 
-    if (needsImage && !hasImageInput) {
-      alert(`${selectedModel.name} requires an image input. Select an image on the canvas and set it as INPUT.`);
-      return;
-    }
-    if (needsVideo && !hasVideoInput && !inputRefs.length) {
-      alert(`${selectedModel.name} requires a video input. Select a video on the canvas and set it as INPUT.`);
-      return;
-    }
-    if (needsAudio && !audioItem) {
-      alert(`${selectedModel.name} requires an audio input. Select an audio file on the canvas and set it as AUDIO INPUT.`);
-      return;
-    }
-
+    // Create item IMMEDIATELY at center of screen — zero latency
     setIsGenerating(true);
-    const pos = getNextPosition();
 
     const outputType =
       selectedModel.type === "audio" || selectedModel.type === "a2a"
@@ -272,17 +237,17 @@ export function PromptBar() {
         ? "image"
         : "video";
 
-    // Calculate dimensions based on aspect ratio
     const ar = (generationOptions.aspect_ratio as string) || selectedModel.options?.aspect_ratio?.default || "16:9";
     let genW = 300;
     let genH = outputType === "audio" ? 80 : 200;
     if (outputType !== "audio") {
       const arParts = ar.split(":").map(Number);
       if (arParts.length === 2 && arParts[0] > 0 && arParts[1] > 0) {
-        const ratio = arParts[1] / arParts[0];
-        genH = Math.round(genW * ratio);
+        genH = Math.round(genW * (arParts[1] / arParts[0]));
       }
     }
+
+    const pos = getCenterPosition(genW, genH);
 
     const genItem: BoardItem = {
       id: `gen_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -297,6 +262,8 @@ export function PromptBar() {
       modelName: selectedModel.name,
       status: "processing",
       outputType,
+      progressText: "Starting...",
+      expectedDuration: parseModelSpeed(selectedModel.speed),
       createdAt: new Date().toISOString(),
     };
 
@@ -323,51 +290,101 @@ export function PromptBar() {
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        // Remove the placeholder item and show error
+        const data = await res.json();
         useAppStore.getState().removeItem(genItem.id);
+        if (res.status === 401) { window.location.href = "/signup"; return; }
         alert(data.error || "Generation failed");
         return;
       }
-      useAppStore.getState().updateItem(genItem.id, {
-        status: data.status === "completed" ? "completed" : "failed",
-        outputUrl: data.outputUrl || null,
-        error: data.error || null,
-        cost: data.cost || selectedModel.cost,
-      });
 
-      // Auto-resize card to match actual output dimensions
-      if (data.outputUrl && data.status === "completed") {
-        if (outputType === "image") {
-          const img = new window.Image();
-          img.onload = () => {
-            const maxW = 400;
-            const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
-            useAppStore.getState().updateItem(genItem.id, {
-              width: Math.round(img.naturalWidth * scale),
-              height: Math.round(img.naturalHeight * scale),
-            });
-          };
-          img.src = data.outputUrl;
-        } else if (outputType === "video") {
-          const vid = document.createElement("video");
-          vid.preload = "metadata";
-          vid.onloadedmetadata = () => {
-            const maxW = 400;
-            const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
-            useAppStore.getState().updateItem(genItem.id, {
-              width: Math.round(vid.videoWidth * scale),
-              height: Math.round(vid.videoHeight * scale),
-            });
-          };
-          vid.src = data.outputUrl;
+      // Read SSE stream for real-time progress
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalData: Record<string, unknown> | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "queued") {
+              useAppStore.getState().updateItem(genItem.id, {
+                progressText: event.position != null ? `Queued #${event.position}` : "Queued...",
+              });
+            } else if (event.type === "processing" || event.type === "started") {
+              useAppStore.getState().updateItem(genItem.id, {
+                progressText: "Processing...",
+              });
+            } else if (event.type === "log") {
+              useAppStore.getState().updateItem(genItem.id, {
+                progressText: event.message || "Processing...",
+              });
+            } else if (event.type === "complete") {
+              finalData = event.data as Record<string, unknown>;
+            } else if (event.type === "error") {
+              useAppStore.getState().updateItem(genItem.id, {
+                status: "failed",
+                error: event.error || "Generation failed",
+                progressText: undefined,
+              });
+              return;
+            }
+          } catch {}
+        }
+      }
+
+      if (finalData) {
+        useAppStore.getState().updateItem(genItem.id, {
+          status: finalData.status === "completed" ? "completed" : "failed",
+          outputUrl: (finalData.outputUrl as string) || undefined,
+          error: (finalData.error as string) || undefined,
+          cost: (finalData.cost as string) || selectedModel.cost,
+          progressText: undefined,
+        });
+
+        // Auto-resize card to match actual output dimensions
+        if (finalData.outputUrl && finalData.status === "completed") {
+          const outUrl = finalData.outputUrl as string;
+          if (outputType === "image") {
+            const img = new window.Image();
+            img.onload = () => {
+              const maxW = 400;
+              const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+              useAppStore.getState().updateItem(genItem.id, {
+                width: Math.round(img.naturalWidth * scale),
+                height: Math.round(img.naturalHeight * scale),
+              });
+            };
+            img.src = outUrl;
+          } else if (outputType === "video") {
+            const vid = document.createElement("video");
+            vid.preload = "metadata";
+            vid.onloadedmetadata = () => {
+              const maxW = 400;
+              const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
+              useAppStore.getState().updateItem(genItem.id, {
+                width: Math.round(vid.videoWidth * scale),
+                height: Math.round(vid.videoHeight * scale),
+              });
+            };
+            vid.src = outUrl;
+          }
         }
       }
     } catch (err) {
       useAppStore.getState().updateItem(genItem.id, {
         status: "failed",
         error: err instanceof Error ? err.message : "Generation failed",
+        progressText: undefined,
       });
     } finally {
       setIsGenerating(false);

@@ -81,6 +81,8 @@ export interface BoardItem {
   outputUrl?: string;
   outputType?: "image" | "video" | "audio";
   cost?: string;
+  progressText?: string;
+  expectedDuration?: number; // seconds, for progress estimation
   createdAt: string;
   // PSD layer metadata
   psdGroupId?: string;

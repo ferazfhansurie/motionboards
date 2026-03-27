@@ -7,6 +7,51 @@ import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
 
+function formatTime(s: number) {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const start = new Date(item.createdAt).getTime();
+    setElapsed(Math.floor((Date.now() - start) / 1000));
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [item.createdAt]);
+
+  const expected = item.expectedDuration || 60;
+  const progress = Math.min(95, Math.round((elapsed / expected) * 100));
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 px-4" style={{ height: item.height }}>
+      <Loader2 className="h-5 w-5 animate-spin text-[#f26522]" />
+      <p className={`text-[10px] font-medium ${isDark ? "text-gray-300" : "text-gray-500"}`}>
+        {item.progressText || "Starting..."}
+      </p>
+      <div className="w-full max-w-[200px]">
+        <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? "bg-gray-700" : "bg-gray-200"}`}>
+          <div
+            className="h-full bg-[#f26522] rounded-full transition-all duration-1000 ease-linear"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-1">
+          <span className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+            {formatTime(elapsed)} / ~{formatTime(expected)}
+          </span>
+          <span className={`text-[9px] font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            {progress}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface BoardItemCardProps {
   item: BoardItem;
   isSelected: boolean;
@@ -430,10 +475,7 @@ export function BoardItemCard({
         {item.type === "generation" && (
           <>
             {item.status === "processing" ? (
-              <div className="flex flex-col items-center justify-center gap-2" style={{ height: item.height }}>
-                <Loader2 className="h-6 w-6 animate-spin text-[#f26522]" />
-                <p className="text-[10px] text-gray-400">Generating...</p>
-              </div>
+              <GeneratingProgress item={item} isDark={isDark} />
             ) : item.status === "failed" ? (
               <div className="flex flex-col items-center justify-center gap-2 p-3" style={{ height: item.height }}>
                 <AlertCircle className="h-5 w-5 text-red-400" />
