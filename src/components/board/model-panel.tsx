@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Search, Sparkles, Film, Wand2, ArrowUpRight, Palette, User, Mic, Music, Zap, Check, PenTool, UserCheck, Layers } from "lucide-react";
+import { X, Search, Sparkles, Film, Wand2, ArrowUpRight, Palette, User, Mic, Music, Zap, Check, PenTool, UserCheck, Layers, Info } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { models, modelCategories, getModelsByCategory, getTypeLabel, type ModelCategory } from "@/lib/models";
 
@@ -148,6 +148,32 @@ export function ModelPanel() {
                   <div className="text-right shrink-0">
                     <span className="text-[11px] font-bold text-[#f26522]">{model.cost}</span>
                     <p className={`text-[8px] mt-0.5 ${isDark ? "text-gray-600" : "text-gray-400"}`}>{model.speed}</p>
+                  </div>
+
+                  {/* Info icon with hover tooltip */}
+                  <div className="relative group/info shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className={`h-6 w-6 rounded-lg flex items-center justify-center transition-colors ${isDark ? "text-gray-600 hover:text-gray-300 hover:bg-white/10" : "text-gray-300 hover:text-gray-600 hover:bg-gray-100"}`}>
+                      <Info className="h-3.5 w-3.5" />
+                    </div>
+                    <div className={`absolute bottom-full right-0 mb-2 w-56 rounded-xl border p-3 shadow-2xl z-50 opacity-0 pointer-events-none group-hover/info:opacity-100 group-hover/info:pointer-events-auto transition-opacity ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
+                      <p className={`text-[10px] font-bold mb-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}>{model.name}</p>
+                      <p className={`text-[9px] mb-2 leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>{model.description}</p>
+                      <div className={`text-[8px] space-y-1 pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-100"}`}>
+                        <p><span className={isDark ? "text-gray-500" : "text-gray-400"}>Type:</span> <span className={isDark ? "text-gray-300" : "text-gray-600"}>{getTypeLabel(model.type)}</span></p>
+                        <p><span className={isDark ? "text-gray-500" : "text-gray-400"}>Cost:</span> <span className="text-[#f26522] font-semibold">{model.cost}</span></p>
+                        <p><span className={isDark ? "text-gray-500" : "text-gray-400"}>Speed:</span> <span className={isDark ? "text-gray-300" : "text-gray-600"}>{model.speed}</span></p>
+                        <p><span className={isDark ? "text-gray-500" : "text-gray-400"}>Provider:</span> <span className={isDark ? "text-gray-300" : "text-gray-600"}>{model.provider}</span></p>
+                        <div className="mt-1.5">
+                          <p className={`font-semibold mb-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Requires:</p>
+                          {model.inputs.map((inp) => (
+                            <p key={inp.name} className={isDark ? "text-gray-400" : "text-gray-500"}>
+                              {inp.required ? "* " : "  "}<span className={isDark ? "text-gray-300" : "text-gray-600"}>{inp.description}</span>
+                              {!inp.required && " (optional)"}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Check */}
