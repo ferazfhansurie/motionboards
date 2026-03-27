@@ -31,24 +31,14 @@ function getStageIndex(text?: string): number {
 
 function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean }) {
   const [elapsed, setElapsed] = useState(0);
-  const TIMEOUT = 600; // 10 minutes max
-
   useEffect(() => {
     const start = new Date(item.createdAt).getTime();
     setElapsed(Math.floor((Date.now() - start) / 1000));
     const interval = setInterval(() => {
-      const secs = Math.floor((Date.now() - start) / 1000);
-      setElapsed(secs);
-      // Auto-fail if stuck too long
-      if (secs >= TIMEOUT && item.status === "processing") {
-        useAppStore.getState().updateItem(item.id, {
-          status: "failed",
-          error: "Timed out. The AI provider didn't respond. Try again.",
-        });
-      }
+      setElapsed(Math.floor((Date.now() - start) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [item.createdAt, item.id, item.status]);
+  }, [item.createdAt]);
 
   const stageIdx = getStageIndex(item.progressText);
   const displayText = item.progressText || "Queued...";
