@@ -24,13 +24,14 @@ export function BoardItemCard({
   onDoubleClick,
   onResizeStart,
 }: BoardItemCardProps) {
-  const { startFrameId, endFrameId, inputRefs, isEditMode, setEditMode, selectItem, theme } = useAppStore();
+  const { startFrameId, endFrameId, inputRefs, audioInputId, isEditMode, setEditMode, selectItem, theme } = useAppStore();
   const isDark = theme === "dark";
 
   const isStartFrame = startFrameId === item.id;
   const isEndFrame = endFrameId === item.id;
   const isInputRef = inputRefs.includes(item.id);
   const inputIndex = inputRefs.indexOf(item.id);
+  const isAudioRef = audioInputId === item.id;
 
   // Text editing state
   const [isEditingText, setIsEditingText] = useState(false);
@@ -276,6 +277,12 @@ export function BoardItemCard({
             INPUT {inputIndex + 1}
           </Badge>
         )}
+        {isAudioRef && (
+          <Badge className="bg-purple-600 text-white text-[10px] px-1.5 py-0 flex items-center gap-1 border-0">
+            <Music className="h-2.5 w-2.5" />
+            AUDIO
+          </Badge>
+        )}
         {item.type === "psd-layer" && (
           <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0 flex items-center gap-1 border-0">
             <Layers className="h-2.5 w-2.5" />
@@ -291,6 +298,8 @@ export function BoardItemCard({
             ? "border-[#f26522] shadow-[0_0_20px_rgba(242,101,34,0.5)] ring-2 ring-[#f26522]/30"
             : isSelected
             ? "border-[#f26522] shadow-[0_0_15px_rgba(242,101,34,0.3)]"
+            : isAudioRef
+            ? "border-purple-500/70"
             : isStartFrame || isEndFrame || isInputRef
             ? "border-emerald-500/70"
             : isDark
