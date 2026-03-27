@@ -207,6 +207,8 @@ export async function POST(req: NextRequest) {
               outputUrl = (data.target as Record<string, unknown>).url as string;
             } else if (data.model_mesh && typeof data.model_mesh === "object") {
               outputUrl = (data.model_mesh as Record<string, unknown>).url as string;
+            } else if (data.speaker_embedding && typeof data.speaker_embedding === "object") {
+              outputUrl = (data.speaker_embedding as Record<string, unknown>).url as string;
             } else if (data.output && typeof data.output === "string") {
               outputUrl = data.output;
             } else if (data.url && typeof data.url === "string") {
