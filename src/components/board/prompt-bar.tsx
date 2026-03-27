@@ -111,7 +111,7 @@ export function PromptBar() {
     if (keys.length === 0) return null;
 
     return (
-      <div className="flex flex-wrap items-center gap-1 mb-1">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
         {keys.map((key) => {
           const opt = opts[key];
           if (!opt) return null;
@@ -123,12 +123,12 @@ export function PromptBar() {
             return (
               <button
                 key={key}
-                className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${
+                className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-all ${
                   currentVal
-                    ? "bg-[#f26522] text-white border-[#f26522]"
+                    ? "bg-[#f26522] text-white shadow-md shadow-[#f26522]/20"
                     : isDark
-                    ? "text-gray-400 border-gray-600 hover:border-[#f26522] hover:text-[#f26522]"
-                    : "text-gray-500 border-gray-300 hover:border-[#f26522] hover:text-[#f26522]"
+                    ? "bg-[#161b22] text-gray-300 border border-gray-700 hover:border-[#f26522] hover:text-[#f26522]"
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-[#f26522] hover:text-[#f26522] shadow-sm"
                 }`}
                 onClick={() => setGenerationOption(key, !currentVal)}
                 title={boolOpt.label}
@@ -145,30 +145,30 @@ export function PromptBar() {
           return (
             <div key={key} className="relative group/opt">
               <button
-                className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1 ${
+                className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                   isDark
-                    ? "text-gray-300 border-gray-600 hover:border-[#f26522]"
-                    : "text-gray-600 border-gray-300 hover:border-[#f26522]"
+                    ? "bg-[#161b22] text-gray-200 border border-gray-700 hover:border-[#f26522] shadow-sm"
+                    : "bg-white text-gray-700 border border-gray-200 hover:border-[#f26522] shadow-sm"
                 }`}
                 title={selectOpt.label}
               >
-                <span className="text-gray-400">{selectOpt.label.replace("Aspect Ratio", "AR").replace("Duration", "Dur").replace("Resolution", "Res")}:</span>
-                <span className="font-medium">{currentVal}</span>
-                <ChevronDown className="w-2 h-2" />
+                <span className={`${isDark ? "text-gray-500" : "text-gray-400"}`}>{selectOpt.label.replace("Aspect Ratio", "AR").replace("Duration", "Dur").replace("Resolution", "Res")}</span>
+                <span className="text-[#f26522]">{currentVal}</span>
+                <ChevronDown className="w-2.5 h-2.5 text-gray-400" />
               </button>
-              <div className={`absolute bottom-full left-0 mb-1 rounded-lg border shadow-xl overflow-hidden z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-opacity ${
-                isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"
+              <div className={`absolute bottom-full left-0 mb-1.5 rounded-xl border shadow-2xl overflow-hidden z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-all ${
+                isDark ? "bg-[#0d1117] border-gray-700" : "bg-white border-gray-200"
               }`}>
-                <div className="p-1 flex flex-col gap-0.5 min-w-[80px]">
+                <div className="p-1.5 flex flex-col gap-0.5 min-w-[90px]">
                   {selectOpt.values.map((v) => (
                     <button
                       key={v}
-                      className={`text-[9px] px-2 py-1 rounded text-left transition-colors whitespace-nowrap ${
+                      className={`text-[10px] px-3 py-1.5 rounded-lg text-left transition-all whitespace-nowrap font-medium ${
                         currentVal === v
-                          ? "bg-[#f26522]/15 text-[#f26522] font-semibold"
+                          ? "bg-[#f26522] text-white"
                           : isDark
                           ? "text-gray-300 hover:bg-white/10"
-                          : "text-gray-600 hover:bg-gray-100"
+                          : "text-gray-600 hover:bg-gray-50"
                       }`}
                       onClick={() => setGenerationOption(key, v)}
                     >
