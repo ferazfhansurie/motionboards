@@ -156,9 +156,8 @@ export function PromptBar() {
                 <span className="text-[#f26522]">{currentVal}</span>
                 <ChevronDown className="w-2.5 h-2.5 text-gray-400" />
               </button>
-              <div className={`absolute bottom-full left-0 mb-1.5 rounded-xl border shadow-2xl overflow-hidden z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-all ${
-                isDark ? "bg-[#0d1117] border-gray-700" : "bg-white border-gray-200"
-              }`}>
+              <div className={`absolute bottom-full left-0 pb-1 z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-all`}>
+                <div className={`rounded-xl border shadow-2xl overflow-hidden ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-white border-gray-200"}`}>
                 <div className="p-1.5 flex flex-col gap-0.5 min-w-[90px]">
                   {selectOpt.values.map((v) => (
                     <button
@@ -175,6 +174,7 @@ export function PromptBar() {
                       {v}
                     </button>
                   ))}
+                </div>
                 </div>
               </div>
             </div>
