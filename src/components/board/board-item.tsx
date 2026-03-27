@@ -8,7 +8,25 @@ import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
 
 function formatTime(s: number) {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+const STAGES = [
+  { key: "queued", label: "Queued", icon: "queue" },
+  { key: "processing", label: "Processing", icon: "process" },
+  { key: "generating", label: "Generating", icon: "generate" },
+  { key: "complete", label: "Complete", icon: "done" },
+];
+
+function getStageIndex(text?: string): number {
+  if (!text) return 0;
+  const t = text.toLowerCase();
+  if (t.includes("complete") || t.includes("done") || t.includes("finish")) return 3;
+  if (t.includes("generat") || t.includes("render") || t.includes("creat")) return 2;
+  if (t.includes("process") || t.includes("running") || t.includes("started")) return 1;
+  return 0;
 }
 
 function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean }) {
@@ -23,30 +41,50 @@ function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean
     return () => clearInterval(interval);
   }, [item.createdAt]);
 
-  const expected = item.expectedDuration || 60;
-  const progress = Math.min(95, Math.round((elapsed / expected) * 100));
+  const stageIdx = getStageIndex(item.progressText);
+  const displayText = item.progressText || "Queued...";
 
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-4" style={{ height: item.height }}>
+    <div className="flex flex-col items-center justify-center gap-3 px-4" style={{ height: item.height }}>
       <Loader2 className="h-5 w-5 animate-spin text-[#f26522]" />
-      <p className={`text-[10px] font-medium ${isDark ? "text-gray-300" : "text-gray-500"}`}>
-        {item.progressText || "Starting..."}
-      </p>
-      <div className="w-full max-w-[200px]">
-        <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? "bg-gray-700" : "bg-gray-200"}`}>
-          <div
-            className="h-full bg-[#f26522] rounded-full transition-all duration-1000 ease-linear"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <div className="flex justify-between mt-1">
-          <span className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-            {formatTime(elapsed)} / ~{formatTime(expected)}
+
+      {/* Stage dots */}
+      <div className="flex items-center gap-1 w-full max-w-[200px]">
+        {STAGES.slice(0, 3).map((stage, i) => (
+          <div key={stage.key} className="flex items-center flex-1">
+            <div className={`h-2 w-2 rounded-full shrink-0 transition-colors ${
+              i < stageIdx ? "bg-[#f26522]"
+              : i === stageIdx ? "bg-[#f26522] animate-pulse"
+              : isDark ? "bg-gray-700" : "bg-gray-300"
+            }`} />
+            {i < 2 && (
+              <div className={`flex-1 h-0.5 mx-0.5 transition-colors ${
+                i < stageIdx ? "bg-[#f26522]" : isDark ? "bg-gray-700" : "bg-gray-300"
+              }`} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Stage labels */}
+      <div className="flex justify-between w-full max-w-[200px]">
+        {STAGES.slice(0, 3).map((stage, i) => (
+          <span key={stage.key} className={`text-[7px] font-semibold uppercase tracking-wider ${
+            i <= stageIdx ? "text-[#f26522]" : isDark ? "text-gray-600" : "text-gray-400"
+          }`}>
+            {stage.label}
           </span>
-          <span className={`text-[9px] font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-            {progress}%
-          </span>
-        </div>
+        ))}
+      </div>
+
+      {/* Current status + elapsed */}
+      <div className="text-center">
+        <p className={`text-[10px] font-medium ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+          {displayText}
+        </p>
+        <p className={`text-[9px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+          {formatTime(elapsed)} elapsed
+        </p>
       </div>
     </div>
   );
