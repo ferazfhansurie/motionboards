@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
     const requestId = req.nextUrl.searchParams.get("requestId");
     const modelId = req.nextUrl.searchParams.get("modelId");
     const generationId = req.nextUrl.searchParams.get("generationId");
+    const ttsInput = req.nextUrl.searchParams.get("ttsInput");
+    const ttsModelId = req.nextUrl.searchParams.get("ttsModelId");
 
     if (!requestId || !modelId || !generationId) {
       return NextResponse.json({ error: "Missing params" }, { status: 400 });
@@ -22,16 +24,33 @@ export async function GET(req: NextRequest) {
     if (!settings.falApiKey) return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     fal.config({ credentials: settings.falApiKey });
 
-    // Check queue status
     const status = await fal.queue.status(modelId, { requestId, logs: true });
 
     if (status.status === "COMPLETED") {
-      // Fetch the result — may throw if fal.ai returned an error
       try {
         const result = await fal.queue.result(modelId, { requestId });
         const data = result.data as Record<string, unknown>;
 
-        // Extract output URL
+        // Voice Clone step completed — submit TTS job with the embedding
+        if (modelId.includes("clone-voice") && ttsInput && ttsModelId) {
+          const embedding = data.speaker_embedding as Record<string, unknown> | undefined;
+          if (!embedding?.url) {
+            await updateGeneration(generationId, { status: "failed", error: "Voice cloning failed", duration: 0 });
+            return NextResponse.json({ status: "failed", error: "Voice cloning failed. Try a clearer audio sample." });
+          }
+          // Submit TTS job with the embedding
+          const parsedInput = JSON.parse(ttsInput) as Record<string, unknown>;
+          parsedInput.speaker_voice_embedding_file_url = embedding.url;
+          const { request_id: ttsReqId } = await fal.queue.submit(ttsModelId, { input: parsedInput });
+          return NextResponse.json({
+            status: "processing",
+            log: "Voice cloned. Generating speech...",
+            nextRequestId: ttsReqId,
+            nextModelId: ttsModelId,
+          });
+        }
+
+        // Normal completion — extract output URL
         let outputUrl: string | null = null;
         if (data.video && typeof data.video === "object") outputUrl = (data.video as Record<string, unknown>).url as string;
         else if (data.video_url && typeof data.video_url === "string") outputUrl = data.video_url;
@@ -44,7 +63,9 @@ export async function GET(req: NextRequest) {
         else if (data.output && typeof data.output === "string") outputUrl = data.output;
         else if (data.url && typeof data.url === "string") outputUrl = data.url;
 
-        const modelInfo = models.find((m) => m.id === modelId);
+        // Find model for credit cost (use the original model, not intermediate steps)
+        const origModelId = req.nextUrl.searchParams.get("origModelId");
+        const modelInfo = models.find((m) => m.id === (origModelId || modelId));
 
         if (outputUrl) {
           await deductCredits(user.id, modelInfo?.creditCost || 0);
@@ -55,7 +76,6 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({ status: "failed", error: "No output received from AI provider" });
         }
       } catch (resultError) {
-        // fal.ai returned COMPLETED but with a validation/processing error
         const errMsg = resultError instanceof Error ? resultError.message : "Generation failed";
         const body = (resultError as Record<string, unknown>)?.body as Record<string, unknown> | undefined;
         const detail = body?.detail;

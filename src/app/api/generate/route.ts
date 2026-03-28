@@ -85,24 +85,11 @@ export async function POST(req: NextRequest) {
       input.gender_0 = "non-binary";
     }
 
-    // Voice Clone TTS: 2-step — clone voice first, then TTS
+    // Voice Clone TTS: handled as 2-step in status endpoint
     let actualModelId = modelId;
+    let cloneAudioUrl: string | null = null;
     if (modelId === "fal-ai/qwen-3-tts/text-to-speech/0.6b" && input.audio_url) {
-      try {
-        const cloneResult = await fal.subscribe("fal-ai/qwen-3-tts/clone-voice/0.6b", {
-          input: { audio_url: input.audio_url },
-          logs: true,
-        });
-        const cloneData = cloneResult.data as Record<string, unknown>;
-        const embedding = cloneData.speaker_embedding as Record<string, unknown> | undefined;
-        if (!embedding?.url) {
-          return NextResponse.json({ error: "Voice cloning failed. Make sure you uploaded a valid audio file with clear speech." }, { status: 400 });
-        }
-        input.speaker_voice_embedding_file_url = embedding.url;
-      } catch (cloneErr) {
-        const msg = cloneErr instanceof Error ? cloneErr.message : "Voice cloning failed";
-        return NextResponse.json({ error: `Voice clone error: ${msg}` }, { status: 400 });
-      }
+      cloneAudioUrl = input.audio_url as string;
       delete input.audio_url;
     }
 
@@ -119,21 +106,31 @@ export async function POST(req: NextRequest) {
     });
 
     // Validate required inputs before submitting
-    // Skip validation for inputs consumed by pre-processing (e.g. voice clone deletes audio_url)
     for (const inp of modelInfo.inputs) {
       if (inp.required && !input[inp.name]) {
-        // Skip if this input was consumed by voice clone pre-processing
-        if (inp.name === "audio_url" && input.speaker_voice_embedding_file_url) continue;
-        console.log(`[generate] Missing input "${inp.name}". Current input keys:`, Object.keys(input), `inputAudio:`, inputAudio ? "set" : "null", `inputImage:`, inputImage ? "set" : "null");
+        if (inp.name === "audio_url" && cloneAudioUrl) continue; // Voice clone handles this
         return NextResponse.json({ error: `Missing required input: ${inp.description}. Please set it as a reference on the canvas.` }, { status: 400 });
       }
     }
 
+    // Voice Clone TTS: submit clone job first, pass info to status endpoint
+    if (cloneAudioUrl) {
+      const { request_id: cloneReqId } = await fal.queue.submit("fal-ai/qwen-3-tts/clone-voice/0.6b", {
+        input: { audio_url: cloneAudioUrl },
+      });
+      return NextResponse.json({
+        generationId: generation.id,
+        requestId: cloneReqId,
+        modelId: "fal-ai/qwen-3-tts/clone-voice/0.6b",
+        status: "processing",
+        // Pass TTS info for the second step
+        ttsStep: { modelId: actualModelId, input },
+      });
+    }
+
     // Submit to fal.ai queue — returns immediately with request_id
-    console.log(`[generate] Submitting to ${actualModelId}`, JSON.stringify(input).slice(0, 500));
     const { request_id } = await fal.queue.submit(actualModelId, { input });
 
-    // Return immediately — client will poll for status
     return NextResponse.json({
       generationId: generation.id,
       requestId: request_id,

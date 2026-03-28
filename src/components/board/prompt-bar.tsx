@@ -300,13 +300,29 @@ export function PromptBar() {
       }
 
       // Poll for status — no timeout limit, works with any Vercel plan
-      const { requestId, modelId: actualModelId, generationId } = data;
-      useAppStore.getState().updateItem(genItem.id, { progressText: "Queued..." });
+      let currentRequestId = data.requestId;
+      let currentModelId = data.modelId;
+      const generationId = data.generationId;
+      const ttsStep = data.ttsStep || null; // Voice Clone TTS 2-step info
+      useAppStore.getState().updateItem(genItem.id, { progressText: ttsStep ? "Cloning voice..." : "Queued..." });
 
       const poll = async () => {
         try {
-          const statusRes = await fetch(`/api/generate/status?requestId=${requestId}&modelId=${encodeURIComponent(actualModelId)}&generationId=${generationId}`);
+          let url = `/api/generate/status?requestId=${currentRequestId}&modelId=${encodeURIComponent(currentModelId)}&generationId=${generationId}`;
+          if (ttsStep && currentModelId.includes("clone-voice")) {
+            url += `&ttsInput=${encodeURIComponent(JSON.stringify(ttsStep.input))}&ttsModelId=${encodeURIComponent(ttsStep.modelId)}`;
+          }
+          const statusRes = await fetch(url);
           const statusData = await statusRes.json();
+
+          // Voice Clone: clone step done, now poll the TTS step
+          if (statusData.nextRequestId) {
+            currentRequestId = statusData.nextRequestId;
+            currentModelId = statusData.nextModelId;
+            useAppStore.getState().updateItem(genItem.id, { progressText: "Generating speech..." });
+            setTimeout(poll, 2000);
+            return;
+          }
 
           if (statusData.status === "completed") {
             useAppStore.getState().updateItem(genItem.id, {
