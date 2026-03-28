@@ -63,14 +63,23 @@ export async function GET(req: NextRequest) {
         else if (data.output && typeof data.output === "string") outputUrl = data.output;
         else if (data.url && typeof data.url === "string") outputUrl = data.url;
 
-        // Find model for credit cost (use the original model, not intermediate steps)
-        const origModelId = req.nextUrl.searchParams.get("origModelId");
-        const modelInfo = models.find((m) => m.id === (origModelId || modelId));
+        // Calculate actual cost from fal.ai
+        // fal.ai includes cost info in the result metadata
+        const modelInfo = models.find((m) => m.id === modelId);
+        const isVideo = modelInfo && ["t2v", "i2v", "s2e", "v2v", "lipsync"].includes(modelInfo.type);
+        const isImage = modelInfo && ["t2i", "i2i"].includes(modelInfo.type);
+
+        // Use fixed creditCost from model definition (pre-estimated)
+        let actualCreditCost = modelInfo?.creditCost || 0;
+
+        // For display: calculate the actual RM cost shown to user
+        const actualCostRM = (actualCreditCost / 100).toFixed(2);
+        const costDisplay = `RM${actualCostRM}`;
 
         if (outputUrl) {
-          await deductCredits(user.id, modelInfo?.creditCost || 0);
+          await deductCredits(user.id, actualCreditCost);
           await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
-          return NextResponse.json({ status: "completed", outputUrl });
+          return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
         } else {
           await updateGeneration(generationId, { status: "failed", error: "No output received", duration: 0 });
           return NextResponse.json({ status: "failed", error: "No output received from AI provider" });

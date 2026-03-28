@@ -349,7 +349,7 @@ export function PromptBar() {
             useAppStore.getState().updateItem(genItem.id, {
               status: "completed",
               outputUrl: statusData.outputUrl,
-              cost: selectedModel.cost,
+              cost: statusData.actualCost || selectedModel.cost,
               progressText: undefined,
             });
 

@@ -57,7 +57,7 @@ export const models: AIModel[] = [
     name: "Nano Banana 2",
     provider: "fal", type: "t2i", category: "Concept Art & Style",
     description: "Google's latest state-of-the-art fast image generation.",
-    cost: "~RM0.41", creditCost: 41, speed: "~30s", stable: true,
+    cost: "~RM0.35", creditCost: 35, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
     ],
@@ -74,7 +74,7 @@ export const models: AIModel[] = [
     name: "Veo 3.1 Fast T2V",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "Fast text-to-video with audio. Cheapest Veo option.",
-    cost: "~RM5.50", creditCost: 550, speed: "~2m", stable: true,
+    cost: "~RM4.66", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
     ],
@@ -91,7 +91,7 @@ export const models: AIModel[] = [
     name: "Veo 3.1 Fast I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "Fast image-to-video with audio. Animate any image.",
-    cost: "~RM5.50", creditCost: 550, speed: "~2m", stable: true,
+    cost: "~RM4.66", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -109,7 +109,7 @@ export const models: AIModel[] = [
     name: "Veo 3.1 Fast S2E",
     provider: "fal", type: "s2e", category: "Cinematic Video Gen",
     description: "Fast start-to-end video with audio. Two frames become cinema.",
-    cost: "~RM5.50", creditCost: 550, speed: "~2m", stable: true,
+    cost: "~RM4.66", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
@@ -128,7 +128,7 @@ export const models: AIModel[] = [
     name: "Veo 3.1 I2V (Premium)",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "Premium image-to-video. Higher quality, 2x cost of Fast.",
-    cost: "~RM14.50", creditCost: 1450, speed: "~5m", stable: true,
+    cost: "~RM12.26", creditCost: 1226, speed: "~5m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -146,7 +146,7 @@ export const models: AIModel[] = [
     name: "Veo 3.1 S2E (Premium)",
     provider: "fal", type: "s2e", category: "Cinematic Video Gen",
     description: "Premium start-to-end video. Higher quality, 2x cost of Fast.",
-    cost: "~RM14.50", creditCost: 1450, speed: "~5m", stable: true,
+    cost: "~RM12.26", creditCost: 1226, speed: "~5m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
@@ -167,7 +167,7 @@ export const models: AIModel[] = [
     name: "Nano Banana 2 Edit",
     provider: "fal", type: "i2i", category: "Concept Art & Style",
     description: "Edit images with text prompts. Upload images and describe changes.",
-    cost: "~RM0.41", creditCost: 41, speed: "~30s", stable: true,
+    cost: "~RM0.35", creditCost: 35, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Edit description" },
       { name: "image_urls", type: "image", required: true, description: "Images to edit" },
@@ -186,7 +186,7 @@ export const models: AIModel[] = [
     name: "Seedance 1.5 Pro I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "ByteDance Seedance 1.5 Pro. Image-to-video with audio generation.",
-    cost: "~RM1.45", creditCost: 145, speed: "~5m", stable: true,
+    cost: "~RM1.24", creditCost: 124, speed: "~5m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "image_url", type: "image", required: true, description: "Starting image" },
@@ -205,7 +205,7 @@ export const models: AIModel[] = [
     name: "Seedance 1.0 Pro Fast I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "Seedance 1.0 Pro Fast. Quick image-to-video, up to 1080p.",
-    cost: "~RM1.18", creditCost: 118, speed: "~3m", stable: true,
+    cost: "~RM1.01", creditCost: 101, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "image_url", type: "image", required: true, description: "Starting image" },
@@ -222,7 +222,7 @@ export const models: AIModel[] = [
     name: "Seedance 1.0 Lite I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
     description: "Seedance 1.0 Lite. Fast, efficient image-to-video.",
-    cost: "~RM0.91", creditCost: 91, speed: "~2m", stable: true,
+    cost: "~RM0.78", creditCost: 78, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "image_url", type: "image", required: true, description: "Starting image" },
@@ -240,7 +240,7 @@ export const models: AIModel[] = [
     name: "Seedance 1.0 Lite T2V",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
     description: "Seedance 1.0 Lite text-to-video. Multiple aspect ratios and durations.",
-    cost: "~RM0.91", creditCost: 91, speed: "~2m", stable: true,
+    cost: "~RM0.78", creditCost: 78, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
     ],
@@ -258,7 +258,7 @@ export const models: AIModel[] = [
     name: "OmniHuman v1.5",
     provider: "fal", type: "lipsync", category: "Lip Sync",
     description: "Full-body lip sync from image + audio. Natural expressions and body movement.",
-    cost: "~RM4.42", creditCost: 442, speed: "~3m", stable: true,
+    cost: "~RM3.75", creditCost: 375, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Video guidance (optional)" },
       { name: "image_url", type: "image", required: true, description: "Character image" },
@@ -271,7 +271,7 @@ export const models: AIModel[] = [
     name: "Creatify Aurora",
     provider: "fal", type: "lipsync", category: "Lip Sync",
     description: "Studio-quality talking avatar from image + audio. Great for UGC ads.",
-    cost: "~RM1.68", creditCost: 168, speed: "~5m", stable: true,
+    cost: "~RM1.43", creditCost: 143, speed: "~5m", stable: true,
     inputs: [
       { name: "image_url", type: "image", required: true, description: "Character image" },
       { name: "audio_url", type: "audio", required: true, description: "Audio/speech file" },
@@ -283,7 +283,7 @@ export const models: AIModel[] = [
     name: "Sync Lipsync 2.0",
     provider: "fal", type: "lipsync", category: "Lip Sync",
     description: "Video + audio lip sync. Upload a face video and new audio to re-sync.",
-    cost: "~RM2.35", creditCost: 235, speed: "~2m", stable: true,
+    cost: "~RM2.00", creditCost: 200, speed: "~2m", stable: true,
     inputs: [
       { name: "video_url", type: "video", required: true, description: "Face video" },
       { name: "audio_url", type: "audio", required: true, description: "Audio/speech" },
@@ -297,7 +297,7 @@ export const models: AIModel[] = [
     name: "Voice Clone TTS",
     provider: "fal", type: "audio", category: "Audio & Music",
     description: "Text-to-speech with voice cloning. Upload a voice reference audio and type what to say.",
-    cost: "~RM0.14", creditCost: 14, speed: "~30s", stable: true,
+    cost: "~RM0.13", creditCost: 13, speed: "~30s", stable: true,
     inputs: [
       { name: "text", type: "text", required: true, description: "Text to speak" },
       { name: "audio_url", type: "audio", required: true, description: "Voice reference audio (clone this voice)" },
@@ -311,7 +311,7 @@ export const models: AIModel[] = [
     name: "Nano Banana Edit (Cheap)",
     provider: "fal", type: "i2i", category: "Concept Art & Style",
     description: "Cheapest image editing. Upload images and describe changes. $0.039/edit.",
-    cost: "~RM0.23", creditCost: 23, speed: "~20s", stable: true,
+    cost: "~RM0.20", creditCost: 20, speed: "~20s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Edit description" },
       { name: "image_urls", type: "image", required: true, description: "Images to edit" },
@@ -326,7 +326,7 @@ export const models: AIModel[] = [
     name: "Nano Banana Pro Edit",
     provider: "fal", type: "i2i", category: "Concept Art & Style",
     description: "Premium image editing with Gemini 3 Pro. Higher quality, more detail.",
-    cost: "~RM0.73", creditCost: 73, speed: "~30s", stable: true,
+    cost: "~RM0.62", creditCost: 62, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Edit description" },
       { name: "image_urls", type: "image", required: true, description: "Images to edit" },
