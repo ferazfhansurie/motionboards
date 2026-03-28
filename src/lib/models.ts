@@ -205,6 +205,18 @@ export const models: AIModel[] = [
     ],
   },
 
+  {
+    id: "fal-ai/sync-lipsync/v2",
+    name: "Sync Lipsync 2.0",
+    provider: "fal", type: "lipsync", category: "Lip Sync",
+    description: "Video + audio lip sync. Upload a face video and new audio to re-sync.",
+    cost: "~RM0.35", creditCost: 35, speed: "~2m", stable: true,
+    inputs: [
+      { name: "video_url", type: "video", required: true, description: "Face video" },
+      { name: "audio_url", type: "audio", required: true, description: "Audio/speech" },
+    ],
+  },
+
   // === Voice / TTS ===
 
   {
