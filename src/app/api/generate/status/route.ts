@@ -26,32 +26,44 @@ export async function GET(req: NextRequest) {
     const status = await fal.queue.status(modelId, { requestId, logs: true });
 
     if (status.status === "COMPLETED") {
-      // Fetch the result
-      const result = await fal.queue.result(modelId, { requestId });
-      const data = result.data as Record<string, unknown>;
+      // Fetch the result — may throw if fal.ai returned an error
+      try {
+        const result = await fal.queue.result(modelId, { requestId });
+        const data = result.data as Record<string, unknown>;
 
-      // Extract output URL
-      let outputUrl: string | null = null;
-      if (data.video && typeof data.video === "object") outputUrl = (data.video as Record<string, unknown>).url as string;
-      else if (data.video_url && typeof data.video_url === "string") outputUrl = data.video_url;
-      else if (data.images && Array.isArray(data.images) && data.images.length > 0) outputUrl = ((data.images[0] as Record<string, unknown>).url as string) || null;
-      else if (data.image && typeof data.image === "object") outputUrl = (data.image as Record<string, unknown>).url as string;
-      else if (data.audio && typeof data.audio === "object") outputUrl = (data.audio as Record<string, unknown>).url as string;
-      else if (data.audio_url && typeof data.audio_url === "string") outputUrl = data.audio_url;
-      else if (data.target && typeof data.target === "object") outputUrl = (data.target as Record<string, unknown>).url as string;
-      else if (data.speaker_embedding && typeof data.speaker_embedding === "object") outputUrl = (data.speaker_embedding as Record<string, unknown>).url as string;
-      else if (data.output && typeof data.output === "string") outputUrl = data.output;
-      else if (data.url && typeof data.url === "string") outputUrl = data.url;
+        // Extract output URL
+        let outputUrl: string | null = null;
+        if (data.video && typeof data.video === "object") outputUrl = (data.video as Record<string, unknown>).url as string;
+        else if (data.video_url && typeof data.video_url === "string") outputUrl = data.video_url;
+        else if (data.images && Array.isArray(data.images) && data.images.length > 0) outputUrl = ((data.images[0] as Record<string, unknown>).url as string) || null;
+        else if (data.image && typeof data.image === "object") outputUrl = (data.image as Record<string, unknown>).url as string;
+        else if (data.audio && typeof data.audio === "object") outputUrl = (data.audio as Record<string, unknown>).url as string;
+        else if (data.audio_url && typeof data.audio_url === "string") outputUrl = data.audio_url;
+        else if (data.target && typeof data.target === "object") outputUrl = (data.target as Record<string, unknown>).url as string;
+        else if (data.speaker_embedding && typeof data.speaker_embedding === "object") outputUrl = (data.speaker_embedding as Record<string, unknown>).url as string;
+        else if (data.output && typeof data.output === "string") outputUrl = data.output;
+        else if (data.url && typeof data.url === "string") outputUrl = data.url;
 
-      const modelInfo = models.find((m) => m.id === modelId);
+        const modelInfo = models.find((m) => m.id === modelId);
 
-      if (outputUrl) {
-        await deductCredits(user.id, modelInfo?.creditCost || 0);
-        await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
-        return NextResponse.json({ status: "completed", outputUrl });
-      } else {
-        await updateGeneration(generationId, { status: "failed", error: "No output received", duration: 0 });
-        return NextResponse.json({ status: "failed", error: "No output received from AI provider" });
+        if (outputUrl) {
+          await deductCredits(user.id, modelInfo?.creditCost || 0);
+          await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+          return NextResponse.json({ status: "completed", outputUrl });
+        } else {
+          await updateGeneration(generationId, { status: "failed", error: "No output received", duration: 0 });
+          return NextResponse.json({ status: "failed", error: "No output received from AI provider" });
+        }
+      } catch (resultError) {
+        // fal.ai returned COMPLETED but with a validation/processing error
+        const errMsg = resultError instanceof Error ? resultError.message : "Generation failed";
+        const body = (resultError as Record<string, unknown>)?.body as Record<string, unknown> | undefined;
+        const detail = body?.detail;
+        const friendlyMsg = Array.isArray(detail) && detail.length > 0
+          ? (detail[0] as Record<string, unknown>).msg as string || errMsg
+          : errMsg;
+        await updateGeneration(generationId, { status: "failed", error: friendlyMsg, duration: 0 });
+        return NextResponse.json({ status: "failed", error: friendlyMsg });
       }
     }
 
