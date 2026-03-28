@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Submit to fal.ai queue — returns immediately with request_id
+    console.log(`[generate] Submitting to ${actualModelId}`, JSON.stringify(input).slice(0, 500));
     const { request_id } = await fal.queue.submit(actualModelId, { input });
 
     // Return immediately — client will poll for status
