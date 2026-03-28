@@ -119,8 +119,11 @@ export async function POST(req: NextRequest) {
     });
 
     // Validate required inputs before submitting
+    // Skip validation for inputs consumed by pre-processing (e.g. voice clone deletes audio_url)
     for (const inp of modelInfo.inputs) {
       if (inp.required && !input[inp.name]) {
+        // Skip if this input was consumed by voice clone pre-processing
+        if (inp.name === "audio_url" && input.speaker_voice_embedding_file_url) continue;
         console.log(`[generate] Missing input "${inp.name}". Current input keys:`, Object.keys(input), `inputAudio:`, inputAudio ? "set" : "null", `inputImage:`, inputImage ? "set" : "null");
         return NextResponse.json({ error: `Missing required input: ${inp.description}. Please set it as a reference on the canvas.` }, { status: 400 });
       }
