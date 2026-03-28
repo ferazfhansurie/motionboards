@@ -67,23 +67,96 @@ export const models: AIModel[] = [
     },
   },
 
-  // === Cinematic Video Gen ===
+  // === Cinematic Video Gen — Veo 3.1 ===
 
   {
-    id: "fal-ai/veo3.1/first-last-frame-to-video",
-    name: "Veo 3.1 S2E",
+    id: "fal-ai/veo3.1/fast",
+    name: "Veo 3.1 Fast T2V",
+    provider: "fal", type: "t2v", category: "Cinematic Video Gen",
+    description: "Fast text-to-video with audio. Cheapest Veo option.",
+    cost: "~RM5.50", creditCost: 550, speed: "~2m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
+      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
+    },
+  },
+
+  {
+    id: "fal-ai/veo3.1/fast/image-to-video",
+    name: "Veo 3.1 Fast I2V",
+    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
+    description: "Fast image-to-video with audio. Animate any image.",
+    cost: "~RM5.50", creditCost: 550, speed: "~2m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How to animate the image" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
+      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
+    },
+  },
+
+  {
+    id: "fal-ai/veo3.1/fast/first-last-frame-to-video",
+    name: "Veo 3.1 Fast S2E",
     provider: "fal", type: "s2e", category: "Cinematic Video Gen",
-    description: "Veo 3.1 start-to-end video. Requires Start Frame and End Frame images.",
-    cost: "~RM10.90", creditCost: 1090, speed: "~3m", stable: true,
+    description: "Fast start-to-end video with audio. Two frames become cinema.",
+    cost: "~RM5.50", creditCost: 550, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
       { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
     ],
     options: {
-      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "16:9", label: "Aspect Ratio" },
-      duration: { values: ["4s", "6s", "8s"], default: "6s", label: "Duration" },
-      resolution: { values: ["720p", "1080p"], default: "720p", label: "Resolution" },
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
+      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
+    },
+  },
+
+  {
+    id: "fal-ai/veo3.1/image-to-video",
+    name: "Veo 3.1 I2V (Premium)",
+    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
+    description: "Premium image-to-video. Higher quality, 2x cost of Fast.",
+    cost: "~RM14.50", creditCost: 1450, speed: "~5m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How to animate the image" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
+      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
+    },
+  },
+
+  {
+    id: "fal-ai/veo3.1/first-last-frame-to-video",
+    name: "Veo 3.1 S2E (Premium)",
+    provider: "fal", type: "s2e", category: "Cinematic Video Gen",
+    description: "Premium start-to-end video. Higher quality, 2x cost of Fast.",
+    cost: "~RM14.50", creditCost: 1450, speed: "~5m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
+      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
     },
   },
 
