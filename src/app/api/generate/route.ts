@@ -112,6 +112,13 @@ export async function POST(req: NextRequest) {
       creditCost,
     });
 
+    // Validate required inputs before submitting
+    for (const inp of modelInfo.inputs) {
+      if (inp.required && !input[inp.name]) {
+        return NextResponse.json({ error: `Missing required input: ${inp.description}. Please set it as a reference on the canvas.` }, { status: 400 });
+      }
+    }
+
     // Submit to fal.ai queue — returns immediately with request_id
     console.log(`[generate] Submitting to ${actualModelId}`, JSON.stringify(input).slice(0, 500));
     const { request_id } = await fal.queue.submit(actualModelId, { input });
