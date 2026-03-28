@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
     // Validate required inputs before submitting
     for (const inp of modelInfo.inputs) {
       if (inp.required && !input[inp.name]) {
+        console.log(`[generate] Missing input "${inp.name}". Current input keys:`, Object.keys(input), `inputAudio:`, inputAudio ? "set" : "null", `inputImage:`, inputImage ? "set" : "null");
         return NextResponse.json({ error: `Missing required input: ${inp.description}. Please set it as a reference on the canvas.` }, { status: 400 });
       }
     }
