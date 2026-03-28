@@ -3,7 +3,7 @@ import { getSettings, createGeneration, updateGeneration, getUserFromToken, dedu
 import { fal } from "@fal-ai/client";
 import { models } from "@/lib/models";
 
-export const maxDuration = 30; // Only needs to be fast — submits to queue and returns
+export const maxDuration = 60; // Segmind calls are synchronous, need more time
 
 export async function POST(req: NextRequest) {
   try {
@@ -110,6 +110,39 @@ export async function POST(req: NextRequest) {
       if (inp.required && !input[inp.name]) {
         if (inp.name === "audio_url" && cloneAudioUrl) continue; // Voice clone handles this
         return NextResponse.json({ error: `Missing required input: ${inp.description}. Please set it as a reference on the canvas.` }, { status: 400 });
+      }
+    }
+
+    // Segmind: synchronous API — call directly and return result
+    if (modelInfo.provider === "segmind") {
+      if (!settings.segmindApiKey) {
+        return NextResponse.json({ error: "Segmind API key not configured." }, { status: 500 });
+      }
+      try {
+        const segRes = await fetch(`https://api.segmind.com/v1/${modelId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": settings.segmindApiKey },
+          body: JSON.stringify({ ...input, base64: true }),
+        });
+        if (!segRes.ok) {
+          const errData = await segRes.json().catch(() => ({ error: "Segmind API error" }));
+          await updateGeneration(generation.id, { status: "failed", error: (errData as Record<string, string>).error || "Generation failed", duration: 0 });
+          return NextResponse.json({ error: (errData as Record<string, string>).error || "Segmind generation failed" }, { status: 400 });
+        }
+        // Response is base64 image string
+        const b64 = await segRes.text();
+        const outputUrl = `data:image/png;base64,${b64}`;
+        await deductCredits(user.id, creditCost);
+        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        return NextResponse.json({
+          generationId: generation.id,
+          status: "completed",
+          outputUrl,
+        });
+      } catch (segErr) {
+        const msg = segErr instanceof Error ? segErr.message : "Segmind error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
 

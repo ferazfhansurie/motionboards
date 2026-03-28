@@ -19,10 +19,11 @@ const SETTINGS_FILE = join(DATA_DIR, "settings.json");
 export interface Settings {
   falApiKey: string;
   replicateApiKey: string;
+  segmindApiKey: string;
 }
 
 export function getSettings(): Settings {
-  let settings: Settings = { falApiKey: "", replicateApiKey: "" };
+  let settings: Settings = { falApiKey: "", replicateApiKey: "", segmindApiKey: "" };
   if (existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
@@ -31,6 +32,7 @@ export function getSettings(): Settings {
   // Fall back to environment variables (works on Vercel)
   if (!settings.falApiKey) settings.falApiKey = process.env.FAL_KEY || "";
   if (!settings.replicateApiKey) settings.replicateApiKey = process.env.REPLICATE_API_TOKEN || "";
+  if (!settings.segmindApiKey) settings.segmindApiKey = process.env.SEGMIND_API_KEY || "";
   return settings;
 }
 

@@ -34,7 +34,7 @@ export interface ModelOptions {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "fal" | "replicate";
+  provider: "fal" | "replicate" | "segmind";
   type: ModelType;
   category: ModelCategory;
   description: string;

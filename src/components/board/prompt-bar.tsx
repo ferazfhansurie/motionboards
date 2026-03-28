@@ -299,6 +299,27 @@ export function PromptBar() {
         return;
       }
 
+      // Segmind models return completed immediately (synchronous)
+      if (data.status === "completed" && data.outputUrl) {
+        useAppStore.getState().updateItem(genItem.id, {
+          status: "completed",
+          outputUrl: data.outputUrl,
+          cost: selectedModel.cost,
+          progressText: undefined,
+        });
+        if (data.outputUrl && outputType === "image") {
+          const img = new window.Image();
+          img.onload = () => {
+            const maxW = 400;
+            const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+            useAppStore.getState().updateItem(genItem.id, { width: Math.round(img.naturalWidth * scale), height: Math.round(img.naturalHeight * scale) });
+          };
+          img.src = data.outputUrl;
+        }
+        setIsGenerating(false);
+        return;
+      }
+
       // Poll for status — no timeout limit, works with any Vercel plan
       let currentRequestId = data.requestId;
       let currentModelId = data.modelId;
