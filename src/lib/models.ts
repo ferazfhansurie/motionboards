@@ -181,35 +181,28 @@ export const models: AIModel[] = [
   // === Lip Sync ===
 
   {
-    id: "fal-ai/infinitalk",
-    name: "InfiniteTalk (Image+Audio)",
+    id: "fal-ai/bytedance/omnihuman/v1.5",
+    name: "OmniHuman v1.5",
     provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Image + audio to lip-synced video. Full-body animation with natural motion.",
-    cost: "~RM0.85", creditCost: 85, speed: "~7m", stable: true,
+    description: "Full-body lip sync from image + audio. Natural expressions and body movement.",
+    cost: "~RM0.61", creditCost: 61, speed: "~3m", stable: true,
     inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "prompt", type: "text", required: false, description: "Video guidance (optional)" },
       { name: "image_url", type: "image", required: true, description: "Character image" },
       { name: "audio_url", type: "audio", required: true, description: "Audio/speech file" },
     ],
-    options: {
-      resolution: { values: ["480p", "720p"], default: "480p", label: "Resolution" },
-    },
   },
 
   {
-    id: "fal-ai/infinitalk/video-to-video",
-    name: "InfiniteTalk (Video Lip-Sync)",
+    id: "fal-ai/creatify/aurora",
+    name: "Creatify Aurora",
     provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Sync a video with a new vocal track. Upload close-up video + audio clip.",
-    cost: "~RM0.83", creditCost: 83, speed: "~7m", stable: true,
+    description: "Studio-quality talking avatar from image + audio. Great for UGC ads.",
+    cost: "~RM0.75", creditCost: 75, speed: "~5m", stable: true,
     inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "video_url", type: "video", required: true, description: "Close-up face video" },
-      { name: "audio_url", type: "audio", required: true, description: "New vocal track" },
+      { name: "image_url", type: "image", required: true, description: "Character image" },
+      { name: "audio_url", type: "audio", required: true, description: "Audio/speech file" },
     ],
-    options: {
-      resolution: { values: ["480p", "720p"], default: "480p", label: "Resolution" },
-    },
   },
 
   // === Voice / TTS ===
