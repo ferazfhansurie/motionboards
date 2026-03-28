@@ -85,17 +85,23 @@ export async function POST(req: NextRequest) {
       input.gender_0 = "non-binary";
     }
 
-    // Voice Clone TTS: 2-step — clone first, then TTS
+    // Voice Clone TTS: 2-step — clone voice first, then TTS
     let actualModelId = modelId;
     if (modelId === "fal-ai/qwen-3-tts/text-to-speech/0.6b" && input.audio_url) {
-      const cloneResult = await fal.subscribe("fal-ai/qwen-3-tts/clone-voice/0.6b", {
-        input: { audio_url: input.audio_url },
-        logs: true,
-      });
-      const cloneData = cloneResult.data as Record<string, unknown>;
-      const embedding = cloneData.speaker_embedding as Record<string, unknown> | undefined;
-      if (embedding?.url) {
+      try {
+        const cloneResult = await fal.subscribe("fal-ai/qwen-3-tts/clone-voice/0.6b", {
+          input: { audio_url: input.audio_url },
+          logs: true,
+        });
+        const cloneData = cloneResult.data as Record<string, unknown>;
+        const embedding = cloneData.speaker_embedding as Record<string, unknown> | undefined;
+        if (!embedding?.url) {
+          return NextResponse.json({ error: "Voice cloning failed. Make sure you uploaded a valid audio file with clear speech." }, { status: 400 });
+        }
         input.speaker_voice_embedding_file_url = embedding.url;
+      } catch (cloneErr) {
+        const msg = cloneErr instanceof Error ? cloneErr.message : "Voice cloning failed";
+        return NextResponse.json({ error: `Voice clone error: ${msg}` }, { status: 400 });
       }
       delete input.audio_url;
     }

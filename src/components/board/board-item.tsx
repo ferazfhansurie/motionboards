@@ -214,6 +214,7 @@ export function BoardItemCard({
         left: item.x,
         top: item.y,
         width: item.width,
+        ...(item.type === "text" ? { height: item.height } : {}),
         zIndex: isSelected ? 50 : 1,
       }}
       onMouseDown={onMouseDown}
