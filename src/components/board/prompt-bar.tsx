@@ -17,8 +17,24 @@ import {
   Music,
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
-import { getModelById, type ModelOptions } from "@/lib/models";
+import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
+
+function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>): string {
+  if (!model) return "";
+  if (!model.perSecond) return model.cost;
+  // Calculate based on selected duration, resolution, audio
+  const durStr = (opts.duration as string) || model.options?.duration?.default || "8s";
+  const seconds = parseInt(durStr) || 8;
+  const res = (opts.resolution as string) || model.options?.resolution?.default || "720p";
+  const audio = opts.generate_audio !== undefined ? !!opts.generate_audio : (model.options?.generate_audio?.default ?? true);
+  const is4k = res === "4k";
+  const rate = is4k
+    ? (audio ? model.perSecond.withAudio4k : model.perSecond.noAudio4k)
+    : (audio ? model.perSecond.withAudio720p : model.perSecond.noAudio720p);
+  const total = (rate * seconds).toFixed(2);
+  return `~RM${total} (${seconds}s × RM${rate.toFixed(2)}/s)`;
+}
 
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
@@ -238,8 +254,8 @@ export function PromptBar() {
         : "video";
 
     const ar = (generationOptions.aspect_ratio as string) || selectedModel.options?.aspect_ratio?.default || "16:9";
-    let genW = 300;
-    let genH = outputType === "audio" ? 80 : 200;
+    let genW = 180;
+    let genH = outputType === "audio" ? 60 : 120;
     if (outputType !== "audio") {
       const arParts = ar.split(":").map(Number);
       if (arParts.length === 2 && arParts[0] > 0 && arParts[1] > 0) {
@@ -304,13 +320,13 @@ export function PromptBar() {
         useAppStore.getState().updateItem(genItem.id, {
           status: "completed",
           outputUrl: data.outputUrl,
-          cost: selectedModel.cost,
+          cost: getEstimatedCost(selectedModel, generationOptions),
           progressText: undefined,
         });
         if (data.outputUrl && outputType === "image") {
           const img = new window.Image();
           img.onload = () => {
-            const maxW = 400;
+            const maxW = 250;
             const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
             useAppStore.getState().updateItem(genItem.id, { width: Math.round(img.naturalWidth * scale), height: Math.round(img.naturalHeight * scale) });
           };
@@ -349,7 +365,7 @@ export function PromptBar() {
             useAppStore.getState().updateItem(genItem.id, {
               status: "completed",
               outputUrl: statusData.outputUrl,
-              cost: statusData.actualCost || selectedModel.cost,
+              cost: statusData.actualCost || getEstimatedCost(selectedModel, generationOptions),
               progressText: undefined,
             });
 
@@ -358,7 +374,7 @@ export function PromptBar() {
               if (outputType === "image") {
                 const img = new window.Image();
                 img.onload = () => {
-                  const maxW = 400;
+                  const maxW = 250;
                   const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
                   useAppStore.getState().updateItem(genItem.id, { width: Math.round(img.naturalWidth * scale), height: Math.round(img.naturalHeight * scale) });
                 };
@@ -367,7 +383,7 @@ export function PromptBar() {
                 const vid = document.createElement("video");
                 vid.preload = "metadata";
                 vid.onloadedmetadata = () => {
-                  const maxW = 400;
+                  const maxW = 250;
                   const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
                   useAppStore.getState().updateItem(genItem.id, { width: Math.round(vid.videoWidth * scale), height: Math.round(vid.videoHeight * scale) });
                 };
@@ -538,7 +554,7 @@ export function PromptBar() {
                 <div className="flex items-center gap-2">
                   {selectedModel && (
                     <span className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
-                      {selectedModel.name} &middot; {selectedModel.cost}
+                      {selectedModel.name} &middot; {getEstimatedCost(selectedModel, generationOptions)}
                     </span>
                   )}
                 </div>
@@ -817,7 +833,7 @@ export function PromptBar() {
 
             {/* Bottom bar — cost + generate */}
             <div className="flex items-center justify-between px-2.5 pb-2 pt-1 shrink-0">
-              {selectedModel && <span className="text-[9px] text-gray-400">{selectedModel.cost}</span>}
+              {selectedModel && <span className="text-[9px] text-gray-400">{getEstimatedCost(selectedModel, generationOptions)}</span>}
               {!selectedModel && <span />}
               <button
                 type="button"

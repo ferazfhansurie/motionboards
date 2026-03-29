@@ -31,6 +31,13 @@ export interface ModelOptions {
   generate_audio?: ModelOptionBool;
 }
 
+export interface PerSecondRate {
+  noAudio720p: number;   // RM per second, 720p/1080p, no audio
+  withAudio720p: number; // RM per second, 720p/1080p, with audio
+  noAudio4k: number;     // RM per second, 4k, no audio
+  withAudio4k: number;   // RM per second, 4k, with audio
+}
+
 export interface AIModel {
   id: string;
   name: string;
@@ -44,6 +51,7 @@ export interface AIModel {
   inputs: ModelInput[];
   stable: boolean;
   options?: ModelOptions;
+  perSecond?: PerSecondRate; // For per-second billed models
 }
 
 // Rate: 1 USD = 3.7 RM. Margin: +RM0.03 photo/audio, +RM0.05 video
@@ -73,8 +81,8 @@ export const models: AIModel[] = [
     id: "fal-ai/veo3.1/fast",
     name: "Veo 3.1 Fast T2V",
     provider: "fal", type: "t2v", category: "Cinematic Video Gen",
-    description: "Fast text-to-video with audio. Cheapest Veo option.",
-    cost: "~RM4.66", creditCost: 466, speed: "~2m", stable: true,
+    description: "Fast text-to-video. Billed per second of output.",
+    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
     ],
@@ -84,14 +92,15 @@ export const models: AIModel[] = [
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
       generate_audio: { default: true, label: "Audio" },
     },
+    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
   },
 
   {
     id: "fal-ai/veo3.1/fast/image-to-video",
     name: "Veo 3.1 Fast I2V",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Fast image-to-video with audio. Animate any image.",
-    cost: "~RM4.66", creditCost: 466, speed: "~2m", stable: true,
+    description: "Fast image-to-video. Billed per second of output.",
+    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -102,14 +111,15 @@ export const models: AIModel[] = [
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
       generate_audio: { default: true, label: "Audio" },
     },
+    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
   },
 
   {
     id: "fal-ai/veo3.1/fast/first-last-frame-to-video",
     name: "Veo 3.1 Fast S2E",
     provider: "fal", type: "s2e", category: "Cinematic Video Gen",
-    description: "Fast start-to-end video with audio. Two frames become cinema.",
-    cost: "~RM4.66", creditCost: 466, speed: "~2m", stable: true,
+    description: "Fast start-to-end video. Billed per second of output.",
+    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
@@ -121,14 +131,15 @@ export const models: AIModel[] = [
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
       generate_audio: { default: true, label: "Audio" },
     },
+    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
   },
 
   {
     id: "fal-ai/veo3.1/image-to-video",
     name: "Veo 3.1 I2V (Premium)",
     provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Premium image-to-video. Higher quality, 2x cost of Fast.",
-    cost: "~RM12.26", creditCost: 1226, speed: "~5m", stable: true,
+    description: "Premium image-to-video. Billed per second of output.",
+    cost: "RM1.53/s", creditCost: 1226, speed: "~5m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -139,14 +150,15 @@ export const models: AIModel[] = [
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
       generate_audio: { default: true, label: "Audio" },
     },
+    perSecond: { noAudio720p: 0.77, withAudio720p: 1.53, noAudio4k: 1.53, withAudio4k: 2.29 },
   },
 
   {
     id: "fal-ai/veo3.1/first-last-frame-to-video",
     name: "Veo 3.1 S2E (Premium)",
     provider: "fal", type: "s2e", category: "Cinematic Video Gen",
-    description: "Premium start-to-end video. Higher quality, 2x cost of Fast.",
-    cost: "~RM12.26", creditCost: 1226, speed: "~5m", stable: true,
+    description: "Premium start-to-end video. Billed per second of output.",
+    cost: "RM1.53/s", creditCost: 1226, speed: "~5m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
@@ -158,6 +170,7 @@ export const models: AIModel[] = [
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
       generate_audio: { default: true, label: "Audio" },
     },
+    perSecond: { noAudio720p: 0.77, withAudio720p: 1.53, noAudio4k: 1.53, withAudio4k: 2.29 },
   },
 
   // === Nano Banana 2 Edit (image editing) ===
