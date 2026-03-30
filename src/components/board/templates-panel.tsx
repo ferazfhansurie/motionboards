@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import {
   X, Search, Copy, Check, BookOpen,
   Video, Frame, Sun, Sparkles, Film,
-  Palette, Clapperboard, Users, Timer, Aperture,
+  Palette, Clapperboard, Users, Timer, Aperture, Eye,
 } from "lucide-react";
 import templateData from "@/lib/prompt-templates.json";
 
@@ -19,6 +19,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   "character-performance": <Users className="h-3.5 w-3.5" />,
   "time-speed": <Timer className="h-3.5 w-3.5" />,
   "texture-detail": <Aperture className="h-3.5 w-3.5" />,
+  "hyper-realistic": <Eye className="h-3.5 w-3.5" />,
 };
 
 import { useAppStore } from "@/lib/store";

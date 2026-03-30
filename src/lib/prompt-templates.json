@@ -542,6 +542,62 @@
           "variables": ["water_type", "location", "surface_behavior", "lens", "aperture", "light_source", "light_pattern", "reflected_elements", "color_palette", "mood", "underwater_elements", "framerate", "motion_quality"]
         }
       ]
+    },
+    {
+      "id": "hyper-realistic",
+      "name": "Hyper Realistic",
+      "icon": "eye",
+      "description": "Ultra-photorealistic prompts that look indistinguishable from real camera footage — no CGI, no renders, pure realism",
+      "templates": [
+        {
+          "name": "Street Vlog POV",
+          "description": "First-person or selfie-style vlog footage of someone walking and talking to camera in a real location",
+          "prompt": "Hyper-realistic selfie-style vlog footage of {subject} walking through {location}, talking directly to camera. Shot on iPhone 16 Pro front camera, natural handheld shake, auto-exposure adjusting to changing light. Real skin texture with visible pores, natural sweat from {weather} heat, stray hairs catching the wind. {subject} is wearing {outfit}. Background is a real busy {location} with passing {background_activity}. Natural ambient audio environment. Raw ungraded look, slight lens distortion from wide selfie angle. Completely indistinguishable from real phone footage. No CGI. No filter.",
+          "variables": ["subject", "location", "weather", "outfit", "background_activity"]
+        },
+        {
+          "name": "Documentary Close-Up",
+          "description": "Raw, intimate close-up that captures every detail of a real person — pores, micro-expressions, imperfections",
+          "prompt": "Extreme close-up documentary shot of {subject}'s face in {location}. Shot on Canon C70 with 85mm f/1.4 lens. Every skin pore, micro-expression, and facial imperfection visible — real skin texture with natural oil, tiny scars, and uneven skin tone. {subject} is {emotion}. Natural available {lighting} light from {light_source}, subtle catch light in eyes. Shallow depth of field, background completely blown out. Slight sensor noise at ISO 3200. Real human being captured in a real moment. No retouching, no CGI, no smoothing. Photojournalistic realism.",
+          "variables": ["subject", "location", "emotion", "lighting", "light_source"]
+        },
+        {
+          "name": "Candid Street Moment",
+          "description": "Unposed, natural street photography-style capture that feels like a stolen moment",
+          "prompt": "Candid street footage of {subject} in {location}. Shot on Sony A7S III with 35mm f/1.8 lens. {subject} is {action}, completely unaware of the camera. Natural {time_of_day} light with real shadows and ambient bounce. Other people walking by in the background, slightly out of focus. Authentic urban environment with real signage, parked vehicles, weathered surfaces. Natural motion blur on moving elements. Subtle camera operator breathing visible. Color science straight out of camera — no heavy grading. Real skin tones, natural fabric texture on {clothing}. Indistinguishable from documentary b-roll footage. Zero CGI.",
+          "variables": ["subject", "location", "action", "time_of_day", "clothing"]
+        },
+        {
+          "name": "Raw Interview Setup",
+          "description": "A real-looking sit-down or casual interview setup with authentic lighting and background",
+          "prompt": "Medium shot of {subject} in a {setting} for an interview. Shot on RED Komodo with 50mm f/1.2 lens. {subject} is speaking naturally with real micro-expressions, subtle hand gestures, and natural eye movement. {lighting} key light with natural fill from {light_source}. Real environment behind them — slightly messy, lived-in, authentic. Visible skin texture, natural makeup or no makeup, real fabric texture on {outfit}. Shallow depth of field with {background_detail} softly blurred behind. Subtle lens breathing on focus. Audio lavalier mic barely visible clipped to collar. Real corporate/documentary footage feel. No CGI, no beauty filter.",
+          "variables": ["subject", "setting", "lighting", "light_source", "outfit", "background_detail"]
+        },
+        {
+          "name": "Action Handheld Chase",
+          "description": "Raw, shaky handheld camera following fast action — feels like real news footage or body cam",
+          "prompt": "Intense handheld tracking shot following {subject} as they {action} through {location}. Shot on Sony FX3 with 24mm f/2.8 lens. Heavy handheld shake, operator running to keep up. Real motion blur, occasional focus hunting, auto-exposure compensating for changing {lighting} conditions. {subject} breathing hard, real sweat, hair disheveled. {environment_details} whipping past in the periphery. Raw, ungraded LOG-style color. Rolling shutter visible on fast camera movements. Feels like real bodycam or news crew footage. No stabilization, no CGI, no post-processing. Completely authentic.",
+          "variables": ["subject", "action", "location", "lighting", "environment_details"]
+        },
+        {
+          "name": "Golden Hour Portrait",
+          "description": "Warm, natural golden hour portrait that looks like a real photo taken during magic hour",
+          "prompt": "Golden hour portrait of {subject} at {location}. Shot on Canon R5 with 85mm f/1.2 lens at magic hour — warm amber sunlight hitting from {light_direction}, creating natural rim light on hair and shoulders. Real skin tone with warm light wrapping around facial features, visible pores and natural skin texture. {subject} is {expression_or_action}. Background is real {background} with warm bokeh circles from practical lights. Natural lens flare from direct sunlight hitting the glass. Wind catching {hair_or_clothing_detail}. Slight chromatic aberration at the edges. Shot looks like a professional photographer's raw file — real, warm, human. No CGI, no AI smoothing.",
+          "variables": ["subject", "location", "light_direction", "expression_or_action", "background", "hair_or_clothing_detail"]
+        },
+        {
+          "name": "Night City Realism",
+          "description": "Real nighttime urban footage with authentic neon reflections, noise, and city atmosphere",
+          "prompt": "Nighttime street footage of {subject} in {location}. Shot on Sony A7S III at ISO 12800 — visible sensor noise and grain adding to raw realism. Neon signs and streetlights casting {color} reflections on wet pavement. {subject} is {action}, lit by a mix of practical {light_sources}. Real skin catching colored city light, shadows deep and natural. Other pedestrians walking by, car headlights flaring. Slight rolling shutter on passing vehicles. Puddle reflections of neon signage. Authentic night city atmosphere — humid air, visible breath if cold. Feels like real handheld footage from a night photography walk. No CGI, no enhancement, raw night capture.",
+          "variables": ["subject", "location", "color", "action", "light_sources"]
+        },
+        {
+          "name": "Product In-Hand Reality",
+          "description": "Ultra-realistic product showcase being held or used by a real person in a real environment",
+          "prompt": "Close-up of {subject} holding and examining {product} in {location}. Shot on iPhone 16 Pro Max in 4K. Real hands with visible fingerprints, skin lines, natural nail texture. {product} showing real material qualities — {material_details}. Natural overhead {lighting} from {light_source} with real reflections and shadows on the product surface. {subject}'s fingers adjusting grip naturally. Background is a real {environment} slightly out of focus. Camera auto-focus rack between hand and product detail. Completely indistinguishable from a real unboxing or review video. No CGI, no 3D render. Real product, real person, real footage.",
+          "variables": ["subject", "product", "location", "material_details", "lighting", "light_source", "environment"]
+        }
+      ]
     }
   ]
 }
