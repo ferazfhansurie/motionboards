@@ -106,6 +106,88 @@ function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean
   );
 }
 
+function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClick: () => void }) {
+  const [imgState, setImgState] = useState<"loading" | "loaded" | "error">("loading");
+  const [retrySrc, setRetrySrc] = useState(item.outputUrl);
+
+  // Reset state when outputUrl changes
+  useEffect(() => {
+    setImgState("loading");
+    setRetrySrc(item.outputUrl);
+  }, [item.outputUrl]);
+
+  // Timeout fallback: if image hasn't loaded after 15 seconds, show error state
+  useEffect(() => {
+    if (imgState !== "loading") return;
+    const timer = setTimeout(() => {
+      if (imgState === "loading") setImgState("error");
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [imgState, retrySrc]);
+
+  if (imgState === "error") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 p-4" style={{ minHeight: 80 }}>
+        <ImageIcon className="h-5 w-5 text-gray-400" />
+        <p className="text-[10px] text-gray-400 text-center">Image failed to display</p>
+        <button
+          className="text-[10px] text-[#f26522] hover:underline"
+          onClick={(e) => { e.stopPropagation(); setImgState("loading"); setRetrySrc(item.outputUrl + "?t=" + Date.now()); }}
+        >
+          Retry
+        </button>
+        <a
+          href={item.outputUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[9px] text-blue-400 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Open original in new tab
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <img
+        src={retrySrc}
+        alt="Generated"
+        className="w-full block pointer-events-none"
+        draggable={false}
+        onLoad={(e) => {
+          setImgState("loaded");
+          const img = e.target as HTMLImageElement;
+          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+            const maxW = 250;
+            const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+            const expectedH = Math.round(img.naturalHeight * scale);
+            if (Math.abs((item.height || 0) - expectedH) > 10) {
+              useAppStore.getState().updateItem(item.id, { width: Math.round(img.naturalWidth * scale), height: expectedH });
+            }
+          }
+        }}
+        onError={() => {
+          if (!retrySrc?.includes("?t=")) {
+            // Retry once with cache-busting
+            setTimeout(() => setRetrySrc(item.outputUrl + "?t=" + Date.now()), 2000);
+          } else {
+            setImgState("error");
+          }
+        }}
+      />
+      <button
+        className="absolute top-1.5 right-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        onClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+        title="Zoom preview"
+      >
+        <ZoomIn className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
 interface BoardItemCardProps {
   item: BoardItem;
   isSelected: boolean;
@@ -561,52 +643,7 @@ export function BoardItemCard({
                   <audio src={item.outputUrl} controls className="w-full" />
                 </div>
               ) : (
-                <div className="relative">
-                  <img
-                    src={item.outputUrl}
-                    alt="Generated"
-                    className="w-full block pointer-events-none"
-                    draggable={false}
-                    onLoad={(e) => {
-                      // Safety net: if card height doesn't match the image, auto-fix it
-                      const img = e.target as HTMLImageElement;
-                      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                        const maxW = 250;
-                        const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
-                        const expectedH = Math.round(img.naturalHeight * scale);
-                        if (Math.abs((item.height || 0) - expectedH) > 10) {
-                          useAppStore.getState().updateItem(item.id, { width: Math.round(img.naturalWidth * scale), height: expectedH });
-                        }
-                      }
-                    }}
-                    onError={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      // Retry once after a short delay (fal.ai URLs can take a moment to be available)
-                      if (!img.dataset.retried) {
-                        img.dataset.retried = "1";
-                        setTimeout(() => { img.src = item.outputUrl + "?t=" + Date.now(); }, 2000);
-                      } else {
-                        // Show fallback
-                        img.style.display = "none";
-                        const parent = img.parentElement;
-                        if (parent && !parent.querySelector(".img-fallback")) {
-                          const fallback = document.createElement("div");
-                          fallback.className = "img-fallback flex flex-col items-center justify-center gap-1 p-4 w-full";
-                          fallback.style.minHeight = "80px";
-                          fallback.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-[10px] text-gray-400">Image failed to load</span><a href="${item.outputUrl}" target="_blank" rel="noopener" class="text-[9px] text-[#f26522] hover:underline">Open in new tab</a>`;
-                          parent.appendChild(fallback);
-                        }
-                      }
-                    }}
-                  />
-                  <button
-                    className="absolute top-1.5 right-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                    onClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
-                    title="Zoom preview"
-                  >
-                    <ZoomIn className="h-3 w-3" />
-                  </button>
-                </div>
+                <GeneratedImage item={item} onDoubleClick={onDoubleClick} />
               )
             ) : (
               <div className="flex items-center justify-center" style={{ height: item.height }}>

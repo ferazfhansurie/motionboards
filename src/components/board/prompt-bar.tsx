@@ -290,6 +290,22 @@ export function PromptBar() {
       const endItem = endFrameId ? items.find((i) => i.id === endFrameId) : null;
       const refItems = inputRefs.map((id) => items.find((i) => i.id === id)).filter(Boolean);
 
+      // Resolve image URLs — reject blob: URLs (image still uploading)
+      const resolveUrl = (item: BoardItem | null | undefined): string | null => {
+        if (!item) return null;
+        const url = item.outputUrl || item.src || null;
+        if (url && url.startsWith("blob:")) {
+          throw new Error("An image is still uploading. Please wait a moment and try again.");
+        }
+        return url;
+      };
+
+      const inputImage = resolveUrl(refItems[0]) || resolveUrl(startItem);
+      const inputImagesList = refItems.map((r) => resolveUrl(r)).filter(Boolean) as string[];
+      const startFrameUrl = resolveUrl(startItem);
+      const endFrameUrl = resolveUrl(endItem);
+      const inputAudioUrl = audioItem?.outputUrl || audioItem?.src || null;
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -297,11 +313,11 @@ export function PromptBar() {
           prompt,
           model: selectedModel.id,
           mode: selectedModel.type,
-          inputImage: refItems[0]?.outputUrl || refItems[0]?.src || startItem?.outputUrl || startItem?.src || null,
-          inputImages: refItems.map((r) => r?.outputUrl || r?.src).filter(Boolean),
-          startFrame: startItem?.outputUrl || startItem?.src || null,
-          endFrame: endItem?.outputUrl || endItem?.src || null,
-          inputAudio: audioItem?.outputUrl || audioItem?.src || null,
+          inputImage,
+          inputImages: inputImagesList,
+          startFrame: startFrameUrl,
+          endFrame: endFrameUrl,
+          inputAudio: inputAudioUrl,
           generationOptions: Object.keys(generationOptions).length > 0 ? generationOptions : undefined,
         }),
       });
