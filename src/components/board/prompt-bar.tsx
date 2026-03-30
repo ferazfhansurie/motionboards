@@ -373,10 +373,18 @@ export function PromptBar() {
             if (statusData.outputUrl) {
               if (outputType === "image") {
                 const img = new window.Image();
+                let retries = 0;
                 img.onload = () => {
                   const maxW = 250;
                   const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
                   useAppStore.getState().updateItem(genItem.id, { width: Math.round(img.naturalWidth * scale), height: Math.round(img.naturalHeight * scale) });
+                };
+                img.onerror = () => {
+                  // Retry up to 3 times with increasing delay — fal.ai URLs can take a moment
+                  if (retries < 3) {
+                    retries++;
+                    setTimeout(() => { img.src = statusData.outputUrl + "?retry=" + retries; }, retries * 2000);
+                  }
                 };
                 img.src = statusData.outputUrl;
               } else if (outputType === "video") {

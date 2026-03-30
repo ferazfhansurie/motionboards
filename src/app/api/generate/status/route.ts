@@ -51,6 +51,8 @@ export async function GET(req: NextRequest) {
         }
 
         // Normal completion — extract output URL
+        console.log("[generate/status] Result data keys:", Object.keys(data), "modelId:", modelId);
+        if (data.images) console.log("[generate/status] images:", JSON.stringify(data.images).slice(0, 500));
         let outputUrl: string | null = null;
         if (data.video && typeof data.video === "object") outputUrl = (data.video as Record<string, unknown>).url as string;
         else if (data.video_url && typeof data.video_url === "string") outputUrl = data.video_url;

@@ -567,6 +567,37 @@ export function BoardItemCard({
                     alt="Generated"
                     className="w-full block pointer-events-none"
                     draggable={false}
+                    onLoad={(e) => {
+                      // Safety net: if card height doesn't match the image, auto-fix it
+                      const img = e.target as HTMLImageElement;
+                      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                        const maxW = 250;
+                        const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+                        const expectedH = Math.round(img.naturalHeight * scale);
+                        if (Math.abs((item.height || 0) - expectedH) > 10) {
+                          useAppStore.getState().updateItem(item.id, { width: Math.round(img.naturalWidth * scale), height: expectedH });
+                        }
+                      }
+                    }}
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      // Retry once after a short delay (fal.ai URLs can take a moment to be available)
+                      if (!img.dataset.retried) {
+                        img.dataset.retried = "1";
+                        setTimeout(() => { img.src = item.outputUrl + "?t=" + Date.now(); }, 2000);
+                      } else {
+                        // Show fallback
+                        img.style.display = "none";
+                        const parent = img.parentElement;
+                        if (parent && !parent.querySelector(".img-fallback")) {
+                          const fallback = document.createElement("div");
+                          fallback.className = "img-fallback flex flex-col items-center justify-center gap-1 p-4 w-full";
+                          fallback.style.minHeight = "80px";
+                          fallback.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-[10px] text-gray-400">Image failed to load</span><a href="${item.outputUrl}" target="_blank" rel="noopener" class="text-[9px] text-[#f26522] hover:underline">Open in new tab</a>`;
+                          parent.appendChild(fallback);
+                        }
+                      }
+                    }}
                   />
                   <button
                     className="absolute top-1.5 right-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
