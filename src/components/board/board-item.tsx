@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +102,33 @@ function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean
           Cancel
         </button>
       )}
+    </div>
+  );
+}
+
+function CopyablePrompt({ prompt, isDark }: { prompt: string; isDark: boolean }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div
+      className={`mt-1 group/prompt relative cursor-pointer rounded px-1 -mx-1 transition-colors ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
+      title="Click to copy prompt"
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(prompt);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      <p className={`text-[11px] leading-relaxed line-clamp-2 pr-5 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+        {prompt}
+      </p>
+      <div className={`absolute top-0.5 right-0.5 transition-opacity ${copied ? "opacity-100" : "opacity-0 group-hover/prompt:opacity-100"}`}>
+        {copied ? (
+          <Check className="h-3 w-3 text-green-500" />
+        ) : (
+          <Copy className={`h-3 w-3 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
+        )}
+      </div>
     </div>
   );
 }
@@ -797,9 +824,7 @@ export function BoardItemCard({
           </div>
         )}
         {item.prompt && (
-          <p className={`mt-1 text-[11px] leading-relaxed line-clamp-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-            {item.prompt}
-          </p>
+          <CopyablePrompt prompt={item.prompt} isDark={isDark} />
         )}
         {!item.modelName && item.cost && (
           <div className="mt-1 inline-flex rounded bg-emerald-500/20 px-1.5 py-0.5">

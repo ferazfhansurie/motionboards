@@ -64,11 +64,10 @@ export const models: AIModel[] = [
     id: "fal-ai/nano-banana-2",
     name: "Nano Banana 2",
     provider: "fal", type: "t2i", category: "Concept Art & Style",
-    description: "Google's latest state-of-the-art fast image generation. Also supports image-to-image editing.",
+    description: "Google's latest state-of-the-art fast image generation.",
     cost: "~RM0.35", creditCost: 35, speed: "~30s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_urls", type: "image", required: false, description: "Reference image(s) for image-to-image editing (optional)" },
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
