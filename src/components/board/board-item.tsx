@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
@@ -133,15 +133,24 @@ function CopyablePrompt({ prompt, isDark }: { prompt: string; isDark: boolean })
   );
 }
 
-function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClick: () => void }) {
-  const [imgState, setImgState] = useState<"loading" | "loaded" | "error">("loading");
-  const [retrySrc, setRetrySrc] = useState(item.outputUrl);
+// Global cache of loaded image URLs — survives component remounts
+const loadedImageCache = new Set<string>();
 
-  // Reset state when outputUrl changes
+function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClick: () => void }) {
+  const url = item.outputUrl || "";
+  const alreadyCached = loadedImageCache.has(url);
+  const [imgState, setImgState] = useState<"loading" | "loaded" | "error">(alreadyCached ? "loaded" : "loading");
+  const [retrySrc, setRetrySrc] = useState(url);
+
+  // Reset state only when outputUrl changes to a genuinely different URL
+  const prevUrlRef = useRef(url);
   useEffect(() => {
-    setImgState("loading");
-    setRetrySrc(item.outputUrl);
-  }, [item.outputUrl]);
+    if (url !== prevUrlRef.current) {
+      prevUrlRef.current = url;
+      setRetrySrc(url);
+      setImgState(loadedImageCache.has(url) ? "loaded" : "loading");
+    }
+  }, [url]);
 
   return (
     <div className="relative" style={{ minHeight: imgState === "loaded" ? undefined : item.height || 120 }}>
@@ -184,6 +193,7 @@ function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClic
         draggable={false}
         onLoad={(e) => {
           setImgState("loaded");
+          if (url) loadedImageCache.add(url);
           const img = e.target as HTMLImageElement;
           if (img.naturalWidth > 0 && img.naturalHeight > 0) {
             const maxW = 250;
