@@ -21,10 +21,11 @@ export interface Settings {
   replicateApiKey: string;
   segmindApiKey: string;
   geminiApiKey: string;
+  fishApiKey: string;
 }
 
 export function getSettings(): Settings {
-  let settings: Settings = { falApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "" };
+  let settings: Settings = { falApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "" };
   if (existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
@@ -35,6 +36,7 @@ export function getSettings(): Settings {
   if (!settings.replicateApiKey) settings.replicateApiKey = process.env.REPLICATE_API_TOKEN || "";
   if (!settings.segmindApiKey) settings.segmindApiKey = process.env.SEGMIND_API_KEY || "";
   if (!settings.geminiApiKey) settings.geminiApiKey = process.env.GEMINI_API_KEY || "";
+  if (!settings.fishApiKey) settings.fishApiKey = process.env.FISH_API_KEY || "";
   return settings;
 }
 

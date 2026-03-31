@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     if (needsPrompt && (!prompt || !prompt.trim())) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
     const settings = getSettings();
-    if (modelInfo.provider !== "gemini" && modelInfo.provider !== "segmind" && !settings.falApiKey) {
+    if (modelInfo.provider !== "gemini" && modelInfo.provider !== "segmind" && modelInfo.provider !== "fish" && !settings.falApiKey) {
       return NextResponse.json({ error: "fal.ai API key not configured." }, { status: 500 });
     }
 
@@ -295,6 +295,96 @@ export async function POST(req: NextRequest) {
         });
       } catch (gemErr) {
         const msg = gemErr instanceof Error ? gemErr.message : "Gemini API error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
+    // Fish Audio: voice clone + TTS in one synchronous flow
+    if (modelInfo.provider === "fish") {
+      if (!settings.fishApiKey) {
+        return NextResponse.json({ error: "Fish Audio API key not configured." }, { status: 500 });
+      }
+      try {
+        const audioUrl = input.audio_url as string;
+        const text = input.text as string;
+        if (!audioUrl || !text) {
+          return NextResponse.json({ error: "Text and audio reference are required." }, { status: 400 });
+        }
+
+        // Step 1: Clone voice — upload audio to create a model
+        const audioRes = await fetch(audioUrl);
+        const audioBlob = await audioRes.blob();
+        const cloneForm = new FormData();
+        cloneForm.append("type", "tts");
+        cloneForm.append("title", `clone_${Date.now()}`);
+        cloneForm.append("train_mode", "fast");
+        cloneForm.append("visibility", "private");
+        cloneForm.append("voices", new File([audioBlob], "voice.mp3", { type: audioBlob.type || "audio/mpeg" }));
+
+        const cloneRes = await fetch("https://api.fish.audio/model", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${settings.fishApiKey}` },
+          body: cloneForm,
+        });
+        if (!cloneRes.ok) {
+          const err = await cloneRes.text();
+          throw new Error(`Voice clone failed: ${err}`);
+        }
+        const cloneData = await cloneRes.json() as Record<string, unknown>;
+        const voiceId = cloneData._id as string;
+
+        // Step 2: Generate TTS with cloned voice
+        const ttsRes = await fetch("https://api.fish.audio/v1/tts", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${settings.fishApiKey}`,
+            "Content-Type": "application/json",
+            "model": "s2-pro",
+          },
+          body: JSON.stringify({
+            text,
+            reference_id: voiceId,
+            format: "mp3",
+          }),
+        });
+        if (!ttsRes.ok) {
+          const err = await ttsRes.text();
+          throw new Error(`TTS failed: ${err}`);
+        }
+
+        // Upload audio to fal.ai storage for persistent URL
+        const ttsBlob = await ttsRes.blob();
+        let outputUrl: string;
+        try {
+          if (settings.falApiKey) {
+            fal.config({ credentials: settings.falApiKey });
+            const file = new File([ttsBlob], `tts_${Date.now()}.mp3`, { type: "audio/mpeg" });
+            outputUrl = await fal.storage.upload(file);
+          } else {
+            const buffer = Buffer.from(await ttsBlob.arrayBuffer());
+            outputUrl = `data:audio/mpeg;base64,${buffer.toString("base64")}`;
+          }
+        } catch {
+          const buffer = Buffer.from(await ttsBlob.arrayBuffer());
+          outputUrl = `data:audio/mpeg;base64,${buffer.toString("base64")}`;
+        }
+
+        // Cleanup: delete the temporary voice model
+        fetch(`https://api.fish.audio/model/${voiceId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${settings.fishApiKey}` },
+        }).catch(() => {});
+
+        await deductCredits(user.id, creditCost);
+        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        return NextResponse.json({
+          generationId: generation.id,
+          status: "completed",
+          outputUrl,
+        });
+      } catch (fishErr) {
+        const msg = fishErr instanceof Error ? fishErr.message : "Fish Audio error";
         await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
         return NextResponse.json({ error: msg }, { status: 500 });
       }

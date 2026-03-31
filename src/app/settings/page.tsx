@@ -13,9 +13,11 @@ export default function SettingsPage() {
   const [falApiKey, setFalApiKey] = useState("");
   const [replicateApiKey, setReplicateApiKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [fishApiKey, setFishApiKey] = useState("");
   const [showFalKey, setShowFalKey] = useState(false);
   const [showReplicateKey, setShowReplicateKey] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [showFishKey, setShowFishKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,7 @@ export default function SettingsPage() {
         setFalApiKey(data.falApiKey || "");
         setReplicateApiKey(data.replicateApiKey || "");
         setGeminiApiKey(data.geminiApiKey || "");
+        setFishApiKey(data.fishApiKey || "");
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -40,7 +43,7 @@ export default function SettingsPage() {
       await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ falApiKey, replicateApiKey, geminiApiKey }),
+        body: JSON.stringify({ falApiKey, replicateApiKey, geminiApiKey, fishApiKey }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -226,6 +229,49 @@ export default function SettingsPage() {
                   </div>
                   <p className="mt-1 text-[10px] text-white/30">
                     Access additional models via Replicate
+                  </p>
+                </div>
+
+                <Separator className="bg-white/5" />
+
+                {/* Fish Audio */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="fish-key" className="text-white/80">
+                      Fish Audio API Key
+                    </Label>
+                    <a
+                      href="https://fish.audio/account/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[10px] text-[#f26522] hover:underline"
+                    >
+                      Get key <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="relative mt-1.5">
+                    <Input
+                      id="fish-key"
+                      type={showFishKey ? "text" : "password"}
+                      value={fishApiKey}
+                      onChange={(e) => setFishApiKey(e.target.value)}
+                      placeholder="Enter your Fish Audio API key"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                      onClick={() => setShowFishKey(!showFishKey)}
+                    >
+                      {showFishKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[10px] text-white/30">
+                    Fast voice cloning TTS — cheaper and faster than fal.ai
                   </p>
                 </div>
 

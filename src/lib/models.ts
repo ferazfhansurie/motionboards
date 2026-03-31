@@ -41,7 +41,7 @@ export interface PerSecondRate {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "fal" | "replicate" | "segmind" | "gemini";
+  provider: "fal" | "replicate" | "segmind" | "gemini" | "fish";
   type: ModelType;
   category: ModelCategory;
   description: string;
@@ -251,11 +251,11 @@ export const models: AIModel[] = [
   // === Voice / TTS ===
 
   {
-    id: "fal-ai/qwen-3-tts/text-to-speech/0.6b",
+    id: "fish-voice-clone-tts",
     name: "Voice Clone TTS",
-    provider: "fal", type: "audio", category: "Audio & Music",
-    description: "Text-to-speech with voice cloning. Upload a voice reference audio and type what to say.",
-    cost: "~RM0.13", creditCost: 13, speed: "~30s", stable: true,
+    provider: "fish", type: "audio", category: "Audio & Music",
+    description: "Fast voice cloning TTS via Fish Audio. Upload a voice reference and type what to say.",
+    cost: "~RM0.06", creditCost: 6, speed: "~10s", stable: true,
     inputs: [
       { name: "text", type: "text", required: true, description: "Text to speak" },
       { name: "audio_url", type: "audio", required: true, description: "Voice reference audio (clone this voice)" },
