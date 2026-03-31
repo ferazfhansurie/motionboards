@@ -287,20 +287,35 @@ export function PromptBar() {
       const endItem = endFrameId ? items.find((i) => i.id === endFrameId) : null;
       const refItems = inputRefs.map((id) => items.find((i) => i.id === id)).filter(Boolean);
 
-      // Resolve image URLs — reject blob: URLs (image still uploading)
-      const resolveUrl = (item: BoardItem | null | undefined): string | null => {
+      // Resolve image URLs — wait for blob: URLs to finish uploading
+      const hasBlob = [...refItems, startItem, endItem].some((it) => {
+        const u = it?.outputUrl || it?.src;
+        return u && u.startsWith("blob:");
+      });
+      if (hasBlob) {
+        useAppStore.getState().updateItem(genItem.id, { progressText: "Waiting for image upload..." });
+      }
+      const resolveUrl = async (item: BoardItem | null | undefined): Promise<string | null> => {
         if (!item) return null;
-        const url = item.outputUrl || item.src || null;
-        if (url && url.startsWith("blob:")) {
-          throw new Error("An image is still uploading. Please wait a moment and try again.");
+        let url = item.outputUrl || item.src || null;
+        if (!url) return null;
+        if (url.startsWith("blob:")) {
+          // Wait up to 15s for upload to complete
+          for (let i = 0; i < 30; i++) {
+            await new Promise((r) => setTimeout(r, 500));
+            const fresh = useAppStore.getState().items.find((it) => it.id === item.id);
+            const freshUrl = fresh?.outputUrl || fresh?.src || null;
+            if (freshUrl && !freshUrl.startsWith("blob:")) return freshUrl;
+          }
+          throw new Error("Image upload timed out. Please try again.");
         }
         return url;
       };
 
-      const inputImage = resolveUrl(refItems[0]) || resolveUrl(startItem);
-      const inputImagesList = refItems.map((r) => resolveUrl(r)).filter(Boolean) as string[];
-      const startFrameUrl = resolveUrl(startItem);
-      const endFrameUrl = resolveUrl(endItem);
+      const inputImage = (await resolveUrl(refItems[0])) || (await resolveUrl(startItem));
+      const inputImagesList = (await Promise.all(refItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
+      const startFrameUrl = await resolveUrl(startItem);
+      const endFrameUrl = await resolveUrl(endItem);
       const inputAudioUrl = audioItem?.outputUrl || audioItem?.src || null;
 
       const res = await fetch("/api/generate", {
