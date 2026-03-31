@@ -17,7 +17,16 @@ function loadSavedState(): Partial<SavedState> | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as SavedState;
+    const parsed = JSON.parse(raw) as SavedState;
+    // Strip items with blob: URLs — they don't survive page reload
+    if (parsed.boards) {
+      for (const board of parsed.boards) {
+        if (board.items) {
+          board.items = board.items.filter((item) => !item.src?.startsWith("blob:"));
+        }
+      }
+    }
+    return parsed;
   } catch {
     return null;
   }

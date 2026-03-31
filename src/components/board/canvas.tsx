@@ -376,33 +376,36 @@ export function Canvas() {
           const file = clipItem.getAsFile();
           if (!file) continue;
 
-          // Show placeholder immediately with local preview
+          // Show placeholder immediately with data URI (survives refresh unlike blob URLs)
           const placeholderId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-          const localUrl = URL.createObjectURL(file);
-          const tempImg = new window.Image();
-          tempImg.onload = () => {
-            const maxW = 500;
-            const scale = tempImg.naturalWidth > maxW ? maxW / tempImg.naturalWidth : 1;
-            const w = Math.round(tempImg.naturalWidth * scale);
-            const h = Math.round(tempImg.naturalHeight * scale);
-            addItem({
-              id: placeholderId,
-              type: "image",
-              x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
-              y: (-panY + window.innerHeight / 2 - h / 2) / zoom,
-              width: w,
-              height: h,
-              src: localUrl,
-              fileName: file.name,
-              createdAt: new Date().toISOString(),
-            });
-            // Upload in background, update src when done
-            uploadFile(file).then((url) => {
-              useAppStore.getState().updateItem(placeholderId, { src: url });
-              URL.revokeObjectURL(localUrl);
-            });
+          const reader = new FileReader();
+          reader.onload = (readerEvent) => {
+            const dataUri = readerEvent.target?.result as string;
+            const tempImg = new window.Image();
+            tempImg.onload = () => {
+              const maxW = 500;
+              const scale = tempImg.naturalWidth > maxW ? maxW / tempImg.naturalWidth : 1;
+              const w = Math.round(tempImg.naturalWidth * scale);
+              const h = Math.round(tempImg.naturalHeight * scale);
+              addItem({
+                id: placeholderId,
+                type: "image",
+                x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
+                y: (-panY + window.innerHeight / 2 - h / 2) / zoom,
+                width: w,
+                height: h,
+                src: dataUri,
+                fileName: file.name,
+                createdAt: new Date().toISOString(),
+              });
+              // Upload in background, replace data URI with hosted URL
+              uploadFile(file).then((url) => {
+                useAppStore.getState().updateItem(placeholderId, { src: url });
+              });
+            };
+            tempImg.src = dataUri;
           };
-          tempImg.src = localUrl;
+          reader.readAsDataURL(file);
         }
       }
     };
