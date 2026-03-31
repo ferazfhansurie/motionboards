@@ -15,12 +15,53 @@ export async function GET(req: NextRequest) {
     const generationId = req.nextUrl.searchParams.get("generationId");
     const ttsInput = req.nextUrl.searchParams.get("ttsInput");
     const ttsModelId = req.nextUrl.searchParams.get("ttsModelId");
+    const geminiVideo = req.nextUrl.searchParams.get("geminiVideo");
 
     if (!requestId || !modelId || !generationId) {
       return NextResponse.json({ error: "Missing params" }, { status: 400 });
     }
 
     const settings = getSettings();
+
+    // --- Gemini Video polling ---
+    if (geminiVideo === "true") {
+      if (!settings.geminiApiKey) return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
+
+        // Poll using operation name stored in requestId
+        const operation = await ai.operations.getVideosOperation({ operation: { name: requestId } as never });
+        const op = operation as unknown as Record<string, unknown>;
+
+        if (op.done) {
+          // Extract video from response
+          const response = op.response as Record<string, unknown> | undefined;
+          const generatedVideos = response?.generatedVideos as Array<Record<string, unknown>> | undefined;
+          const videoFile = generatedVideos?.[0]?.video as Record<string, unknown> | undefined;
+
+          if (videoFile?.uri) {
+            const outputUrl = videoFile.uri as string;
+            const modelInfo = models.find((m) => m.id === modelId);
+            const actualCreditCost = modelInfo?.creditCost || 0;
+            const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
+            await deductCredits(user.id, actualCreditCost);
+            await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+            return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
+          }
+
+          await updateGeneration(generationId, { status: "failed", error: "No video generated", duration: 0 });
+          return NextResponse.json({ status: "failed", error: "No video in Gemini response" });
+        }
+
+        return NextResponse.json({ status: "processing", log: "Generating video..." });
+      } catch (gemErr) {
+        const msg = gemErr instanceof Error ? gemErr.message : "Gemini status check failed";
+        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ status: "failed", error: msg });
+      }
+    }
+
     if (!settings.falApiKey) return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     fal.config({ credentials: settings.falApiKey });
 

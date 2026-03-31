@@ -357,11 +357,13 @@ export function PromptBar() {
       let currentModelId = data.modelId;
       const generationId = data.generationId;
       const ttsStep = data.ttsStep || null; // Voice Clone TTS 2-step info
+      const isGeminiVideo = data.geminiVideo || false;
       useAppStore.getState().updateItem(genItem.id, { progressText: ttsStep ? "Cloning voice..." : "Queued..." });
 
       const poll = async () => {
         try {
-          let url = `/api/generate/status?requestId=${currentRequestId}&modelId=${encodeURIComponent(currentModelId)}&generationId=${generationId}`;
+          let url = `/api/generate/status?requestId=${encodeURIComponent(currentRequestId)}&modelId=${encodeURIComponent(currentModelId)}&generationId=${generationId}`;
+          if (isGeminiVideo) url += `&geminiVideo=true`;
           if (ttsStep && currentModelId.includes("clone-voice")) {
             url += `&ttsInput=${encodeURIComponent(JSON.stringify(ttsStep.input))}&ttsModelId=${encodeURIComponent(ttsStep.modelId)}`;
           }

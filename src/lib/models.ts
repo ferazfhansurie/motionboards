@@ -76,14 +76,14 @@ export const models: AIModel[] = [
     },
   },
 
-  // === Cinematic Video Gen — Veo 3.1 ===
+  // === Cinematic Video Gen — Veo 3.1 (Direct Google) ===
 
   {
-    id: "fal-ai/veo3.1/fast",
-    name: "Veo 3.1 Fast T2V",
-    provider: "fal", type: "t2v", category: "Cinematic Video Gen",
-    description: "Fast text-to-video. Billed per second of output.",
-    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
+    id: "veo-3.1-generate-preview",
+    name: "Veo 3.1 T2V",
+    provider: "gemini", type: "t2v", category: "Cinematic Video Gen",
+    description: "Direct Google Veo 3.1. Text-to-video with audio. Billed per second.",
+    cost: "RM0.56/s", creditCost: 448, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
     ],
@@ -93,15 +93,15 @@ export const models: AIModel[] = [
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
       generate_audio: { default: true, label: "Audio" },
     },
-    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
+    perSecond: { noAudio720p: 0.37, withAudio720p: 0.56, noAudio4k: 1.11, withAudio4k: 1.30 },
   },
 
   {
-    id: "fal-ai/veo3.1/fast/image-to-video",
-    name: "Veo 3.1 Fast I2V",
-    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Fast image-to-video. Billed per second of output.",
-    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
+    id: "veo-3.1-generate-preview/i2v",
+    name: "Veo 3.1 I2V",
+    provider: "gemini", type: "i2v", category: "Cinematic Video Gen",
+    description: "Direct Google Veo 3.1. Image-to-video with audio. Billed per second.",
+    cost: "RM0.56/s", creditCost: 448, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -112,66 +112,7 @@ export const models: AIModel[] = [
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
       generate_audio: { default: true, label: "Audio" },
     },
-    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
-  },
-
-  {
-    id: "fal-ai/veo3.1/fast/first-last-frame-to-video",
-    name: "Veo 3.1 Fast S2E",
-    provider: "fal", type: "s2e", category: "Cinematic Video Gen",
-    description: "Fast start-to-end video. Billed per second of output.",
-    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
-      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
-      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
-      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
-      generate_audio: { default: true, label: "Audio" },
-    },
-    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
-  },
-
-  {
-    id: "fal-ai/veo3.1/image-to-video",
-    name: "Veo 3.1 I2V (Premium)",
-    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Premium image-to-video. Billed per second of output.",
-    cost: "RM1.53/s", creditCost: 1226, speed: "~5m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "How to animate the image" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
-      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
-      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
-      generate_audio: { default: true, label: "Audio" },
-    },
-    perSecond: { noAudio720p: 0.77, withAudio720p: 1.53, noAudio4k: 1.53, withAudio4k: 2.29 },
-  },
-
-  {
-    id: "fal-ai/veo3.1/first-last-frame-to-video",
-    name: "Veo 3.1 S2E (Premium)",
-    provider: "fal", type: "s2e", category: "Cinematic Video Gen",
-    description: "Premium start-to-end video. Billed per second of output.",
-    cost: "RM1.53/s", creditCost: 1226, speed: "~5m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
-      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
-      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
-      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
-      generate_audio: { default: true, label: "Audio" },
-    },
-    perSecond: { noAudio720p: 0.77, withAudio720p: 1.53, noAudio4k: 1.53, withAudio4k: 2.29 },
+    perSecond: { noAudio720p: 0.37, withAudio720p: 0.56, noAudio4k: 1.11, withAudio4k: 1.30 },
   },
 
 
@@ -301,38 +242,6 @@ export const models: AIModel[] = [
     ],
   },
 
-  // === Image Editing ===
-
-  {
-    id: "fal-ai/gemini-25-flash-image/edit",
-    name: "Nano Banana Edit (Cheap)",
-    provider: "fal", type: "i2i", category: "Concept Art & Style",
-    description: "Cheapest image editing. Upload images and describe changes. $0.039/edit.",
-    cost: "~RM0.20", creditCost: 20, speed: "~20s", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Edit description" },
-      { name: "image_urls", type: "image", required: true, description: "Images to edit" },
-    ],
-    options: {
-      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"], default: "auto", label: "Aspect Ratio" },
-    },
-  },
-
-  {
-    id: "fal-ai/gemini-3-pro-image-preview/edit",
-    name: "Nano Banana Pro Edit",
-    provider: "fal", type: "i2i", category: "Concept Art & Style",
-    description: "Premium image editing with Gemini 3 Pro. Higher quality, more detail.",
-    cost: "~RM0.62", creditCost: 62, speed: "~30s", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Edit description" },
-      { name: "image_urls", type: "image", required: true, description: "Images to edit" },
-    ],
-    options: {
-      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"], default: "auto", label: "Aspect Ratio" },
-      resolution: { values: ["1K", "2K", "4K"], default: "1K", label: "Resolution" },
-    },
-  },
 ];
 
 export const modelCategories: ModelCategory[] = [

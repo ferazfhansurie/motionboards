@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Gemini: synchronous direct Google API call
+    // Gemini: direct Google API call
     if (modelInfo.provider === "gemini") {
       if (!settings.geminiApiKey) {
         return NextResponse.json({ error: "Google Gemini API key not configured." }, { status: 500 });
@@ -157,6 +157,51 @@ export async function POST(req: NextRequest) {
         const { GoogleGenAI } = await import("@google/genai");
         const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
 
+        const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
+
+        if (isVideo) {
+          // --- Gemini Video Generation (async long-running operation) ---
+          const videoConfig: Record<string, unknown> = {};
+          if (input.aspect_ratio && input.aspect_ratio !== "auto") videoConfig.aspectRatio = input.aspect_ratio;
+          if (input.resolution) videoConfig.resolution = input.resolution;
+          if (input.duration) {
+            const dur = (input.duration as string).replace("s", "");
+            videoConfig.durationSeconds = parseInt(dur);
+          }
+          if (input.generate_audio !== undefined) videoConfig.generateAudio = input.generate_audio;
+
+          // Build image input for I2V / S2E
+          let imageInput: Record<string, unknown> | undefined;
+          const imgUrl = (input.image_url || input.first_frame_url) as string | undefined;
+          if (imgUrl) {
+            const imgRes = await fetch(imgUrl);
+            const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+            const mimeType = imgRes.headers.get("content-type") || "image/png";
+            imageInput = { imageBytes: imgBuffer.toString("base64"), mimeType };
+          }
+
+          // Strip /i2v suffix — Gemini uses same model for T2V and I2V
+          const geminiModelId = modelId.replace(/\/i2v$/, "");
+          const genConfig: Record<string, unknown> = {
+            model: geminiModelId,
+            prompt: prompt?.trim() || "Generate a video",
+            config: videoConfig,
+          };
+          if (imageInput) genConfig.image = imageInput;
+
+          const operation = await ai.models.generateVideos(genConfig as unknown as Parameters<typeof ai.models.generateVideos>[0]);
+          const opName = (operation as unknown as Record<string, unknown>).name as string;
+
+          return NextResponse.json({
+            generationId: generation.id,
+            requestId: opName,
+            modelId,
+            status: "processing",
+            geminiVideo: true,
+          });
+        }
+
+        // --- Gemini Image Generation (synchronous) ---
         const imageConfig: Record<string, string> = {};
         if (input.aspect_ratio && input.aspect_ratio !== "auto") {
           imageConfig.aspectRatio = input.aspect_ratio as string;
@@ -169,7 +214,6 @@ export async function POST(req: NextRequest) {
         const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
         contentParts.push({ text: prompt?.trim() || "Generate an image" });
 
-        // If an image was provided, fetch it and include as base64
         const imageUrl = input.image_url as string | undefined;
         if (imageUrl) {
           const imgRes = await fetch(imageUrl);
@@ -187,7 +231,6 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Extract base64 image from response
         const parts = response.candidates?.[0]?.content?.parts;
         let outputUrl: string | null = null;
         if (parts) {
