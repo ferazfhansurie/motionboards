@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
           if (input.generate_audio !== undefined) videoConfig.generateAudio = input.generate_audio;
 
           // Build image input for I2V / S2E (first frame)
-          let imageInput: Record<string, unknown> | undefined;
+          let imageInput: { imageBytes: string; mimeType: string } | undefined;
           const imgUrl = (input.image_url || input.first_frame_url) as string | undefined;
           if (imgUrl) {
             const imgRes = await fetch(imgUrl);
@@ -191,15 +191,14 @@ export async function POST(req: NextRequest) {
 
           // Strip /i2v, /s2e suffixes — Gemini uses same model for all modes
           const geminiModelId = modelId.replace(/\/(i2v|s2e)$/, "");
-          const genConfig: Record<string, unknown> = {
+
+          const operation = await ai.models.generateVideos({
             model: geminiModelId,
             prompt: prompt?.trim() || "Generate a video",
-            config: videoConfig,
-          };
-          if (imageInput) genConfig.image = imageInput;
-
-          const operation = await ai.models.generateVideos(genConfig as unknown as Parameters<typeof ai.models.generateVideos>[0]);
-          const opName = (operation as unknown as Record<string, unknown>).name as string;
+            image: imageInput,
+            config: videoConfig as Parameters<typeof ai.models.generateVideos>[0]["config"],
+          });
+          const opName = operation.name;
 
           return NextResponse.json({
             generationId: generation.id,

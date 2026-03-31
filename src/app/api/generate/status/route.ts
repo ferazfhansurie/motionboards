@@ -27,21 +27,20 @@ export async function GET(req: NextRequest) {
     if (geminiVideo === "true") {
       if (!settings.geminiApiKey) return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
       try {
-        const { GoogleGenAI } = await import("@google/genai");
+        const { GoogleGenAI, GenerateVideosOperation } = await import("@google/genai");
         const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
 
         // Poll using operation name stored in requestId
-        const operation = await ai.operations.getVideosOperation({ operation: { name: requestId } as never });
-        const op = operation as unknown as Record<string, unknown>;
+        const opStub = new GenerateVideosOperation();
+        opStub.name = requestId;
+        const operation = await ai.operations.getVideosOperation({ operation: opStub });
 
-        if (op.done) {
+        if (operation.done) {
           // Extract video from response
-          const response = op.response as Record<string, unknown> | undefined;
-          const generatedVideos = response?.generatedVideos as Array<Record<string, unknown>> | undefined;
-          const videoFile = generatedVideos?.[0]?.video as Record<string, unknown> | undefined;
+          const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
 
-          if (videoFile?.uri) {
-            const outputUrl = videoFile.uri as string;
+          if (videoUri) {
+            const outputUrl = videoUri;
             const modelInfo = models.find((m) => m.id === modelId);
             const actualCreditCost = modelInfo?.creditCost || 0;
             const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
