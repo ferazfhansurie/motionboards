@@ -48,8 +48,6 @@ export function PromptBar() {
     selectedModelId,
     setModelPanelOpen,
     isModelPanelOpen,
-    isGenerating,
-    setIsGenerating,
     addItem,
     items,
     startFrameId,
@@ -244,7 +242,6 @@ export function PromptBar() {
     if (needsAudio && !audioItem) { alert(`${selectedModel.name} requires an audio input.`); return; }
 
     // Create item IMMEDIATELY at center of screen — zero latency
-    setIsGenerating(true);
 
     const outputType =
       selectedModel.type === "audio" || selectedModel.type === "a2a"
@@ -348,7 +345,6 @@ export function PromptBar() {
           };
           img.src = data.outputUrl;
         }
-        setIsGenerating(false);
         return;
       }
 
@@ -416,7 +412,6 @@ export function PromptBar() {
                 vid.src = statusData.outputUrl;
               }
             }
-            setIsGenerating(false);
             return;
           }
 
@@ -426,7 +421,6 @@ export function PromptBar() {
               error: statusData.error || "Generation failed",
               progressText: undefined,
             });
-            setIsGenerating(false);
             return;
           }
 
@@ -441,7 +435,7 @@ export function PromptBar() {
       };
 
       poll();
-      return; // Don't hit the finally block yet — polling handles setIsGenerating
+      return;
     } catch (err) {
       useAppStore.getState().updateItem(genItem.id, {
         status: "failed",
@@ -449,7 +443,7 @@ export function PromptBar() {
         progressText: undefined,
       });
     } finally {
-      setIsGenerating(false);
+      // No lock — multiple generations can run in parallel
     }
   };
 
@@ -586,20 +580,16 @@ export function PromptBar() {
                 </div>
                 <button
                   type="button"
-                  disabled={isGenerating || !selectedModel}
+                  disabled={!selectedModel}
                   onClick={handleGenerate}
                   className={`flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-semibold transition-all ${
-                    isGenerating || !selectedModel
+                    !selectedModel
                       ? "bg-gray-300 text-gray-400 cursor-not-allowed"
                       : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer hover:scale-105"
                   }`}
                   title="Generate (Ctrl+Enter)"
                 >
-                  {isGenerating ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <WandSparkles className="h-3.5 w-3.5" />
-                  )}
+                  <WandSparkles className="h-3.5 w-3.5" />
                   Generate
                 </button>
               </div>
@@ -863,16 +853,16 @@ export function PromptBar() {
               {!selectedModel && <span />}
               <button
                 type="button"
-                disabled={isGenerating || !selectedModel}
+                disabled={!selectedModel}
                 onClick={handleGenerate}
                 className={`flex items-center justify-center h-6 w-6 rounded-full transition-colors ${
-                  isGenerating || !selectedModel
+                  !selectedModel
                     ? "bg-gray-300 text-gray-400 cursor-not-allowed"
                     : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer"
                 }`}
                 title="Generate (Ctrl+Enter)"
               >
-                {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                <WandSparkles className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
