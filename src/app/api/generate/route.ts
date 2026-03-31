@@ -219,13 +219,14 @@ export async function POST(req: NextRequest) {
           imageConfig.imageSize = input.resolution as string;
         }
 
-        // Build contents: text prompt + optional image input for editing
+        // Build contents: text prompt + optional image inputs for editing
         const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
         contentParts.push({ text: prompt?.trim() || "Generate an image" });
 
-        const imageUrl = input.image_url as string | undefined;
-        if (imageUrl) {
-          const imgRes = await fetch(imageUrl);
+        // Support multiple images (image_urls array) or single image (image_url)
+        const imageUrls = (input.image_urls as string[] | undefined) || (input.image_url ? [input.image_url as string] : []);
+        for (const url of imageUrls) {
+          const imgRes = await fetch(url);
           const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
           const mimeType = imgRes.headers.get("content-type") || "image/png";
           contentParts.push({ inlineData: { mimeType, data: imgBuffer.toString("base64") } });

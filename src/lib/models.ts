@@ -68,7 +68,7 @@ export const models: AIModel[] = [
     cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_url", type: "image", required: false, description: "Image to edit (optional)" },
+      { name: "image_urls", type: "image", required: false, description: "Reference images (optional)" },
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
