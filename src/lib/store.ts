@@ -9,6 +9,7 @@ interface SavedState {
   boards: Board[];
   activeBoardId: string;
   selectedModelId: string | null;
+  savedAt?: number;
 }
 
 function loadSavedState(): Partial<SavedState> | null {
@@ -22,24 +23,41 @@ function loadSavedState(): Partial<SavedState> | null {
   }
 }
 
-function saveState(state: AppState) {
+function getCurrentBoards(state: AppState): Board[] {
+  return state.boards.map((b) =>
+    b.id === state.activeBoardId
+      ? { ...b, items: state.items, connections: state.connections, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
+      : b
+  );
+}
+
+function saveToLocalStorage(state: AppState) {
   if (typeof window === "undefined") return;
   try {
-    // Save current board items into boards array
-    const boards = state.boards.map((b) =>
-      b.id === state.activeBoardId
-        ? { ...b, items: state.items, connections: state.connections, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
-        : b
-    );
     const data: SavedState = {
-      boards,
+      boards: getCurrentBoards(state),
       activeBoardId: state.activeBoardId,
       selectedModelId: state.selectedModelId,
+      savedAt: Date.now(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
     // localStorage full or unavailable
   }
+}
+
+function saveToDb(state: AppState) {
+  const boards = getCurrentBoards(state);
+  fetch("/api/boards", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      boards,
+      activeBoardId: state.activeBoardId,
+      selectedModelId: state.selectedModelId,
+      savedAt: Date.now(),
+    }),
+  }).catch(() => {});
 }
 
 export interface ImageEditState {
@@ -505,25 +523,39 @@ export const useAppStore = create<AppState>((set) => {
 });
 });
 
-// Autosave on every state change (debounced) — localStorage + DB
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+// Autosave on every state change — fast localStorage + debounced DB
+let dbSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let lsSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let dbLoadedOnce = false; // prevent overwriting DB before initial load completes
+
 useAppStore.subscribe((state) => {
-  if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    saveState(state); // localStorage
-    // Also save to DB
-    const boards = state.boards.map((b) =>
-      b.id === state.activeBoardId
-        ? { ...b, items: state.items, connections: state.connections, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
-        : b
-    );
-    fetch("/api/boards", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ boards, activeBoardId: state.activeBoardId, selectedModelId: state.selectedModelId }),
-    }).catch(() => {}); // silent fail
-  }, 2000); // 2s debounce for DB saves
+  // localStorage: short debounce (300ms) — fast enough to survive most refreshes
+  if (lsSaveTimeout) clearTimeout(lsSaveTimeout);
+  lsSaveTimeout = setTimeout(() => saveToLocalStorage(state), 300);
+
+  // DB: longer debounce (2s), only after initial DB load completes
+  if (dbLoadedOnce) {
+    if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
+    dbSaveTimeout = setTimeout(() => saveToDb(state), 2000);
+  }
 });
+
+// Flush pending saves on page close / refresh
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", () => {
+    if (lsSaveTimeout) clearTimeout(lsSaveTimeout);
+    if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
+    const state = useAppStore.getState();
+    saveToLocalStorage(state);
+    // Try to save to DB via sendBeacon (works during page unload)
+    const boards = getCurrentBoards(state);
+    const blob = new Blob(
+      [JSON.stringify({ boards, activeBoardId: state.activeBoardId, selectedModelId: state.selectedModelId, savedAt: Date.now() })],
+      { type: "application/json" }
+    );
+    navigator.sendBeacon("/api/boards", blob);
+  });
+}
 
 // Load from DB on startup — keyed by user session
 if (typeof window !== "undefined") {
@@ -531,7 +563,7 @@ if (typeof window !== "undefined") {
     .then((r) => r.json())
     .then((authData) => {
       const userId = authData?.user?.id;
-      if (!userId) return;
+      if (!userId) { dbLoadedOnce = true; return; }
 
       // Check if localStorage belongs to this user
       const storedUser = localStorage.getItem("motionboards_user");
@@ -554,6 +586,17 @@ if (typeof window !== "undefined") {
         .then((r) => r.json())
         .then((data) => {
           if (data?.boards?.length > 0) {
+            const localState = loadSavedState();
+            const localSavedAt = localState?.savedAt || 0;
+            const dbSavedAt = data.savedAt || 0;
+
+            // If localStorage has newer data for this user, keep it and sync to DB
+            if (localSavedAt > dbSavedAt && localState?.boards?.length) {
+              dbLoadedOnce = true;
+              saveToDb(useAppStore.getState());
+              return;
+            }
+
             const board = data.boards.find((b: Board) => b.id === data.activeBoardId) || data.boards[0];
             useAppStore.setState({
               boards: data.boards,
@@ -567,7 +610,8 @@ if (typeof window !== "undefined") {
               selectedModelId: data.selectedModelId || null,
             });
           }
+          dbLoadedOnce = true;
         });
     })
-    .catch(() => {});
+    .catch(() => { dbLoadedOnce = true; });
 }
