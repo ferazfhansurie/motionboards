@@ -223,13 +223,23 @@ export async function POST(req: NextRequest) {
         const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
         contentParts.push({ text: prompt?.trim() || "Generate an image" });
 
-        // Support multiple images (image_urls array) or single image (image_url)
-        const imageUrls = (input.image_urls as string[] | undefined) || (input.image_url ? [input.image_url as string] : []);
-        for (const url of imageUrls) {
-          const imgRes = await fetch(url);
-          const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-          const mimeType = imgRes.headers.get("content-type") || "image/png";
-          contentParts.push({ inlineData: { mimeType, data: imgBuffer.toString("base64") } });
+        // Support multiple images via image_urls array
+        const imageUrls = input.image_urls as string[] | undefined;
+        if (imageUrls && imageUrls.length > 0) {
+          for (const url of imageUrls) {
+            if (!url || url.startsWith("blob:")) {
+              await updateGeneration(generation.id, { status: "failed", error: "Image not ready", duration: 0 });
+              return NextResponse.json({ error: "One or more images are still processing. Please wait and try again." }, { status: 400 });
+            }
+            const imgRes = await fetch(url);
+            if (!imgRes.ok) {
+              await updateGeneration(generation.id, { status: "failed", error: "Failed to fetch image", duration: 0 });
+              return NextResponse.json({ error: "Failed to fetch input image. Try refreshing the page." }, { status: 400 });
+            }
+            const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+            const mimeType = imgRes.headers.get("content-type") || "image/png";
+            contentParts.push({ inlineData: { mimeType, data: imgBuffer.toString("base64") } });
+          }
         }
 
         const response = await ai.models.generateContent({
