@@ -41,7 +41,7 @@ export interface PerSecondRate {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "fal" | "replicate" | "segmind";
+  provider: "fal" | "replicate" | "segmind" | "gemini";
   type: ModelType;
   category: ModelCategory;
   description: string;
@@ -66,6 +66,21 @@ export const models: AIModel[] = [
     provider: "fal", type: "t2i", category: "Concept Art & Style",
     description: "Google's latest state-of-the-art fast image generation.",
     cost: "~RM0.35", creditCost: 35, speed: "~30s", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Image description" },
+    ],
+    options: {
+      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
+      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
+    },
+  },
+
+  {
+    id: "gemini-3.1-flash-image-preview",
+    name: "Nano Banana 2 (Direct Google)",
+    provider: "gemini", type: "t2i", category: "Concept Art & Style",
+    description: "Direct Google Gemini API — cheaper than fal.ai (~$0.02/image at 0.5K).",
+    cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
     ],

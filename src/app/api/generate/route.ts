@@ -30,9 +30,11 @@ export async function POST(req: NextRequest) {
     if (needsPrompt && (!prompt || !prompt.trim())) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
     const settings = getSettings();
-    if (!settings.falApiKey) return NextResponse.json({ error: "fal.ai API key not configured." }, { status: 500 });
+    if (modelInfo.provider !== "gemini" && modelInfo.provider !== "segmind" && !settings.falApiKey) {
+      return NextResponse.json({ error: "fal.ai API key not configured." }, { status: 500 });
+    }
 
-    fal.config({ credentials: settings.falApiKey });
+    if (settings.falApiKey) fal.config({ credentials: settings.falApiKey });
 
     // Build input
     const input: Record<string, unknown> = {};
@@ -141,6 +143,64 @@ export async function POST(req: NextRequest) {
         });
       } catch (segErr) {
         const msg = segErr instanceof Error ? segErr.message : "Segmind error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
+    // Gemini: synchronous direct Google API call
+    if (modelInfo.provider === "gemini") {
+      if (!settings.geminiApiKey) {
+        return NextResponse.json({ error: "Google Gemini API key not configured." }, { status: 500 });
+      }
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
+
+        const imageConfig: Record<string, string> = {};
+        if (input.aspect_ratio && input.aspect_ratio !== "auto") {
+          imageConfig.aspectRatio = input.aspect_ratio as string;
+        }
+        if (input.resolution) {
+          imageConfig.imageSize = input.resolution as string;
+        }
+
+        const response = await ai.models.generateContent({
+          model: modelId,
+          contents: prompt?.trim() || "Generate an image",
+          config: {
+            responseModalities: ["IMAGE"],
+            imageConfig: Object.keys(imageConfig).length > 0 ? imageConfig : undefined,
+          },
+        });
+
+        // Extract base64 image from response
+        const parts = response.candidates?.[0]?.content?.parts;
+        let outputUrl: string | null = null;
+        if (parts) {
+          for (const part of parts) {
+            if ((part as Record<string, unknown>).inlineData) {
+              const inlineData = (part as Record<string, unknown>).inlineData as { data: string; mimeType: string };
+              outputUrl = `data:${inlineData.mimeType};base64,${inlineData.data}`;
+              break;
+            }
+          }
+        }
+
+        if (!outputUrl) {
+          await updateGeneration(generation.id, { status: "failed", error: "No image generated", duration: 0 });
+          return NextResponse.json({ error: "Gemini returned no image" }, { status: 400 });
+        }
+
+        await deductCredits(user.id, creditCost);
+        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        return NextResponse.json({
+          generationId: generation.id,
+          status: "completed",
+          outputUrl,
+        });
+      } catch (gemErr) {
+        const msg = gemErr instanceof Error ? gemErr.message : "Gemini API error";
         await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
