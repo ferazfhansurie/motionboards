@@ -288,12 +288,12 @@ export function PromptBar() {
       const refItems = inputRefs.map((id) => items.find((i) => i.id === id)).filter(Boolean);
 
       // Resolve image URLs — wait for blob: URLs to finish uploading
-      const hasBlob = [...refItems, startItem, endItem].some((it) => {
+      const hasBlob = [...refItems, startItem, endItem, audioItem].some((it) => {
         const u = it?.outputUrl || it?.src;
         return u && u.startsWith("blob:");
       });
       if (hasBlob) {
-        useAppStore.getState().updateItem(genItem.id, { progressText: "Waiting for image upload..." });
+        useAppStore.getState().updateItem(genItem.id, { progressText: "Waiting for file upload..." });
       }
       const resolveUrl = async (item: BoardItem | null | undefined): Promise<string | null> => {
         if (!item) return null;
@@ -307,7 +307,7 @@ export function PromptBar() {
             const freshUrl = fresh?.outputUrl || fresh?.src || null;
             if (freshUrl && !freshUrl.startsWith("blob:")) return freshUrl;
           }
-          throw new Error("Image upload timed out. Please try again.");
+          throw new Error("File upload timed out. Please try again.");
         }
         return url;
       };
@@ -316,7 +316,7 @@ export function PromptBar() {
       const inputImagesList = (await Promise.all(refItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
       const startFrameUrl = await resolveUrl(startItem);
       const endFrameUrl = await resolveUrl(endItem);
-      const inputAudioUrl = audioItem?.outputUrl || audioItem?.src || null;
+      const inputAudioUrl = await resolveUrl(audioItem);
 
       const res = await fetch("/api/generate", {
         method: "POST",
