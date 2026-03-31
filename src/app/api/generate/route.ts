@@ -252,20 +252,38 @@ export async function POST(req: NextRequest) {
         });
 
         const parts = response.candidates?.[0]?.content?.parts;
-        let outputUrl: string | null = null;
+        let imageBase64: string | null = null;
+        let imageMime = "image/png";
         if (parts) {
           for (const part of parts) {
             if ((part as Record<string, unknown>).inlineData) {
               const inlineData = (part as Record<string, unknown>).inlineData as { data: string; mimeType: string };
-              outputUrl = `data:${inlineData.mimeType};base64,${inlineData.data}`;
+              imageBase64 = inlineData.data;
+              imageMime = inlineData.mimeType || "image/png";
               break;
             }
           }
         }
 
-        if (!outputUrl) {
+        if (!imageBase64) {
           await updateGeneration(generation.id, { status: "failed", error: "No image generated", duration: 0 });
           return NextResponse.json({ error: "Gemini returned no image" }, { status: 400 });
+        }
+
+        // Upload to fal.ai storage for a persistent URL
+        let outputUrl: string;
+        try {
+          if (settings.falApiKey) {
+            fal.config({ credentials: settings.falApiKey });
+            const ext = imageMime.includes("png") ? "png" : "jpg";
+            const buffer = Buffer.from(imageBase64, "base64");
+            const file = new File([buffer], `gemini_${Date.now()}.${ext}`, { type: imageMime });
+            outputUrl = await fal.storage.upload(file);
+          } else {
+            outputUrl = `data:${imageMime};base64,${imageBase64}`;
+          }
+        } catch {
+          outputUrl = `data:${imageMime};base64,${imageBase64}`;
         }
 
         await deductCredits(user.id, creditCost);
