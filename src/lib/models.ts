@@ -61,28 +61,14 @@ export const models: AIModel[] = [
   // === Image Generation ===
 
   {
-    id: "fal-ai/nano-banana-2",
-    name: "Nano Banana 2",
-    provider: "fal", type: "t2i", category: "Concept Art & Style",
-    description: "Google's latest state-of-the-art fast image generation.",
-    cost: "~RM0.35", creditCost: 35, speed: "~30s", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Image description" },
-    ],
-    options: {
-      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
-      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
-    },
-  },
-
-  {
     id: "gemini-3.1-flash-image-preview",
-    name: "Nano Banana 2 (Direct Google)",
+    name: "Nano Banana 2",
     provider: "gemini", type: "t2i", category: "Concept Art & Style",
-    description: "Direct Google Gemini API — cheaper than fal.ai (~$0.02/image at 0.5K).",
+    description: "Google's image generation via direct Gemini API (~$0.02/image).",
     cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
+      { name: "image_url", type: "image", required: false, description: "Image to edit (optional)" },
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
@@ -188,23 +174,6 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.77, withAudio720p: 1.53, noAudio4k: 1.53, withAudio4k: 2.29 },
   },
 
-  // === Nano Banana 2 Edit (image editing) ===
-
-  {
-    id: "fal-ai/nano-banana-2/edit",
-    name: "Nano Banana 2 Edit",
-    provider: "fal", type: "i2i", category: "Concept Art & Style",
-    description: "Edit images with text prompts. Upload images and describe changes.",
-    cost: "~RM0.35", creditCost: 35, speed: "~30s", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Edit description" },
-      { name: "image_urls", type: "image", required: true, description: "Images to edit" },
-    ],
-    options: {
-      aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
-      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "2K", label: "Resolution" },
-    },
-  },
 
 
   // === Seedance (ByteDance) ===

@@ -165,9 +165,22 @@ export async function POST(req: NextRequest) {
           imageConfig.imageSize = input.resolution as string;
         }
 
+        // Build contents: text prompt + optional image input for editing
+        const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+        contentParts.push({ text: prompt?.trim() || "Generate an image" });
+
+        // If an image was provided, fetch it and include as base64
+        const imageUrl = input.image_url as string | undefined;
+        if (imageUrl) {
+          const imgRes = await fetch(imageUrl);
+          const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+          const mimeType = imgRes.headers.get("content-type") || "image/png";
+          contentParts.push({ inlineData: { mimeType, data: imgBuffer.toString("base64") } });
+        }
+
         const response = await ai.models.generateContent({
           model: modelId,
-          contents: prompt?.trim() || "Generate an image",
+          contents: contentParts,
           config: {
             responseModalities: ["IMAGE"],
             imageConfig: Object.keys(imageConfig).length > 0 ? imageConfig : undefined,

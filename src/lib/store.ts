@@ -266,7 +266,7 @@ export const useAppStore = create<AppState>((set) => {
   panY: startBoard.panY || 0,
   zoom: startBoard.zoom || 1,
   boardName: startBoard.name || "Board 1",
-  selectedModelId: saved?.selectedModelId || "fal-ai/nano-banana-2",
+  selectedModelId: saved?.selectedModelId || "gemini-3.1-flash-image-preview",
   isModelPanelOpen: false,
   isTemplatesOpen: false,
   isDashboardOpen: false,
