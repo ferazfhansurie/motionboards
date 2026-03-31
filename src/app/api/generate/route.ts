@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
           }
           if (input.generate_audio !== undefined) videoConfig.generateAudio = input.generate_audio;
 
-          // Build image input for I2V / S2E
+          // Build image input for I2V / S2E (first frame)
           let imageInput: Record<string, unknown> | undefined;
           const imgUrl = (input.image_url || input.first_frame_url) as string | undefined;
           if (imgUrl) {
@@ -180,8 +180,17 @@ export async function POST(req: NextRequest) {
             imageInput = { imageBytes: imgBuffer.toString("base64"), mimeType };
           }
 
-          // Strip /i2v suffix — Gemini uses same model for T2V and I2V
-          const geminiModelId = modelId.replace(/\/i2v$/, "");
+          // Build last frame for S2E
+          const lastFrameUrl = input.last_frame_url as string | undefined;
+          if (lastFrameUrl) {
+            const lastRes = await fetch(lastFrameUrl);
+            const lastBuffer = Buffer.from(await lastRes.arrayBuffer());
+            const lastMime = lastRes.headers.get("content-type") || "image/png";
+            videoConfig.lastFrame = { imageBytes: lastBuffer.toString("base64"), mimeType: lastMime };
+          }
+
+          // Strip /i2v, /s2e suffixes — Gemini uses same model for all modes
+          const geminiModelId = modelId.replace(/\/(i2v|s2e)$/, "");
           const genConfig: Record<string, unknown> = {
             model: geminiModelId,
             prompt: prompt?.trim() || "Generate a video",

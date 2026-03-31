@@ -115,6 +115,26 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.37, withAudio720p: 0.56, noAudio4k: 1.11, withAudio4k: 1.30 },
   },
 
+  {
+    id: "veo-3.1-generate-preview/s2e",
+    name: "Veo 3.1 S2E",
+    provider: "gemini", type: "s2e", category: "Cinematic Video Gen",
+    description: "Direct Google Veo 3.1. Start-to-end frame interpolation with audio.",
+    cost: "RM0.56/s", creditCost: 448, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
+      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
+    },
+    perSecond: { noAudio720p: 0.37, withAudio720p: 0.56, noAudio4k: 1.11, withAudio4k: 1.30 },
+  },
+
 
 
   // === Seedance (ByteDance) ===
