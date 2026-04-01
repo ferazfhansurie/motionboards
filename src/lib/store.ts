@@ -18,11 +18,14 @@ function loadSavedState(): Partial<SavedState> | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SavedState;
-    // Strip items with blob: URLs — they don't survive page reload
+    // Strip items with blob: or data: URLs — they don't survive reload / blow storage limits
     if (parsed.boards) {
       for (const board of parsed.boards) {
         if (board.items) {
-          board.items = board.items.filter((item) => !item.src?.startsWith("blob:"));
+          board.items = board.items.filter((item) => {
+            const src = item.src || "";
+            return !src.startsWith("blob:") && !src.startsWith("data:");
+          });
         }
       }
     }
@@ -43,8 +46,17 @@ function getCurrentBoards(state: AppState): Board[] {
 function saveToLocalStorage(state: AppState) {
   if (typeof window === "undefined") return;
   try {
+    const boards = getCurrentBoards(state).map((b) => ({
+      ...b,
+      items: b.items.map((item) => {
+        const src = item.src || "";
+        // Don't persist data: URIs — too large for localStorage
+        if (src.startsWith("data:")) return { ...item, src: "" };
+        return item;
+      }),
+    }));
     const data: SavedState = {
-      boards: getCurrentBoards(state),
+      boards,
       activeBoardId: state.activeBoardId,
       selectedModelId: state.selectedModelId,
       savedAt: Date.now(),
@@ -56,7 +68,14 @@ function saveToLocalStorage(state: AppState) {
 }
 
 function saveToDb(state: AppState) {
-  const boards = getCurrentBoards(state);
+  const boards = getCurrentBoards(state).map((b) => ({
+    ...b,
+    items: b.items.map((item) => {
+      const src = item.src || "";
+      if (src.startsWith("data:")) return { ...item, src: "" };
+      return item;
+    }),
+  }));
   fetch("/api/boards", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
