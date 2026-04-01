@@ -168,8 +168,6 @@ export async function POST(req: NextRequest) {
             const dur = (input.duration as string).replace("s", "");
             videoConfig.durationSeconds = parseInt(dur);
           }
-          // Always disable audio — Google charges RM1.56/s for Veo audio generation
-          videoConfig.generateAudio = false;
 
           // Build image input for I2V / S2E (first frame)
           let imageInput: { imageBytes: string; mimeType: string } | undefined;
