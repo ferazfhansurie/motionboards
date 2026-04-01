@@ -76,14 +76,14 @@ export const models: AIModel[] = [
     },
   },
 
-  // === Cinematic Video Gen — Veo 3.1 Fast (Direct Google, audio included at $0.15/s) ===
+  // === Cinematic Video Gen — Veo 3.1 (via fal.ai) ===
 
   {
-    id: "veo-3.1-fast-generate-preview",
+    id: "fal-ai/veo3.1/fast",
     name: "Veo 3.1 Fast T2V",
-    provider: "gemini", type: "t2v", category: "Cinematic Video Gen",
-    description: "Direct Google Veo 3.1 Fast. Text-to-video with audio. $0.15/s.",
-    cost: "RM0.56/s", creditCost: 448, speed: "~2m", stable: true,
+    provider: "fal", type: "t2v", category: "Cinematic Video Gen",
+    description: "Fast text-to-video with audio via fal.ai. Billed per second.",
+    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
     ],
@@ -91,16 +91,17 @@ export const models: AIModel[] = [
       aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
       duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
     },
-    perSecond: { noAudio720p: 0.56, withAudio720p: 0.56, noAudio4k: 1.30, withAudio4k: 1.30 },
+    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
   },
 
   {
-    id: "veo-3.1-fast-generate-preview/i2v",
+    id: "fal-ai/veo3.1/fast/image-to-video",
     name: "Veo 3.1 Fast I2V",
-    provider: "gemini", type: "i2v", category: "Cinematic Video Gen",
-    description: "Direct Google Veo 3.1 Fast. Image-to-video with audio. $0.15/s.",
-    cost: "RM0.56/s", creditCost: 448, speed: "~2m", stable: true,
+    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
+    description: "Fast image-to-video with audio via fal.ai. Billed per second.",
+    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -109,16 +110,17 @@ export const models: AIModel[] = [
       aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
       duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
     },
-    perSecond: { noAudio720p: 0.56, withAudio720p: 0.56, noAudio4k: 1.30, withAudio4k: 1.30 },
+    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
   },
 
   {
-    id: "veo-3.1-fast-generate-preview/s2e",
+    id: "fal-ai/veo3.1/fast/first-last-frame-to-video",
     name: "Veo 3.1 Fast S2E",
-    provider: "gemini", type: "s2e", category: "Cinematic Video Gen",
-    description: "Direct Google Veo 3.1 Fast. Start-to-end with audio. $0.15/s.",
-    cost: "RM0.56/s", creditCost: 448, speed: "~2m", stable: true,
+    provider: "fal", type: "s2e", category: "Cinematic Video Gen",
+    description: "Fast start-to-end video with audio via fal.ai. Billed per second.",
+    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
@@ -128,8 +130,9 @@ export const models: AIModel[] = [
       aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
       duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
       resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Audio" },
     },
-    perSecond: { noAudio720p: 0.56, withAudio720p: 0.56, noAudio4k: 1.30, withAudio4k: 1.30 },
+    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
   },
 
 
