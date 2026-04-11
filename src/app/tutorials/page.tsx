@@ -237,7 +237,7 @@ export default function TutorialsPage() {
             <button onClick={() => { setSelectedTutorial(null); setActiveStep(0); }} className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
+            <img src="/logo.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
             <div className="flex-1">
               <h1 className="text-sm font-bold text-gray-900 dark:text-white">{selectedTutorial.title}</h1>
               <p className="text-[10px] text-gray-400 dark:text-gray-500">Step {activeStep + 1} of {selectedTutorial.steps.length}</p>
@@ -304,7 +304,7 @@ export default function TutorialsPage() {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <a href="/generate" className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"><ArrowLeft className="h-4 w-4" /></a>
-            <img src="/logo-motionboards.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
+            <img src="/logo.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
             <div>
               <h1 className="text-sm font-bold text-gray-900 dark:text-white">Tutorials</h1>
               <p className="text-[10px] text-gray-400 dark:text-gray-500">Learn how to use MotionBoards</p>
