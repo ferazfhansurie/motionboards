@@ -240,8 +240,8 @@ export async function POST(req: NextRequest) {
           // Strip /i2v, /s2e suffixes — Gemini uses same model for all modes.
           // Vertex AI uses -001 suffix; AI Studio uses -preview suffix.
           let geminiModelId = modelId.replace(/\/(i2v|s2e)$/, "");
-          // Use original model ID as-is — Vertex AI global endpoint accepts the same
-          // IDs as AI Studio (dots + -preview suffix)
+          // Vertex AI uses -001 suffix, AI Studio uses -preview (dots stay the same)
+          if (useVertexAI) geminiModelId = geminiModelId.replace(/-preview$/, "-001");
 
           const operation = await ai.models.generateVideos({
             model: geminiModelId,
