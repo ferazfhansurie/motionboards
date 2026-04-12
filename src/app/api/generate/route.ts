@@ -185,14 +185,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Gemini: direct Google API call
+    // Gemini: direct Google API call (Vertex AI preferred, falls back to API key)
     if (modelInfo.provider === "gemini") {
-      if (!settings.geminiApiKey) {
-        return NextResponse.json({ error: "Google Gemini API key not configured." }, { status: 500 });
+      const gcpProject = process.env.GOOGLE_PROJECT_ID;
+      const gcpLocation = process.env.GOOGLE_LOCATION || "us-central1";
+      const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+      const hasVertexAI = !!(gcpProject && gcpServiceAccount);
+
+      if (!hasVertexAI && !settings.geminiApiKey) {
+        return NextResponse.json({ error: "Google API not configured. Set GOOGLE_PROJECT_ID + GOOGLE_SERVICE_ACCOUNT_KEY env vars, or a Gemini API key." }, { status: 500 });
       }
       try {
         const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
+        const ai = hasVertexAI
+          ? new GoogleGenAI({
+              vertexai: true,
+              project: gcpProject,
+              location: gcpLocation,
+              googleAuthOptions: { credentials: JSON.parse(gcpServiceAccount!) },
+            })
+          : new GoogleGenAI({ apiKey: settings.geminiApiKey });
 
         const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
 

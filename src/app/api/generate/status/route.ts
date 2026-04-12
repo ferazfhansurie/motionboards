@@ -25,12 +25,24 @@ export async function GET(req: NextRequest) {
 
     const settings = getSettings();
 
-    // --- Gemini Video polling ---
+    // --- Gemini Video polling (Vertex AI preferred, falls back to API key) ---
     if (geminiVideo === "true") {
-      if (!settings.geminiApiKey) return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
+      const gcpProject = process.env.GOOGLE_PROJECT_ID;
+      const gcpLocation = process.env.GOOGLE_LOCATION || "us-central1";
+      const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+      const hasVertexAI = !!(gcpProject && gcpServiceAccount);
+
+      if (!hasVertexAI && !settings.geminiApiKey) return NextResponse.json({ error: "Google API not configured" }, { status: 500 });
       try {
         const { GoogleGenAI, GenerateVideosOperation } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
+        const ai = hasVertexAI
+          ? new GoogleGenAI({
+              vertexai: true,
+              project: gcpProject,
+              location: gcpLocation,
+              googleAuthOptions: { credentials: JSON.parse(gcpServiceAccount!) },
+            })
+          : new GoogleGenAI({ apiKey: settings.geminiApiKey });
 
         // Poll using operation name stored in requestId
         const opStub = new GenerateVideosOperation();
