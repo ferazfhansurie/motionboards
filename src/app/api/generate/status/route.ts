@@ -89,9 +89,9 @@ export async function GET(req: NextRequest) {
           }
 
           // Extract rejection reason if available
-          const genVideo = operation.response?.generatedVideos?.[0];
-          const filterReason = (genVideo as Record<string, unknown>)?.filteredReason
-            || (genVideo as Record<string, unknown>)?.finishReason
+          const failedVideo = operation.response?.generatedVideos?.[0];
+          const filterReason = (failedVideo as Record<string, unknown>)?.filteredReason
+            || (failedVideo as Record<string, unknown>)?.finishReason
             || (operation.response as Record<string, unknown>)?.blockReason;
           const errDetail = filterReason
             ? `Video blocked: ${filterReason}. Try rephrasing your prompt.`
