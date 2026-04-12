@@ -152,6 +152,7 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
         muted
         loop
         playsInline
+        preload="auto"
         draggable={false}
         onLoadedData={() => setLoaded(true)}
       />
@@ -588,6 +589,7 @@ export function BoardItemCard({
               muted
               loop
               playsInline
+              preload="auto"
               draggable={false}
             />
             <div className="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5">

@@ -138,7 +138,15 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
             />
           )}
           {isVideo && (
-            <video src={mediaSrc} controls autoPlay loop className="max-h-[85vh] max-w-[90vw] rounded-xl" onClick={(e) => e.stopPropagation()} />
+            <video
+              src={mediaSrc}
+              controls
+              autoPlay
+              loop
+              preload="auto"
+              className="max-h-[85vh] max-w-[90vw] rounded-xl"
+              onClick={(e) => e.stopPropagation()}
+            />
           )}
           {isAudio && (
             <div className="flex flex-col items-center gap-4 rounded-xl bg-[#0d1f30] p-8" onClick={(e) => e.stopPropagation()}>
