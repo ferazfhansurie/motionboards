@@ -136,6 +136,34 @@ function CopyablePrompt({ prompt, isDark }: { prompt: string; isDark: boolean })
 // Global cache of loaded image URLs — survives component remounts
 const loadedImageCache = new Set<string>();
 
+function GeneratedVideo({ item }: { item: BoardItem }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className="relative" style={{ minHeight: loaded ? undefined : item.height || 120 }}>
+      {!loaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-[1]">
+          <Loader2 className="h-5 w-5 text-[#f26522] animate-spin" />
+          <p className="text-[10px] text-gray-400">Loading video...</p>
+        </div>
+      )}
+      <video
+        src={item.outputUrl}
+        className={`w-full block ${loaded ? "" : "opacity-0"}`}
+        muted
+        loop
+        playsInline
+        draggable={false}
+        onLoadedData={() => setLoaded(true)}
+      />
+      {loaded && (
+        <div className="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5">
+          <Play className="h-3 w-3 text-white" fill="white" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClick: () => void }) {
   const url = item.outputUrl || "";
   const alreadyCached = loadedImageCache.has(url);
@@ -665,19 +693,7 @@ export function BoardItemCard({
               </div>
             ) : item.outputUrl ? (
               item.outputType === "video" ? (
-                <div className="relative">
-                  <video
-                    src={item.outputUrl}
-                    className="w-full block"
-                    muted
-                    loop
-                    playsInline
-                    draggable={false}
-                  />
-                  <div className="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5">
-                    <Play className="h-3 w-3 text-white" fill="white" />
-                  </div>
-                </div>
+                <GeneratedVideo item={item} />
               ) : item.outputType === "audio" ? (
                 <div className="flex items-center justify-center p-4" style={{ height: item.height }}>
                   <audio src={item.outputUrl} controls className="w-full" />
