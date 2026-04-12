@@ -50,9 +50,18 @@ export async function GET(req: NextRequest) {
         const operation = await ai.operations.getVideosOperation({ operation: opStub });
 
         if (operation.done) {
+          // Check for operation-level error first (response may be undefined)
+          const opError = (operation as Record<string, unknown>).error as Record<string, string> | undefined;
+          if (opError || !operation.response) {
+            const errMsg = opError?.message || "Video generation failed — no response from Google.";
+            console.error("[Veo] Operation error:", JSON.stringify(opError || "no response"));
+            await updateGeneration(generationId, { status: "failed", error: errMsg, duration: 0 });
+            return NextResponse.json({ status: "failed", error: errMsg });
+          }
+
           // Extract video from response — Vertex AI returns videoBytes (base64),
           // AI Studio returns uri (signed URL). Handle both.
-          const genVideo = operation.response?.generatedVideos?.[0]?.video;
+          const genVideo = operation.response.generatedVideos?.[0]?.video;
           const videoUri = genVideo?.uri;
           const videoBytes = (genVideo as Record<string, unknown>)?.videoBytes as string | undefined;
 
@@ -89,7 +98,7 @@ export async function GET(req: NextRequest) {
           }
 
           // Extract rejection reason if available
-          const failedVideo = operation.response?.generatedVideos?.[0];
+          const failedVideo = operation.response.generatedVideos?.[0];
           const filterReason = (failedVideo as Record<string, unknown>)?.filteredReason
             || (failedVideo as Record<string, unknown>)?.finishReason
             || (operation.response as Record<string, unknown>)?.blockReason;
