@@ -106,6 +106,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // OpenAI Sora: async video generation via openai.videos.create
+    if (modelInfo.provider === "openai") {
+      if (!settings.openaiApiKey) {
+        return NextResponse.json({ error: "OpenAI API key not configured." }, { status: 500 });
+      }
+      try {
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({ apiKey: settings.openaiApiKey });
+
+        // Map aspect_ratio + model type to OpenAI size
+        const ar = (input.aspect_ratio as string) || "16:9";
+        const size = ar === "9:16" ? "720x1280" : "1280x720";
+
+        // Parse duration — OpenAI SDK expects string VideoSeconds: '4' | '8' | '12'
+        const durStr = (input.duration as string) || "8s";
+        const seconds = durStr.replace("s", "") as "4" | "8" | "12";
+
+        // Strip /i2v suffix to get the raw model name
+        const openaiModel = modelId.replace(/\/i2v$/, "") as "sora-2" | "sora-2-pro";
+
+        // I2V: pass reference image
+        const imageUrl = input.image_url as string | undefined;
+
+        const video = await openai.videos.create({
+          model: openaiModel,
+          prompt: prompt?.trim() || "Generate a video",
+          seconds,
+          size: size as "720x1280" | "1280x720",
+          ...(imageUrl ? { input_reference: { image_url: imageUrl } } : {}),
+        });
+
+        return NextResponse.json({
+          generationId: generation.id,
+          requestId: video.id,
+          modelId,
+          status: "processing",
+          openaiVideo: true,
+        });
+      } catch (oaiErr) {
+        const msg = oaiErr instanceof Error ? oaiErr.message : "OpenAI API error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
     // Segmind: synchronous API — call directly and return result
     if (modelInfo.provider === "segmind") {
       if (!settings.segmindApiKey) {
@@ -355,7 +400,67 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // No matching provider — fal.ai was the catch-all here and has been removed.
+    // Replicate: async prediction — POST to create, poll in status route
+    if (modelInfo.provider === "replicate") {
+      if (!settings.replicateApiKey) {
+        return NextResponse.json({ error: "Replicate API key not configured." }, { status: 500 });
+      }
+      try {
+        // Strip /i2v or /s2e suffixes to get the Replicate model slug
+        const replicateModel = modelId.replace(/\/(i2v|s2e)$/, "");
+
+        // Build Replicate input
+        const repInput: Record<string, unknown> = {
+          prompt: prompt?.trim() || "Generate a video",
+        };
+
+        // Options passthrough
+        if (input.aspect_ratio) repInput.aspect_ratio = input.aspect_ratio;
+        if (input.resolution) repInput.resolution = input.resolution;
+        if (input.generate_audio !== undefined) repInput.generate_audio = !!input.generate_audio;
+        if (input.duration) {
+          const dur = parseInt((input.duration as string).replace("s", ""));
+          if (dur > 0) repInput.duration = dur;
+        }
+
+        // I2V: map image_url → first_frame_url (Seedance API field name)
+        const imageUrl = input.image_url as string | undefined;
+        if (imageUrl) repInput.first_frame_url = imageUrl;
+
+        // S2E: pass both frames
+        if (input.first_frame_url) repInput.first_frame_url = input.first_frame_url;
+        if (input.last_frame_url) repInput.last_frame_url = input.last_frame_url;
+
+        const predRes = await fetch(`https://api.replicate.com/v1/models/${replicateModel}/predictions`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${settings.replicateApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ input: repInput }),
+        });
+        const predData = await predRes.json() as Record<string, unknown>;
+        if (!predRes.ok) {
+          const errMsg = (predData.detail as string) || "Replicate submission failed";
+          await updateGeneration(generation.id, { status: "failed", error: errMsg, duration: 0 });
+          return NextResponse.json({ error: errMsg }, { status: 400 });
+        }
+
+        return NextResponse.json({
+          generationId: generation.id,
+          requestId: predData.id as string,
+          modelId,
+          status: "processing",
+          replicateVideo: true,
+        });
+      } catch (repErr) {
+        const msg = repErr instanceof Error ? repErr.message : "Replicate error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
+    // No matching provider
     await updateGeneration(generation.id, { status: "failed", error: "Provider not supported", duration: 0 });
     return NextResponse.json({ error: `Provider "${modelInfo.provider}" is not supported.` }, { status: 400 });
   } catch (error) {

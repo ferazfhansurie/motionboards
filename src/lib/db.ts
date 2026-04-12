@@ -17,6 +17,7 @@ const DATA_DIR = join(process.cwd(), "data");
 const SETTINGS_FILE = join(DATA_DIR, "settings.json");
 
 export interface Settings {
+  openaiApiKey: string;
   replicateApiKey: string;
   segmindApiKey: string;
   geminiApiKey: string;
@@ -24,13 +25,14 @@ export interface Settings {
 }
 
 export function getSettings(): Settings {
-  let settings: Settings = { replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "" };
+  let settings: Settings = { openaiApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "" };
   if (existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
     } catch {}
   }
   // Fall back to environment variables (works on Vercel)
+  if (!settings.openaiApiKey) settings.openaiApiKey = process.env.OPENAI_API_KEY || "";
   if (!settings.replicateApiKey) settings.replicateApiKey = process.env.REPLICATE_API_TOKEN || "";
   if (!settings.segmindApiKey) settings.segmindApiKey = process.env.SEGMIND_API_KEY || "";
   if (!settings.geminiApiKey) settings.geminiApiKey = process.env.GEMINI_API_KEY || "";

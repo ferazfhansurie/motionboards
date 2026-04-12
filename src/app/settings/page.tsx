@@ -10,9 +10,11 @@ import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [replicateApiKey, setReplicateApiKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [fishApiKey, setFishApiKey] = useState("");
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showReplicateKey, setShowReplicateKey] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showFishKey, setShowFishKey] = useState(false);
@@ -25,6 +27,7 @@ export default function SettingsPage() {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
+        setOpenaiApiKey(data.openaiApiKey || "");
         setReplicateApiKey(data.replicateApiKey || "");
         setGeminiApiKey(data.geminiApiKey || "");
         setFishApiKey(data.fishApiKey || "");
@@ -40,7 +43,7 @@ export default function SettingsPage() {
       await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ replicateApiKey, geminiApiKey, fishApiKey }),
+        body: JSON.stringify({ openaiApiKey, replicateApiKey, geminiApiKey, fishApiKey }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -102,6 +105,49 @@ export default function SettingsPage() {
           <div className="flex-1 p-6 overflow-y-auto space-y-6">
             {activeSection === "ai-generation" && (
               <>
+                {/* OpenAI */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="openai-key" className="text-white/80">
+                      OpenAI API Key
+                    </Label>
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[10px] text-[#f26522] hover:underline"
+                    >
+                      Get key <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="relative mt-1.5">
+                    <Input
+                      id="openai-key"
+                      type={showOpenaiKey ? "text" : "password"}
+                      value={openaiApiKey}
+                      onChange={(e) => setOpenaiApiKey(e.target.value)}
+                      placeholder="Enter your OpenAI API key"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                      onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                    >
+                      {showOpenaiKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[10px] text-white/30">
+                    Access Sora 2 Pro video generation
+                  </p>
+                </div>
+
+                <Separator className="bg-white/5" />
+
                 {/* Google Gemini */}
                 <div>
                   <div className="flex items-center justify-between">
