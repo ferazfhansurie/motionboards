@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Zap, History, LogOut, Loader2, CreditCard, Clock } from "lucide-react";
+import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 
 interface UserData {
@@ -145,6 +145,17 @@ export function ProfilePanel() {
                   </button>
                 </div>
                 <p className="text-[9px] text-gray-400 mt-1.5">Minimum RM10. Enter any amount.</p>
+              </div>
+
+              {/* Storage notice */}
+              <div className={`flex items-start gap-2 p-2.5 rounded-lg border ${isDark ? "border-amber-500/20 bg-amber-500/5" : "border-amber-200 bg-amber-50"}`}>
+                <AlertTriangle className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
+                <div>
+                  <p className={`text-[10px] font-semibold ${isDark ? "text-amber-300" : "text-amber-800"}`}>Files auto-delete after 14 days</p>
+                  <p className={`text-[9px] mt-0.5 ${isDark ? "text-amber-300/70" : "text-amber-700"}`}>
+                    Uploaded images, videos, audio, and AI-generated outputs are stored temporarily. Download anything you want to keep before it expires.
+                  </p>
+                </div>
               </div>
 
               {/* Logout */}

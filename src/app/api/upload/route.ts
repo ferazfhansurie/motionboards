@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken, getSettings } from "@/lib/db";
-import { fal } from "@fal-ai/client";
+import { getUserFromToken, putFile } from "@/lib/db";
 
 export const maxDuration = 60;
 
+// POST /api/upload — accepts a multipart file upload, stores it as bytea in Neon
+// (mb_files), and returns an absolute URL pointing at /api/files/:id.
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("session")?.value;
@@ -12,20 +13,17 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const settings = getSettings();
-    if (!settings.falApiKey) {
-      return NextResponse.json({ error: "fal.ai API key not configured" }, { status: 500 });
-    }
-
-    fal.config({ credentials: settings.falApiKey });
-
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const file = formData.get("file") as File | null;
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const url = await fal.storage.upload(file);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mimeType = file.type || "application/octet-stream";
+    const { id } = await putFile(buffer, mimeType, user.id);
+
+    const url = `${req.nextUrl.origin}/api/files/${id}`;
     return NextResponse.json({ url });
   } catch (error) {
     console.error("Upload error:", error);

@@ -10,11 +10,9 @@ import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [falApiKey, setFalApiKey] = useState("");
   const [replicateApiKey, setReplicateApiKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [fishApiKey, setFishApiKey] = useState("");
-  const [showFalKey, setShowFalKey] = useState(false);
   const [showReplicateKey, setShowReplicateKey] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showFishKey, setShowFishKey] = useState(false);
@@ -27,7 +25,6 @@ export default function SettingsPage() {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        setFalApiKey(data.falApiKey || "");
         setReplicateApiKey(data.replicateApiKey || "");
         setGeminiApiKey(data.geminiApiKey || "");
         setFishApiKey(data.fishApiKey || "");
@@ -43,7 +40,7 @@ export default function SettingsPage() {
       await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ falApiKey, replicateApiKey, geminiApiKey, fishApiKey }),
+        body: JSON.stringify({ replicateApiKey, geminiApiKey, fishApiKey }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -105,49 +102,6 @@ export default function SettingsPage() {
           <div className="flex-1 p-6 overflow-y-auto space-y-6">
             {activeSection === "ai-generation" && (
               <>
-                {/* fal.ai */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="fal-key" className="text-white/80">
-                      fal.ai API Key
-                    </Label>
-                    <a
-                      href="https://fal.ai/dashboard/keys"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-[10px] text-[#f26522] hover:underline"
-                    >
-                      Get key <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id="fal-key"
-                      type={showFalKey ? "text" : "password"}
-                      value={falApiKey}
-                      onChange={(e) => setFalApiKey(e.target.value)}
-                      placeholder="Enter your fal.ai API key"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
-                      onClick={() => setShowFalKey(!showFalKey)}
-                    >
-                      {showFalKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-[10px] text-white/30">
-                    Access Veo 3.1, Sora 2, Kling 3.0, Wan, LTX, Nano Banana and more
-                  </p>
-                </div>
-
-                <Separator className="bg-white/5" />
-
                 {/* Google Gemini */}
                 <div>
                   <div className="flex items-center justify-between">
@@ -185,7 +139,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                   <p className="mt-1 text-[10px] text-white/30">
-                    Direct Google API for Nano Banana 2 — cheaper than fal.ai (~$0.02/image)
+                    Direct Google API for Nano Banana 2 (~$0.02/image)
                   </p>
                 </div>
 
@@ -271,7 +225,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                   <p className="mt-1 text-[10px] text-white/30">
-                    Fast voice cloning TTS — cheaper and faster than fal.ai
+                    Fast voice cloning TTS via Fish Audio
                   </p>
                 </div>
 

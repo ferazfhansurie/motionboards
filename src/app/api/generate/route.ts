@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, createGeneration, updateGeneration, getUserFromToken, deductCredits } from "@/lib/db";
-import { fal } from "@fal-ai/client";
+import { getSettings, createGeneration, updateGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
 import { models } from "@/lib/models";
 
 export const maxDuration = 60; // Segmind calls are synchronous, need more time
+
+// Persist a generated binary blob to Neon and return an absolute URL.
+async function storeOutput(
+  origin: string,
+  buffer: Buffer,
+  mimeType: string,
+  userId: string
+): Promise<string> {
+  const { id } = await putFile(buffer, mimeType, userId);
+  return `${origin}/api/files/${id}`;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,11 +40,6 @@ export async function POST(req: NextRequest) {
     if (needsPrompt && (!prompt || !prompt.trim())) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
     const settings = getSettings();
-    if (modelInfo.provider !== "gemini" && modelInfo.provider !== "segmind" && modelInfo.provider !== "fish" && !settings.falApiKey) {
-      return NextResponse.json({ error: "fal.ai API key not configured." }, { status: 500 });
-    }
-
-    if (settings.falApiKey) fal.config({ credentials: settings.falApiKey });
 
     // Build input
     const input: Record<string, unknown> = {};
@@ -82,19 +87,6 @@ export async function POST(req: NextRequest) {
     for (const inp of videoInputs) { if (inputImage) input[inp.name] = inputImage; }
     for (const inp of audioInputs) { if (inputAudio) input[inp.name] = inputAudio; }
 
-    if (modelId === "easel-ai/advanced-face-swap") {
-      input.workflow_type = "user_hair";
-      input.gender_0 = "non-binary";
-    }
-
-    // Voice Clone TTS: handled as 2-step in status endpoint
-    let actualModelId = modelId;
-    let cloneAudioUrl: string | null = null;
-    if (modelId === "fal-ai/qwen-3-tts/text-to-speech/0.6b" && input.audio_url) {
-      cloneAudioUrl = input.audio_url as string;
-      delete input.audio_url;
-    }
-
     // Create generation record
     const generation = await createGeneration({
       prompt: prompt || "",
@@ -110,7 +102,6 @@ export async function POST(req: NextRequest) {
     // Validate required inputs before submitting
     for (const inp of modelInfo.inputs) {
       if (inp.required && !input[inp.name]) {
-        if (inp.name === "audio_url" && cloneAudioUrl) continue; // Voice clone handles this
         return NextResponse.json({ error: `Missing required input: ${inp.description}. Please set it as a reference on the canvas.` }, { status: 400 });
       }
     }
@@ -131,9 +122,10 @@ export async function POST(req: NextRequest) {
           await updateGeneration(generation.id, { status: "failed", error: (errData as Record<string, string>).error || "Generation failed", duration: 0 });
           return NextResponse.json({ error: (errData as Record<string, string>).error || "Segmind generation failed" }, { status: 400 });
         }
-        // Response is base64 image string
+        // Response is base64 image string — store as a real file in Neon
         const b64 = await segRes.text();
-        const outputUrl = `data:image/png;base64,${b64}`;
+        const buffer = Buffer.from(b64, "base64");
+        const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "image/png", user.id);
         await deductCredits(user.id, creditCost);
         await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
         return NextResponse.json({
@@ -268,21 +260,9 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Gemini returned no image" }, { status: 400 });
         }
 
-        // Upload to fal.ai storage for a persistent URL
-        let outputUrl: string;
-        try {
-          if (settings.falApiKey) {
-            fal.config({ credentials: settings.falApiKey });
-            const ext = imageMime.includes("png") ? "png" : "jpg";
-            const buffer = Buffer.from(imageBase64, "base64");
-            const file = new File([buffer], `gemini_${Date.now()}.${ext}`, { type: imageMime });
-            outputUrl = await fal.storage.upload(file);
-          } else {
-            outputUrl = `data:${imageMime};base64,${imageBase64}`;
-          }
-        } catch {
-          outputUrl = `data:${imageMime};base64,${imageBase64}`;
-        }
+        // Store the result in Neon and return a /api/files/:id URL
+        const buffer = Buffer.from(imageBase64, "base64");
+        const outputUrl = await storeOutput(req.nextUrl.origin, buffer, imageMime, user.id);
 
         await deductCredits(user.id, creditCost);
         await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
@@ -351,22 +331,9 @@ export async function POST(req: NextRequest) {
           throw new Error(`TTS failed: ${err}`);
         }
 
-        // Upload audio to fal.ai storage for persistent URL
-        const ttsBlob = await ttsRes.blob();
-        let outputUrl: string;
-        try {
-          if (settings.falApiKey) {
-            fal.config({ credentials: settings.falApiKey });
-            const file = new File([ttsBlob], `tts_${Date.now()}.mp3`, { type: "audio/mpeg" });
-            outputUrl = await fal.storage.upload(file);
-          } else {
-            const buffer = Buffer.from(await ttsBlob.arrayBuffer());
-            outputUrl = `data:audio/mpeg;base64,${buffer.toString("base64")}`;
-          }
-        } catch {
-          const buffer = Buffer.from(await ttsBlob.arrayBuffer());
-          outputUrl = `data:audio/mpeg;base64,${buffer.toString("base64")}`;
-        }
+        // Store the TTS audio in Neon and return a /api/files/:id URL
+        const ttsBuffer = Buffer.from(await ttsRes.arrayBuffer());
+        const outputUrl = await storeOutput(req.nextUrl.origin, ttsBuffer, "audio/mpeg", user.id);
 
         // Cleanup: delete the temporary voice model
         fetch(`https://api.fish.audio/model/${voiceId}`, {
@@ -388,30 +355,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Voice Clone TTS: submit clone job first, pass info to status endpoint
-    if (cloneAudioUrl) {
-      const { request_id: cloneReqId } = await fal.queue.submit("fal-ai/qwen-3-tts/clone-voice/0.6b", {
-        input: { audio_url: cloneAudioUrl },
-      });
-      return NextResponse.json({
-        generationId: generation.id,
-        requestId: cloneReqId,
-        modelId: "fal-ai/qwen-3-tts/clone-voice/0.6b",
-        status: "processing",
-        // Pass TTS info for the second step
-        ttsStep: { modelId: actualModelId, input },
-      });
-    }
-
-    // Submit to fal.ai queue — returns immediately with request_id
-    const { request_id } = await fal.queue.submit(actualModelId, { input });
-
-    return NextResponse.json({
-      generationId: generation.id,
-      requestId: request_id,
-      modelId: actualModelId,
-      status: "processing",
-    });
+    // No matching provider — fal.ai was the catch-all here and has been removed.
+    await updateGeneration(generation.id, { status: "failed", error: "Provider not supported", duration: 0 });
+    return NextResponse.json({ error: `Provider "${modelInfo.provider}" is not supported.` }, { status: 400 });
   } catch (error) {
     console.error("Generate error:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Something went wrong" }, { status: 500 });

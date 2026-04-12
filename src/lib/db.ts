@@ -17,7 +17,6 @@ const DATA_DIR = join(process.cwd(), "data");
 const SETTINGS_FILE = join(DATA_DIR, "settings.json");
 
 export interface Settings {
-  falApiKey: string;
   replicateApiKey: string;
   segmindApiKey: string;
   geminiApiKey: string;
@@ -25,14 +24,13 @@ export interface Settings {
 }
 
 export function getSettings(): Settings {
-  let settings: Settings = { falApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "" };
+  let settings: Settings = { replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "" };
   if (existsSync(SETTINGS_FILE)) {
     try {
       settings = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
     } catch {}
   }
   // Fall back to environment variables (works on Vercel)
-  if (!settings.falApiKey) settings.falApiKey = process.env.FAL_KEY || "";
   if (!settings.replicateApiKey) settings.replicateApiKey = process.env.REPLICATE_API_TOKEN || "";
   if (!settings.segmindApiKey) settings.segmindApiKey = process.env.SEGMIND_API_KEY || "";
   if (!settings.geminiApiKey) settings.geminiApiKey = process.env.GEMINI_API_KEY || "";
@@ -251,5 +249,102 @@ export async function getGeneration(id: string): Promise<Generation | undefined>
 
 export async function deleteGeneration(id: string): Promise<boolean> {
   const rows = await sql`DELETE FROM mb_generations WHERE id = ${id} RETURNING id`;
+  return rows.length > 0;
+}
+
+// --- File storage (Neon bytea) ---
+//
+// User uploads and AI-generated outputs are stored as bytea rows in mb_files,
+// then served back via GET /api/files/:id. This replaced fal.ai storage so the
+// app has no external storage dependency — everything lives in Neon.
+//
+// Files are NOT permanent: rows older than FILE_TTL_DAYS are swept on a
+// throttled background pass triggered by every putFile call. This keeps Neon
+// storage costs bounded since bytea in Postgres has no native expiry.
+
+export const FILE_TTL_DAYS = 14;
+const CLEANUP_THROTTLE_MS = 60 * 60 * 1000; // run sweep at most once per hour per server instance
+let lastCleanupAt = 0;
+
+let filesTableInitialized = false;
+
+async function ensureFilesTable(): Promise<void> {
+  if (filesTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_files (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      data BYTEA NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  // Index for fast TTL sweeps
+  await sql`CREATE INDEX IF NOT EXISTS mb_files_created_at_idx ON mb_files (created_at)`;
+  filesTableInitialized = true;
+}
+
+export interface StoredFile {
+  id: string;
+  mimeType: string;
+  sizeBytes: number;
+  data: Buffer;
+}
+
+// Delete files older than FILE_TTL_DAYS. Throttled to once per hour to avoid
+// running on every upload. Fire-and-forget; failures are swallowed.
+async function sweepExpiredFiles(): Promise<void> {
+  const now = Date.now();
+  if (now - lastCleanupAt < CLEANUP_THROTTLE_MS) return;
+  lastCleanupAt = now;
+  try {
+    await sql`
+      DELETE FROM mb_files
+      WHERE created_at < NOW() - (${FILE_TTL_DAYS}::int * INTERVAL '1 day')
+    `;
+  } catch (err) {
+    console.error("File TTL sweep failed:", err);
+  }
+}
+
+export async function putFile(
+  data: Buffer,
+  mimeType: string,
+  userId?: string | null
+): Promise<{ id: string }> {
+  await ensureFilesTable();
+  const id = `file_${Date.now()}_${randomBytes(6).toString("hex")}`;
+  // Neon's tagged-template driver passes Buffer through as bytea
+  await sql`
+    INSERT INTO mb_files (id, user_id, mime_type, size_bytes, data)
+    VALUES (${id}, ${userId || null}, ${mimeType}, ${data.length}, ${data})
+  `;
+  // Background sweep — don't await, don't block the upload response
+  sweepExpiredFiles().catch(() => {});
+  return { id };
+}
+
+export async function getFile(id: string): Promise<StoredFile | null> {
+  await ensureFilesTable();
+  const rows = await sql`
+    SELECT id, mime_type, size_bytes, data FROM mb_files WHERE id = ${id}
+  `;
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  // Neon returns bytea as a Node Buffer (or Uint8Array). Normalize to Buffer.
+  const raw = r.data as Buffer | Uint8Array;
+  const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+  return {
+    id: r.id as string,
+    mimeType: r.mime_type as string,
+    sizeBytes: r.size_bytes as number,
+    data: buf,
+  };
+}
+
+export async function deleteFile(id: string): Promise<boolean> {
+  await ensureFilesTable();
+  const rows = await sql`DELETE FROM mb_files WHERE id = ${id} RETURNING id`;
   return rows.length > 0;
 }

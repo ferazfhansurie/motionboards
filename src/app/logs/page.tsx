@@ -147,20 +147,7 @@ export default function LogsPage() {
               </p>
               {generations[0].error?.includes("Forbidden") && (
                 <p className="text-xs text-neutral-400 mt-2">
-                  This usually means your API key has no credits. Top up at{" "}
-                  <a
-                    href={
-                      generations[0].provider === "fal"
-                        ? "https://fal.ai/dashboard/billing"
-                        : "https://replicate.com/account/billing"
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#f26522] hover:underline inline-flex items-center gap-0.5"
-                  >
-                    {generations[0].provider === "fal" ? "fal.ai billing" : "Replicate billing"}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  This usually means your API key has no credits. Top up at the relevant provider dashboard.
                 </p>
               )}
             </div>

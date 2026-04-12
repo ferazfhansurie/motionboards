@@ -280,7 +280,7 @@ export function Toolbar() {
           <button
             className={`${btnBase} ${isDark ? "text-gray-400 hover:bg-[#f26522]/10 hover:text-[#f26522]" : "text-gray-400 hover:bg-[#f26522]/10 hover:text-[#f26522]"} transition-colors`}
             onClick={() => uploadInputRef.current?.click()}
-            title="Upload files to canvas"
+            title="Upload files to canvas — files auto-delete after 14 days"
           >
             <ImagePlus className="h-3.5 w-3.5" />
           </button>

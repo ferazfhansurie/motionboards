@@ -41,7 +41,7 @@ export interface PerSecondRate {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "fal" | "replicate" | "segmind" | "gemini" | "fish";
+  provider: "replicate" | "segmind" | "gemini" | "fish";
   type: ModelType;
   category: ModelCategory;
   description: string;
@@ -55,7 +55,6 @@ export interface AIModel {
 }
 
 // Rate: 1 USD = 3.7 RM. Margin: +RM0.03 photo/audio, +RM0.05 video
-// Inputs verified against fal.ai API docs (2026-03-25)
 
 export const models: AIModel[] = [
   // === Image Generation ===
@@ -76,178 +75,6 @@ export const models: AIModel[] = [
     },
   },
 
-  // === Cinematic Video Gen — Veo 3.1 (via fal.ai) ===
-
-  {
-    id: "fal-ai/veo3.1/fast",
-    name: "Veo 3.1 Fast T2V",
-    provider: "fal", type: "t2v", category: "Cinematic Video Gen",
-    description: "Fast text-to-video with audio via fal.ai. Billed per second.",
-    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
-      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
-      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
-      generate_audio: { default: true, label: "Audio" },
-    },
-    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
-  },
-
-  {
-    id: "fal-ai/veo3.1/fast/image-to-video",
-    name: "Veo 3.1 Fast I2V",
-    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Fast image-to-video with audio via fal.ai. Billed per second.",
-    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "How to animate the image" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
-      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
-      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
-      generate_audio: { default: true, label: "Audio" },
-    },
-    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
-  },
-
-  {
-    id: "fal-ai/veo3.1/fast/first-last-frame-to-video",
-    name: "Veo 3.1 Fast S2E",
-    provider: "fal", type: "s2e", category: "Cinematic Video Gen",
-    description: "Fast start-to-end video with audio via fal.ai. Billed per second.",
-    cost: "RM0.58/s", creditCost: 466, speed: "~2m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
-      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "auto"], default: "auto", label: "Aspect Ratio" },
-      duration: { values: ["4s", "6s", "8s"], default: "8s", label: "Duration" },
-      resolution: { values: ["720p", "1080p", "4k"], default: "720p", label: "Resolution" },
-      generate_audio: { default: true, label: "Audio" },
-    },
-    perSecond: { noAudio720p: 0.39, withAudio720p: 0.58, noAudio4k: 1.15, withAudio4k: 1.34 },
-  },
-
-
-
-  // === Seedance (ByteDance) ===
-
-  {
-    id: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
-    name: "Seedance 1.5 Pro I2V",
-    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "ByteDance Seedance 1.5 Pro. Image-to-video with audio generation.",
-    cost: "~RM1.24", creditCost: 124, speed: "~5m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "image_url", type: "image", required: true, description: "Starting image" },
-      { name: "end_image_url", type: "image", required: false, description: "End frame (optional)" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "auto"], default: "16:9", label: "Aspect Ratio" },
-      duration: { values: ["4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
-      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
-      generate_audio: { default: true, label: "Generate Audio" },
-    },
-  },
-
-  {
-    id: "fal-ai/bytedance/seedance/v1/pro/fast/image-to-video",
-    name: "Seedance 1.0 Pro Fast I2V",
-    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Seedance 1.0 Pro Fast. Quick image-to-video, up to 1080p.",
-    cost: "~RM1.01", creditCost: 101, speed: "~3m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "image_url", type: "image", required: true, description: "Starting image" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "auto"], default: "auto", label: "Aspect Ratio" },
-      duration: { values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
-      resolution: { values: ["480p", "720p", "1080p"], default: "1080p", label: "Resolution" },
-    },
-  },
-
-  {
-    id: "fal-ai/bytedance/seedance/v1/lite/image-to-video",
-    name: "Seedance 1.0 Lite I2V",
-    provider: "fal", type: "i2v", category: "Cinematic Video Gen",
-    description: "Seedance 1.0 Lite. Fast, efficient image-to-video.",
-    cost: "~RM0.78", creditCost: 78, speed: "~2m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "image_url", type: "image", required: true, description: "Starting image" },
-      { name: "end_image_url", type: "image", required: false, description: "End frame (optional)" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "auto"], default: "auto", label: "Aspect Ratio" },
-      duration: { values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
-      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
-    },
-  },
-
-  {
-    id: "fal-ai/bytedance/seedance/v1/lite/text-to-video",
-    name: "Seedance 1.0 Lite T2V",
-    provider: "fal", type: "t2v", category: "Cinematic Video Gen",
-    description: "Seedance 1.0 Lite text-to-video. Multiple aspect ratios and durations.",
-    cost: "~RM0.78", creditCost: 78, speed: "~2m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: true, description: "Video description" },
-    ],
-    options: {
-      aspect_ratio: { values: ["16:9", "9:16", "4:3", "1:1", "3:4", "21:9", "9:21"], default: "16:9", label: "Aspect Ratio" },
-      duration: { values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"], default: "5", label: "Duration (sec)" },
-      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
-    },
-  },
-
-  // === Lip Sync ===
-
-  {
-    id: "fal-ai/bytedance/omnihuman/v1.5",
-    name: "OmniHuman v1.5",
-    provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Full-body lip sync from image + audio. Natural expressions and body movement.",
-    cost: "~RM3.75", creditCost: 375, speed: "~3m", stable: true,
-    inputs: [
-      { name: "prompt", type: "text", required: false, description: "Video guidance (optional)" },
-      { name: "image_url", type: "image", required: true, description: "Character image" },
-      { name: "audio_url", type: "audio", required: true, description: "Audio/speech file" },
-    ],
-  },
-
-  {
-    id: "fal-ai/creatify/aurora",
-    name: "Creatify Aurora",
-    provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Studio-quality talking avatar from image + audio. Great for UGC ads.",
-    cost: "~RM1.43", creditCost: 143, speed: "~5m", stable: true,
-    inputs: [
-      { name: "image_url", type: "image", required: true, description: "Character image" },
-      { name: "audio_url", type: "audio", required: true, description: "Audio/speech file" },
-    ],
-  },
-
-  {
-    id: "fal-ai/sync-lipsync/v2",
-    name: "Sync Lipsync 2.0",
-    provider: "fal", type: "lipsync", category: "Lip Sync",
-    description: "Video + audio lip sync. Upload a face video and new audio to re-sync.",
-    cost: "~RM2.00", creditCost: 200, speed: "~2m", stable: true,
-    inputs: [
-      { name: "video_url", type: "video", required: true, description: "Face video" },
-      { name: "audio_url", type: "audio", required: true, description: "Audio/speech" },
-    ],
-  },
-
   // === Voice / TTS ===
 
   {
@@ -265,7 +92,7 @@ export const models: AIModel[] = [
 ];
 
 export const modelCategories: ModelCategory[] = [
-  "Concept Art & Style", "Cinematic Video Gen", "Lip Sync", "Audio & Music",
+  "Concept Art & Style", "Audio & Music",
 ];
 
 export function getModelsByCategory(category: ModelCategory) {
