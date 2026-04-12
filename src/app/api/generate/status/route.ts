@@ -78,8 +78,17 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
           }
 
-          await updateGeneration(generationId, { status: "failed", error: "No video generated", duration: 0 });
-          return NextResponse.json({ status: "failed", error: "No video in Gemini response" });
+          // Extract rejection reason if available
+          const genVideo = operation.response?.generatedVideos?.[0];
+          const filterReason = (genVideo as Record<string, unknown>)?.filteredReason
+            || (genVideo as Record<string, unknown>)?.finishReason
+            || (operation.response as Record<string, unknown>)?.blockReason;
+          const errDetail = filterReason
+            ? `Video blocked: ${filterReason}. Try rephrasing your prompt.`
+            : "No video generated — the prompt may have been flagged by content policy.";
+          console.error("[Veo] No video output:", JSON.stringify(operation.response).slice(0, 1000));
+          await updateGeneration(generationId, { status: "failed", error: errDetail, duration: 0 });
+          return NextResponse.json({ status: "failed", error: errDetail });
         }
 
         return NextResponse.json({ status: "processing", log: "Generating video..." });
