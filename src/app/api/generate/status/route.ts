@@ -50,24 +50,34 @@ export async function GET(req: NextRequest) {
         const operation = await ai.operations.getVideosOperation({ operation: opStub });
 
         if (operation.done) {
-          // Extract video from response
-          const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+          // Extract video from response — Vertex AI returns videoBytes (base64),
+          // AI Studio returns uri (signed URL). Handle both.
+          const genVideo = operation.response?.generatedVideos?.[0]?.video;
+          const videoUri = genVideo?.uri;
+          const videoBytes = (genVideo as Record<string, unknown>)?.videoBytes as string | undefined;
 
-          if (videoUri) {
-            // Gemini's videoUri is a short-lived signed URL. Download the bytes
-            // and re-host them in Neon so the canvas keeps working forever.
-            let outputUrl = videoUri;
+          if (videoUri || videoBytes) {
+            let outputUrl: string;
             try {
-              const videoRes = await fetch(videoUri);
-              if (videoRes.ok) {
-                const buffer = Buffer.from(await videoRes.arrayBuffer());
-                const mimeType = videoRes.headers.get("content-type") || "video/mp4";
-                const { id } = await putFile(buffer, mimeType, user.id);
+              if (videoBytes) {
+                // Vertex AI: raw base64 video data — store directly in Neon
+                const buffer = Buffer.from(videoBytes, "base64");
+                const { id } = await putFile(buffer, "video/mp4", user.id);
                 outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
+              } else {
+                // AI Studio: short-lived signed URL — download and re-host in Neon
+                outputUrl = videoUri!;
+                const videoRes = await fetch(videoUri!);
+                if (videoRes.ok) {
+                  const buffer = Buffer.from(await videoRes.arrayBuffer());
+                  const mimeType = videoRes.headers.get("content-type") || "video/mp4";
+                  const { id } = await putFile(buffer, mimeType, user.id);
+                  outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
+                }
               }
             } catch (storeErr) {
-              console.error("Failed to re-host Gemini video:", storeErr);
-              // Fall back to the raw Gemini URL — it will work for a while at least
+              console.error("Failed to store Gemini video:", storeErr);
+              outputUrl = videoUri || "";
             }
 
             const modelInfo = models.find((m) => m.id === modelId);
