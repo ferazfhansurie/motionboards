@@ -211,12 +211,13 @@ export async function POST(req: NextRequest) {
         if (isVideo) {
           // --- Gemini Video Generation (async long-running operation) ---
           const videoConfig: Record<string, unknown> = {};
-          if (input.aspect_ratio && input.aspect_ratio !== "auto") videoConfig.aspectRatio = input.aspect_ratio;
-          if (input.resolution) videoConfig.resolution = input.resolution;
-          if (input.duration) {
-            const dur = (input.duration as string).replace("s", "");
-            videoConfig.durationSeconds = parseInt(dur);
-          }
+          // Fall back to model defaults if user didn't explicitly set an option
+          const ar = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default;
+          if (ar && ar !== "auto") videoConfig.aspectRatio = ar;
+          const res = (input.resolution as string) || modelInfo.options?.resolution?.default;
+          if (res) videoConfig.resolution = res;
+          const dur = (input.duration as string) || modelInfo.options?.duration?.default;
+          if (dur) videoConfig.durationSeconds = parseInt(dur.toString().replace("s", ""));
 
           // Build image input for I2V / S2E (first frame)
           let imageInput: { imageBytes: string; mimeType: string } | undefined;
