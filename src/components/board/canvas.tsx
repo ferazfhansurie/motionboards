@@ -286,14 +286,25 @@ export function Canvas() {
     setDrawPoints([]);
   }, [isDrawing, drawPoints]);
 
-  // Zoom with scroll
+  // Zoom with scroll — zooms toward screen center
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.08 : 0.08;
-      setZoom(zoom + delta);
+      const newZoom = Math.max(0.1, Math.min(3, zoom + delta));
+      if (newZoom === zoom) return;
+
+      // Zoom toward screen center: adjust pan so the center point stays fixed
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const scale = newZoom / zoom;
+      const newPanX = cx - scale * (cx - panX);
+      const newPanY = cy - scale * (cy - panY);
+
+      setPan(newPanX, newPanY);
+      setZoom(newZoom);
     },
-    [zoom, setZoom]
+    [zoom, panX, panY, setZoom, setPan]
   );
 
   // Item drag start (or connect)

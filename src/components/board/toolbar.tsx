@@ -7,7 +7,7 @@ import { parsePsdBuffer, buildPsdFromItems, downloadPsd } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
 export function Toolbar() {
-  const { zoom, setZoom, setPan, items, addItem, boardName, undo, redo, undoStack, redoStack, activeCanvasTool, setActiveCanvasTool, theme, setTheme, drawingColor, setDrawingColor, drawingStrokeWidth, setDrawingStrokeWidth, isTimelineOpen, setTimelineOpen } = useAppStore();
+  const { zoom, setZoom, setPan, panX, panY, items, addItem, boardName, undo, redo, undoStack, redoStack, activeCanvasTool, setActiveCanvasTool, theme, setTheme, drawingColor, setDrawingColor, drawingStrokeWidth, setDrawingStrokeWidth, isTimelineOpen, setTimelineOpen } = useAppStore();
   const isDark = theme === "dark";
   const psdInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -328,7 +328,13 @@ export function Toolbar() {
         <div className={`flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
           <button
             className={`rounded p-1 transition-colors ${btnInactive}`}
-            onClick={() => setZoom(zoom - 0.1)}
+            onClick={() => {
+              const nz = Math.max(0.1, zoom - 0.1);
+              const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+              const s = nz / zoom;
+              setPan(cx - s * (cx - panX), cy - s * (cy - panY));
+              setZoom(nz);
+            }}
           >
             <ZoomOut className="h-3 w-3" />
           </button>
@@ -340,7 +346,13 @@ export function Toolbar() {
           </button>
           <button
             className={`rounded p-1 transition-colors ${btnInactive}`}
-            onClick={() => setZoom(zoom + 0.1)}
+            onClick={() => {
+              const nz = Math.min(3, zoom + 0.1);
+              const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+              const s = nz / zoom;
+              setPan(cx - s * (cx - panX), cy - s * (cy - panY));
+              setZoom(nz);
+            }}
           >
             <ZoomIn className="h-3 w-3" />
           </button>
