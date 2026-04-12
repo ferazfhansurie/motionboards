@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 
         if (operation.done) {
           // Check for operation-level error first (response may be undefined)
-          const opError = (operation as Record<string, unknown>).error as Record<string, string> | undefined;
+          const opError = (operation as unknown as Record<string, unknown>).error as Record<string, string> | undefined;
           if (opError || !operation.response) {
             const errMsg = opError?.message || "Video generation failed — no response from Google.";
             console.error("[Veo] Operation error:", JSON.stringify(opError || "no response"));
