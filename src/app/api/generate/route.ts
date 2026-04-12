@@ -185,19 +185,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Gemini: direct Google API call (Vertex AI preferred, falls back to API key)
+    // Gemini: Vertex AI for video (direct Google Cloud), API key for images (AI Studio free tier)
     if (modelInfo.provider === "gemini") {
       const gcpProject = process.env.GOOGLE_PROJECT_ID;
       const gcpLocation = process.env.GOOGLE_LOCATION || "us-central1";
       const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
       const hasVertexAI = !!(gcpProject && gcpServiceAccount);
+      const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
 
-      if (!hasVertexAI && !settings.geminiApiKey) {
-        return NextResponse.json({ error: "Google API not configured. Set GOOGLE_PROJECT_ID + GOOGLE_SERVICE_ACCOUNT_KEY env vars, or a Gemini API key." }, { status: 500 });
+      // Video → Vertex AI (avoids AI Studio project issues).
+      // Images → API key / AI Studio (free tier is cheaper).
+      const useVertexAI = isVideo && hasVertexAI;
+
+      if (!useVertexAI && !settings.geminiApiKey) {
+        return NextResponse.json({ error: isVideo
+          ? "Google API not configured. Set GOOGLE_PROJECT_ID + GOOGLE_SERVICE_ACCOUNT_KEY env vars for Veo video generation."
+          : "Google Gemini API key not configured." }, { status: 500 });
       }
       try {
         const { GoogleGenAI } = await import("@google/genai");
-        const ai = hasVertexAI
+        const ai = useVertexAI
           ? new GoogleGenAI({
               vertexai: true,
               project: gcpProject,
@@ -205,8 +212,6 @@ export async function POST(req: NextRequest) {
               googleAuthOptions: { credentials: JSON.parse(gcpServiceAccount!) },
             })
           : new GoogleGenAI({ apiKey: settings.geminiApiKey });
-
-        const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
 
         if (isVideo) {
           // --- Gemini Video Generation (async long-running operation) ---
@@ -240,7 +245,7 @@ export async function POST(req: NextRequest) {
           // Strip /i2v, /s2e suffixes — Gemini uses same model for all modes.
           // Vertex AI uses -001 suffix; AI Studio uses -preview suffix.
           let geminiModelId = modelId.replace(/\/(i2v|s2e)$/, "");
-          if (hasVertexAI) geminiModelId = geminiModelId.replace(/-preview$/, "-001");
+          if (useVertexAI) geminiModelId = geminiModelId.replace(/-preview$/, "-001");
 
           const operation = await ai.models.generateVideos({
             model: geminiModelId,
@@ -292,7 +297,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Vertex AI uses -001 suffix; AI Studio uses -preview suffix
-        const imageModelId = hasVertexAI ? modelId.replace(/-preview$/, "-001") : modelId;
+        // Images always use AI Studio (API key) — no model ID mapping needed
+        const imageModelId = modelId;
 
         const response = await ai.models.generateContent({
           model: imageModelId,
