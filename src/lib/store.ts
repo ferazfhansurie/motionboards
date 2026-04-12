@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { imgCachePut, imgCacheGet, imgCacheDelete, imgCacheKeys } from "./image-cache";
 
 // --- LocalStorage autosave ---
 const STORAGE_KEY = "motionboards_state";
@@ -18,13 +19,16 @@ function loadSavedState(): Partial<SavedState> | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SavedState;
-    // Strip items with blob: or data: URLs — they don't survive reload / blow storage limits
+    // Items with empty src are kept — they will be restored asynchronously from
+    // IndexedDB by restoreFromImageCache() after the store initializes. Any lingering
+    // blob: URLs from a previous session are dead references and must be cleared.
     if (parsed.boards) {
       for (const board of parsed.boards) {
         if (board.items) {
-          board.items = board.items.filter((item) => {
+          board.items = board.items.map((item) => {
             const src = item.src || "";
-            return !src.startsWith("blob:") && !src.startsWith("data:");
+            if (src.startsWith("blob:")) return { ...item, src: "" };
+            return item;
           });
         }
       }
@@ -46,12 +50,21 @@ function getCurrentBoards(state: AppState): Board[] {
 function saveToLocalStorage(state: AppState) {
   if (typeof window === "undefined") return;
   try {
+    // Track items whose src must be cached in IndexedDB instead of localStorage
+    // (data: URIs are too large for LS; blob: URLs die with the document).
+    const pendingCache: Array<{ id: string; src: string; isBlob: boolean }> = [];
     const boards = getCurrentBoards(state).map((b) => ({
       ...b,
       items: b.items.map((item) => {
         const src = item.src || "";
-        // Don't persist data: URIs — too large for localStorage
-        if (src.startsWith("data:")) return { ...item, src: "" };
+        if (src.startsWith("data:")) {
+          pendingCache.push({ id: item.id, src, isBlob: false });
+          return { ...item, src: "" };
+        }
+        if (src.startsWith("blob:")) {
+          pendingCache.push({ id: item.id, src, isBlob: true });
+          return { ...item, src: "" };
+        }
         return item;
       }),
     }));
@@ -62,6 +75,30 @@ function saveToLocalStorage(state: AppState) {
       savedAt: Date.now(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+    // Persist unfinalized sources to IndexedDB (async, fire-and-forget).
+    // data: URIs are stored as strings; blob: URLs are fetched and stored as Blobs.
+    for (const p of pendingCache) {
+      if (p.isBlob) {
+        fetch(p.src)
+          .then((r) => r.blob())
+          .then((blob) => imgCachePut(p.id, blob))
+          .catch(() => {});
+      } else {
+        imgCachePut(p.id, p.src).catch(() => {});
+      }
+    }
+
+    // GC: remove IDB entries for items that no longer need caching
+    // (src was finalized to a CDN URL, or the item was deleted).
+    const activeIds = new Set(pendingCache.map((p) => p.id));
+    imgCacheKeys()
+      .then((keys) => {
+        for (const k of keys) {
+          if (!activeIds.has(k)) imgCacheDelete(k).catch(() => {});
+        }
+      })
+      .catch(() => {});
   } catch {
     // localStorage full or unavailable
   }
@@ -568,6 +605,53 @@ useAppStore.subscribe((state) => {
   }
 });
 
+// Restore unfinalized image sources from IndexedDB into items with empty src.
+// Runs after state loads (from localStorage and/or DB) to rehydrate pasted/dropped
+// images that hadn't finished uploading to the CDN at the time of the last save.
+async function restoreFromImageCache() {
+  if (typeof window === "undefined") return;
+  try {
+    const keys = await imgCacheKeys();
+    if (keys.length === 0) return;
+    const state = useAppStore.getState();
+
+    // Find items with empty src across all boards, keyed by id
+    const needsRestore = new Set<string>();
+    for (const b of state.boards) {
+      for (const item of b.items) {
+        if (!item.src && keys.includes(item.id)) needsRestore.add(item.id);
+      }
+    }
+    for (const item of state.items) {
+      if (!item.src && keys.includes(item.id)) needsRestore.add(item.id);
+    }
+
+    for (const id of needsRestore) {
+      const cached = await imgCacheGet(id);
+      if (!cached) continue;
+      const src = typeof cached === "string" ? cached : URL.createObjectURL(cached);
+      useAppStore.setState((s) => ({
+        items: s.items.map((i) => (i.id === id ? { ...i, src } : i)),
+        boards: s.boards.map((b) => ({
+          ...b,
+          items: b.items.map((i) => (i.id === id ? { ...i, src } : i)),
+        })),
+      }));
+    }
+
+    // GC: delete IDB entries whose items no longer exist in any board
+    const allItemIds = new Set<string>();
+    const freshState = useAppStore.getState();
+    for (const b of freshState.boards) for (const item of b.items) allItemIds.add(item.id);
+    for (const item of freshState.items) allItemIds.add(item.id);
+    for (const k of keys) {
+      if (!allItemIds.has(k)) imgCacheDelete(k).catch(() => {});
+    }
+  } catch {
+    // noop
+  }
+}
+
 // Flush pending saves on page close / refresh
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
@@ -583,6 +667,11 @@ if (typeof window !== "undefined") {
     );
     navigator.sendBeacon("/api/boards", blob);
   });
+}
+
+// Restore from IDB as soon as the store is hydrated from localStorage
+if (typeof window !== "undefined") {
+  restoreFromImageCache();
 }
 
 // Load from DB on startup — keyed by user session
@@ -637,6 +726,9 @@ if (typeof window !== "undefined") {
               boardName: board.name || "Board 1",
               selectedModelId: data.selectedModelId || null,
             });
+            // Items loaded from DB may still have empty src if they were unfinalized
+            // on their last save. Re-run the IDB restore against the new items.
+            restoreFromImageCache();
           }
           dbLoadedOnce = true;
         });
