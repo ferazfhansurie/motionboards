@@ -434,22 +434,21 @@ export async function POST(req: NextRequest) {
           prompt: prompt?.trim() || "Generate a video",
         };
 
-        // Options passthrough
-        if (input.aspect_ratio) repInput.aspect_ratio = input.aspect_ratio;
-        if (input.resolution) repInput.resolution = input.resolution;
-        if (input.generate_audio !== undefined) repInput.generate_audio = !!input.generate_audio;
-        if (input.duration) {
-          const dur = parseInt((input.duration as string).replace("s", ""));
-          if (dur > 0) repInput.duration = dur;
-        }
+        // Options passthrough — fall back to model defaults if user didn't override
+        repInput.aspect_ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "16:9";
+        repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "720p";
+        repInput.generate_audio = input.generate_audio !== undefined ? !!input.generate_audio : (modelInfo.options?.generate_audio?.default ?? true);
+        const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "5s";
+        const dur = parseInt(durStr.replace("s", ""));
+        if (dur > 0) repInput.duration = dur;
 
-        // I2V: map image_url → first_frame_url (Seedance API field name)
+        // I2V: map image_url → "image" (Replicate's Seedance field name for first frame)
         const imageUrl = input.image_url as string | undefined;
-        if (imageUrl) repInput.first_frame_url = imageUrl;
+        if (imageUrl) repInput.image = imageUrl;
 
-        // S2E: pass both frames
-        if (input.first_frame_url) repInput.first_frame_url = input.first_frame_url;
-        if (input.last_frame_url) repInput.last_frame_url = input.last_frame_url;
+        // S2E: "image" = first frame, "last_frame_image" = last frame
+        if (input.first_frame_url) repInput.image = input.first_frame_url;
+        if (input.last_frame_url) repInput.last_frame_image = input.last_frame_url;
 
         const predRes = await fetch(`https://api.replicate.com/v1/models/${replicateModel}/predictions`, {
           method: "POST",
