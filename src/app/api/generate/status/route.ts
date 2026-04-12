@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     // --- Gemini Video polling (Vertex AI preferred, falls back to API key) ---
     if (geminiVideo === "true") {
       const gcpProject = process.env.GOOGLE_PROJECT_ID;
-      const gcpLocation = process.env.GOOGLE_LOCATION || "us-central1";
+      const gcpLocation = process.env.GOOGLE_LOCATION || "global";
       const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
       const hasVertexAI = !!(gcpProject && gcpServiceAccount);
 
