@@ -180,9 +180,9 @@ export function Toolbar() {
   return (
     <>
       {/* Top-left: Logo + actions */}
-      <div className="absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto">
+      <div className={`absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto rounded-xl px-2 py-1.5 backdrop-blur-md ${isDark ? "bg-black/50 border border-white/10" : "bg-white/70 border border-gray-200/50 shadow-sm"}`}>
         <div className="flex items-center px-1 py-0.5 rounded-lg">
-          <img src="/logo.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
+          <img src="/logo.jpg" alt="MotionBoards" className="h-12 w-auto rounded-lg" />
         </div>
 
         {/* Undo/Redo */}
