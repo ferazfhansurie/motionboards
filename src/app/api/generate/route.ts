@@ -188,10 +188,11 @@ export async function POST(req: NextRequest) {
     // Gemini: Vertex AI (service account) preferred, API key fallback
     if (modelInfo.provider === "gemini") {
       const gcpProject = process.env.GOOGLE_PROJECT_ID;
-      const gcpLocation = process.env.GOOGLE_LOCATION || "us-central1";
       const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
       const useVertexAI = !!(gcpProject && gcpServiceAccount);
       const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
+      // Preview image models are on the global endpoint; video models use a regional endpoint
+      const gcpLocation = isVideo ? (process.env.GOOGLE_LOCATION || "us-central1") : "global";
 
       if (!useVertexAI && !settings.geminiApiKey) {
         return NextResponse.json({ error: "Google API not configured. Set GOOGLE_PROJECT_ID + GOOGLE_SERVICE_ACCOUNT_KEY env vars, or a Gemini API key." }, { status: 500 });
