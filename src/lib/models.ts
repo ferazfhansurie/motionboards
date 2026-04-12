@@ -242,6 +242,26 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.57, withAudio720p: 0.57, noAudio4k: 0, withAudio4k: 0 },
   },
 
+  {
+    id: "bytedance/seedance-2.0/s2e",
+    name: "Seedance 2.0 S2E",
+    provider: "replicate", type: "s2e", category: "Cinematic Video Gen",
+    description: "ByteDance Seedance 2.0 first-to-last-frame video via Replicate. Interpolates between two images. Audio toggleable.",
+    cost: "~RM2.85", creditCost: 285, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Describe the transition between frames" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4s", "5s", "6s", "8s", "10s"], default: "5s", label: "Duration" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      generate_audio: { default: true, label: "Generate Audio" },
+    },
+    perSecond: { noAudio720p: 0.57, withAudio720p: 0.57, noAudio4k: 0, withAudio4k: 0 },
+  },
+
   // === Voice / TTS ===
 
   {
