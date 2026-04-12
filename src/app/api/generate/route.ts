@@ -237,8 +237,10 @@ export async function POST(req: NextRequest) {
             videoConfig.lastFrame = { imageBytes: lastBuffer.toString("base64"), mimeType: lastMime };
           }
 
-          // Strip /i2v, /s2e suffixes — Gemini uses same model for all modes
-          const geminiModelId = modelId.replace(/\/(i2v|s2e)$/, "");
+          // Strip /i2v, /s2e suffixes — Gemini uses same model for all modes.
+          // Vertex AI uses -001 suffix; AI Studio uses -preview suffix.
+          let geminiModelId = modelId.replace(/\/(i2v|s2e)$/, "");
+          if (hasVertexAI) geminiModelId = geminiModelId.replace(/-preview$/, "-001");
 
           const operation = await ai.models.generateVideos({
             model: geminiModelId,
@@ -289,8 +291,11 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Vertex AI uses -001 suffix; AI Studio uses -preview suffix
+        const imageModelId = hasVertexAI ? modelId.replace(/-preview$/, "-001") : modelId;
+
         const response = await ai.models.generateContent({
-          model: modelId,
+          model: imageModelId,
           contents: contentParts,
           config: {
             responseModalities: ["IMAGE"],
