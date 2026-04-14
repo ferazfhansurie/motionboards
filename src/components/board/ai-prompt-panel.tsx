@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { useAppStore } from "@/lib/store";
 
 // Message content is either a plain string (simple turns) or an array of parts
@@ -481,7 +482,7 @@ export function AIPromptPanel() {
                         <p className="whitespace-pre-wrap">{text}</p>
                       ) : (
                         <div className={`markdown-body ${isDark ? "md-dark" : "md-light"}`}>
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{text}</ReactMarkdown>
                         </div>
                       )
                     )}
