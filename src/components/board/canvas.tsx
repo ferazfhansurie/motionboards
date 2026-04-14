@@ -53,7 +53,9 @@ export function Canvas() {
     connections,
     theme,
     connectingFromId,
+    isAIPromptOpen,
   } = useAppStore();
+  const AI_SIDEBAR_WIDTH = 420;
 
   const isDark = theme === "dark";
 
@@ -604,7 +606,10 @@ export function Canvas() {
     : "cursor-default";
 
   return (
-    <div className={`relative h-screen w-screen overflow-hidden ${isDark ? "bg-[#0d1117]" : "bg-white"}`}>
+    <div
+      className={`relative h-screen overflow-hidden transition-[width] duration-200 ${isDark ? "bg-[#0d1117]" : "bg-white"}`}
+      style={{ width: isAIPromptOpen ? `calc(100vw - ${AI_SIDEBAR_WIDTH}px)` : "100vw" }}
+    >
       {/* Canvas area */}
       <div
         ref={canvasRef}

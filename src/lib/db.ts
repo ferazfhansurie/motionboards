@@ -350,3 +350,122 @@ export async function deleteFile(id: string): Promise<boolean> {
   const rows = await sql`DELETE FROM mb_files WHERE id = ${id} RETURNING id`;
   return rows.length > 0;
 }
+
+// --- AI Prompt Generator chats ---
+//
+// Conversation history for the AI Prompt Generator side panel. Each chat is a
+// full message transcript stored as JSONB so the backend (GPT-4o-mini) can
+// rebuild context on every reply. Chats share the same 14-day TTL as files.
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface Chat {
+  id: string;
+  userId: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+let chatsTableInitialized = false;
+let lastChatSweepAt = 0;
+
+async function ensureChatsTable(): Promise<void> {
+  if (chatsTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_chats (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT 'New Chat',
+      messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_chats_user_updated_idx ON mb_chats (user_id, updated_at DESC)`;
+  chatsTableInitialized = true;
+}
+
+async function sweepExpiredChats(): Promise<void> {
+  const now = Date.now();
+  if (now - lastChatSweepAt < CLEANUP_THROTTLE_MS) return;
+  lastChatSweepAt = now;
+  try {
+    await sql`
+      DELETE FROM mb_chats
+      WHERE updated_at < NOW() - (${FILE_TTL_DAYS}::int * INTERVAL '1 day')
+    `;
+  } catch (err) {
+    console.error("Chat TTL sweep failed:", err);
+  }
+}
+
+function rowToChat(row: Record<string, unknown>): Chat {
+  const rawMessages = row.messages as ChatMessage[] | string;
+  const messages = typeof rawMessages === "string" ? JSON.parse(rawMessages) : rawMessages;
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    title: row.title as string,
+    messages: (messages as ChatMessage[]) || [],
+    createdAt: (row.created_at as Date).toISOString(),
+    updatedAt: (row.updated_at as Date).toISOString(),
+  };
+}
+
+export async function listChats(userId: string): Promise<Chat[]> {
+  await ensureChatsTable();
+  const rows = await sql`
+    SELECT * FROM mb_chats WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 50
+  `;
+  return rows.map(rowToChat);
+}
+
+export async function createChat(userId: string, title: string = "New Chat"): Promise<Chat> {
+  await ensureChatsTable();
+  const id = `chat_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const rows = await sql`
+    INSERT INTO mb_chats (id, user_id, title, messages)
+    VALUES (${id}, ${userId}, ${title}, '[]'::jsonb)
+    RETURNING *
+  `;
+  sweepExpiredChats().catch(() => {});
+  return rowToChat(rows[0]);
+}
+
+export async function getChat(id: string, userId: string): Promise<Chat | null> {
+  await ensureChatsTable();
+  const rows = await sql`
+    SELECT * FROM mb_chats WHERE id = ${id} AND user_id = ${userId}
+  `;
+  return rows.length > 0 ? rowToChat(rows[0]) : null;
+}
+
+export async function updateChat(
+  id: string,
+  userId: string,
+  updates: { title?: string; messages?: ChatMessage[] }
+): Promise<Chat | null> {
+  await ensureChatsTable();
+  const rows = await sql`
+    UPDATE mb_chats SET
+      title = COALESCE(${updates.title ?? null}, title),
+      messages = COALESCE(${updates.messages ? JSON.stringify(updates.messages) : null}::jsonb, messages),
+      updated_at = NOW()
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING *
+  `;
+  return rows.length > 0 ? rowToChat(rows[0]) : null;
+}
+
+export async function deleteChat(id: string, userId: string): Promise<boolean> {
+  await ensureChatsTable();
+  const rows = await sql`
+    DELETE FROM mb_chats WHERE id = ${id} AND user_id = ${userId} RETURNING id
+  `;
+  return rows.length > 0;
+}
