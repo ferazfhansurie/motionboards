@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -822,6 +822,65 @@ export function BoardItemCard({
                 Add to Timeline
               </button>
             )}
+
+            {/* Reference frame toggles — for image-like items */}
+            {isImageType || (item.type === "generation" && item.outputType === "image") ? (
+              <>
+                <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />
+                <button
+                  type="button"
+                  className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+                  onClick={() => {
+                    closeContextMenu();
+                    const store = useAppStore.getState();
+                    store.setStartFrame(isStartFrame ? null : item.id);
+                  }}
+                >
+                  <Flag className={`h-3.5 w-3.5 ${isStartFrame ? "text-[#f26522]" : "text-gray-400"}`} />
+                  {isStartFrame ? "Clear Start Frame" : "Set as Start Frame"}
+                </button>
+                <button
+                  type="button"
+                  className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+                  onClick={() => {
+                    closeContextMenu();
+                    const store = useAppStore.getState();
+                    store.setEndFrame(isEndFrame ? null : item.id);
+                  }}
+                >
+                  <Flag className={`h-3.5 w-3.5 ${isEndFrame ? "text-[#f26522]" : "text-gray-400"}`} />
+                  {isEndFrame ? "Clear End Frame" : "Set as End Frame"}
+                </button>
+                <button
+                  type="button"
+                  className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+                  onClick={() => { closeContextMenu(); useAppStore.getState().toggleInputRef(item.id); }}
+                >
+                  <Target className={`h-3.5 w-3.5 ${isInputRef ? "text-[#f26522]" : "text-gray-400"}`} />
+                  {isInputRef ? "Remove as Input" : "Set as Input"}
+                </button>
+              </>
+            ) : null}
+
+            {/* Copy / Paste */}
+            <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />
+            <button
+              type="button"
+              className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+              onClick={() => { closeContextMenu(); selectItem(item.id); useAppStore.getState().copySelectedItems(); }}
+            >
+              <Copy className="h-3.5 w-3.5 text-gray-400" />
+              Copy
+            </button>
+            <button
+              type="button"
+              className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+              onClick={() => { closeContextMenu(); useAppStore.getState().pasteItems(item.x + 30, item.y + 30); }}
+            >
+              <ClipboardPaste className="h-3.5 w-3.5 text-gray-400" />
+              Paste
+            </button>
+
             <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />
             <button
               type="button"

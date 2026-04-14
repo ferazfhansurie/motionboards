@@ -223,6 +223,8 @@ export interface AppState {
   // Canvas (derived from active board)
   items: BoardItem[];
   selectedItemId: string | null;
+  selectedItemIds: string[]; // multi-selection (marquee, shift-click)
+  clipboard: BoardItem[]; // copied items, in-memory only
   panX: number;
   panY: number;
   zoom: number;
@@ -277,6 +279,10 @@ export interface AppState {
   updateItem: (id: string, updates: Partial<BoardItem>) => void;
   removeItem: (id: string) => void;
   selectItem: (id: string | null) => void;
+  selectItems: (ids: string[]) => void;
+  copySelectedItems: () => void;
+  pasteItems: (atX?: number, atY?: number) => void;
+  removeSelectedItems: () => void;
   moveItem: (id: string, x: number, y: number) => void;
   setPan: (x: number, y: number) => void;
   setZoom: (zoom: number) => void;
@@ -345,6 +351,8 @@ export const useAppStore = create<AppState>((set) => {
   activeBoardId: saved?.activeBoardId || "board_1",
   items: startBoard.items || [],
   selectedItemId: null,
+  selectedItemIds: [],
+  clipboard: [],
   panX: startBoard.panX || 0,
   panY: startBoard.panY || 0,
   zoom: startBoard.zoom || 1,
@@ -445,7 +453,55 @@ export const useAppStore = create<AppState>((set) => {
       inputRefs: s.inputRefs.filter((r) => r !== id),
       audioInputId: s.audioInputId === id ? null : s.audioInputId,
     })),
-  selectItem: (id) => set({ selectedItemId: id }),
+  selectItem: (id) => set({ selectedItemId: id, selectedItemIds: id ? [id] : [] }),
+  selectItems: (ids) => set({ selectedItemIds: ids, selectedItemId: ids[0] || null }),
+  copySelectedItems: () =>
+    set((s) => {
+      const ids = s.selectedItemIds.length > 0 ? s.selectedItemIds : (s.selectedItemId ? [s.selectedItemId] : []);
+      const copied = s.items.filter((i) => ids.includes(i.id));
+      return { clipboard: copied.map((i) => ({ ...i })) };
+    }),
+  pasteItems: (atX, atY) =>
+    set((s) => {
+      if (s.clipboard.length === 0) return s;
+      // Compute offset so pasted group appears near the target (or offset by 30px from originals)
+      const minX = Math.min(...s.clipboard.map((i) => i.x));
+      const minY = Math.min(...s.clipboard.map((i) => i.y));
+      const offsetX = atX !== undefined ? atX - minX : 30;
+      const offsetY = atY !== undefined ? atY - minY : 30;
+      const pasted = s.clipboard.map((src) => ({
+        ...src,
+        id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        x: src.x + offsetX,
+        y: src.y + offsetY,
+        createdAt: new Date().toISOString(),
+      }));
+      return {
+        undoStack: [...s.undoStack.slice(-49), s.items],
+        redoStack: [],
+        items: [...s.items, ...pasted],
+        selectedItemIds: pasted.map((p) => p.id),
+        selectedItemId: pasted[0]?.id || null,
+      };
+    }),
+  removeSelectedItems: () =>
+    set((s) => {
+      const ids = s.selectedItemIds.length > 0 ? s.selectedItemIds : (s.selectedItemId ? [s.selectedItemId] : []);
+      if (ids.length === 0) return s;
+      const idSet = new Set(ids);
+      return {
+        undoStack: [...s.undoStack.slice(-49), s.items],
+        redoStack: [],
+        items: s.items.filter((i) => !idSet.has(i.id)),
+        connections: s.connections.filter((c) => !idSet.has(c.fromId) && !idSet.has(c.toId)),
+        selectedItemId: null,
+        selectedItemIds: [],
+        startFrameId: idSet.has(s.startFrameId || "") ? null : s.startFrameId,
+        endFrameId: idSet.has(s.endFrameId || "") ? null : s.endFrameId,
+        inputRefs: s.inputRefs.filter((r) => !idSet.has(r)),
+        audioInputId: idSet.has(s.audioInputId || "") ? null : s.audioInputId,
+      };
+    }),
   moveItem: (id, x, y) =>
     set((s) => ({
       items: s.items.map((i) => (i.id === id ? { ...i, x, y } : i)),

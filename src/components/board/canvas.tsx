@@ -43,7 +43,9 @@ export function Canvas() {
     setZoom,
     addItem,
     selectItem,
+    selectItems,
     selectedItemId,
+    selectedItemIds,
     activeCanvasTool,
     setActiveCanvasTool,
     drawingColor,
@@ -75,6 +77,9 @@ export function Canvas() {
   const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
   const [drawOrigin, setDrawOrigin] = useState({ x: 0, y: 0 });
 
+  // Marquee selection state (right-click drag). Coords are in screen space.
+  const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
   // Space key tracking + keyboard shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -104,12 +109,18 @@ export function Canvas() {
         useAppStore.getState().setActiveCanvasTool("select");
         useAppStore.getState().setConnectingFromId(null);
       }
-      // Delete selected item
+      // Delete selected item(s)
       if ((e.key === "Delete" || e.key === "Backspace") && tag !== "INPUT" && tag !== "TEXTAREA") {
-        const state = useAppStore.getState();
-        if (state.selectedItemId) {
-          state.removeItem(state.selectedItemId);
-        }
+        useAppStore.getState().removeSelectedItems();
+      }
+      // Copy: Ctrl+C
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+        useAppStore.getState().copySelectedItems();
+      }
+      // Paste: Ctrl+V
+      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+        e.preventDefault();
+        useAppStore.getState().pasteItems();
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -128,6 +139,13 @@ export function Canvas() {
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
       const isCanvas = target === canvasRef.current || !!target.dataset.canvas;
+
+      // Right-click drag on empty canvas → start marquee selection
+      if (e.button === 2 && isCanvas) {
+        e.preventDefault();
+        setMarquee({ x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY });
+        return;
+      }
 
       if (isCanvas) {
         selectItem(null);
@@ -190,6 +208,11 @@ export function Canvas() {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // Update marquee box while dragging
+      if (marquee) {
+        setMarquee({ ...marquee, x2: e.clientX, y2: e.clientY });
+        return;
+      }
       if (isPanning) {
         setPan(e.clientX - panStart.x, e.clientY - panStart.y);
         return;
@@ -245,13 +268,35 @@ export function Canvas() {
         useAppStore.getState().moveItem(dragId, x, y);
       }
     },
-    [isPanning, panStart, dragId, dragOffset, resizeId, resizeStart, panX, panY, zoom, setPan, isDrawing]
+    [isPanning, panStart, dragId, dragOffset, resizeId, resizeStart, panX, panY, zoom, setPan, isDrawing, marquee]
   );
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     setDragId(null);
     setResizeId(null);
+
+    // Finalize marquee selection — find all items whose bounding box intersects the marquee
+    if (marquee) {
+      const mx = Math.min(marquee.x1, marquee.x2);
+      const my = Math.min(marquee.y1, marquee.y2);
+      const mw = Math.abs(marquee.x2 - marquee.x1);
+      const mh = Math.abs(marquee.y2 - marquee.y1);
+      // Ignore near-zero drags (treat as simple right-click, no marquee)
+      if (mw > 4 || mh > 4) {
+        const selectedIds = items.filter((item) => {
+          // Convert item canvas coords to screen coords
+          const ix1 = panX + item.x * zoom;
+          const iy1 = panY + item.y * zoom;
+          const ix2 = ix1 + item.width * zoom;
+          const iy2 = iy1 + item.height * zoom;
+          // AABB overlap test
+          return ix1 < mx + mw && ix2 > mx && iy1 < my + mh && iy2 > my;
+        }).map((i) => i.id);
+        selectItems(selectedIds);
+      }
+      setMarquee(null);
+    }
 
     // Finalize drawing
     if (isDrawing && drawPoints.length > 1) {
@@ -284,7 +329,7 @@ export function Canvas() {
     }
     setIsDrawing(false);
     setDrawPoints([]);
-  }, [isDrawing, drawPoints]);
+  }, [isDrawing, drawPoints, marquee, items, panX, panY, zoom, selectItems]);
 
   // Zoom with scroll — zooms toward screen center
   const handleWheel = useCallback(
@@ -562,6 +607,13 @@ export function Canvas() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onContextMenu={(e) => {
+          // Suppress native right-click menu on canvas so marquee drag works
+          const target = e.target as HTMLElement;
+          if (target === canvasRef.current || !!target.dataset.canvas) {
+            e.preventDefault();
+          }
+        }}
         onWheel={handleWheel}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -680,7 +732,7 @@ export function Canvas() {
             <BoardItemCard
               key={item.id}
               item={item}
-              isSelected={item.id === selectedItemId}
+              isSelected={item.id === selectedItemId || selectedItemIds.includes(item.id)}
               isConnecting={activeCanvasTool === "connect" && connectingFromId === item.id}
               onMouseDown={(e) => handleItemDragStart(item.id, e)}
               onDoubleClick={() => handleItemDoubleClick(item.id)}
@@ -708,6 +760,19 @@ export function Canvas() {
       <HistoryPanel />
       <AIPromptPanel />
       <TimelineWidget />
+
+      {/* Marquee selection rectangle (right-click drag) */}
+      {marquee && (
+        <div
+          className="pointer-events-none fixed z-[40] border border-[#f26522] bg-[#f26522]/10"
+          style={{
+            left: Math.min(marquee.x1, marquee.x2),
+            top: Math.min(marquee.y1, marquee.y2),
+            width: Math.abs(marquee.x2 - marquee.x1),
+            height: Math.abs(marquee.y2 - marquee.y1),
+          }}
+        />
+      )}
 
       {/* Zoom preview */}
       {previewItem && (
