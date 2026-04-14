@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, ChevronLeft, Paperclip } from "lucide-react";
+import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useAppStore } from "@/lib/store";
 
 // Message content is either a plain string (simple turns) or an array of parts
-// when the user attaches images/videos. OpenAI's multimodal API accepts this
-// same shape for the "user" role.
+// when the user attaches images/videos. OpenAI-shaped — the server converts to
+// Anthropic's schema before calling Claude.
 type MessagePart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
@@ -24,7 +26,12 @@ interface ChatSummary {
   updatedAt: string;
 }
 
-// Helper: render message content as plain text (for UI display + copy/paste)
+const MIN_WIDTH = 400;
+const MAX_WIDTH = 1100;
+const DEFAULT_WIDTH = 640;
+const CHAT_LIST_WIDTH = 180;
+const WIDTH_STORAGE_KEY = "motionboards_ai_panel_width";
+
 function messageText(content: MessageContent): string {
   if (typeof content === "string") return content;
   return content.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("\n");
@@ -35,7 +42,6 @@ function messageImages(content: MessageContent): string[] {
   return content.filter((p) => p.type === "image_url").map((p) => (p as { image_url: { url: string } }).image_url.url);
 }
 
-// Extract the first frame of a video as a JPEG data URL
 async function extractVideoFrame(file: File): Promise<string | null> {
   return new Promise((resolve) => {
     const video = document.createElement("video");
@@ -65,7 +71,6 @@ async function extractVideoFrame(file: File): Promise<string | null> {
   });
 }
 
-// Read a File into a base64 data URL
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -75,30 +80,62 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-const SIDEBAR_WIDTH = 420;
-
 export function AIPromptPanel() {
   const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme } = useAppStore();
   const isDark = theme === "dark";
 
-  // Chat list state
+  // Resizable width — persisted to localStorage
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(WIDTH_STORAGE_KEY);
+    if (saved) {
+      const n = parseInt(saved, 10);
+      if (!isNaN(n) && n >= MIN_WIDTH && n <= MAX_WIDTH) setPanelWidth(n);
+    }
+  }, []);
+
+  // Persist width so the canvas knows how much space to reserve
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ai-panel-width", { detail: panelWidth }));
+    }
+  }, [panelWidth]);
+
+  // Drag-to-resize — track mouse globally while resizing
+  useEffect(() => {
+    if (!isResizing) return;
+    const move = (e: MouseEvent) => {
+      // Panel is anchored right, so its width = viewportWidth - mouseX
+      const w = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, window.innerWidth - e.clientX));
+      setPanelWidth(w);
+    };
+    const up = () => {
+      setIsResizing(false);
+      localStorage.setItem(WIDTH_STORAGE_KEY, String(panelWidth));
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, [isResizing, panelWidth]);
+
+  // Chat list + current conversation state
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [listLoading, setListLoading] = useState(false);
-
-  // Current conversation state
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  // Pending attachments — array of data URLs (images or extracted video frames)
   const [attachments, setAttachments] = useState<Array<{ url: string; label: string }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle file attach (from button, drop, or paste)
   const handleFiles = useCallback(async (files: File[]) => {
     for (const file of files) {
       if (file.type.startsWith("image/")) {
@@ -106,9 +143,7 @@ export function AIPromptPanel() {
         setAttachments((prev) => [...prev, { url, label: file.name || "image" }]);
       } else if (file.type.startsWith("video/")) {
         const frame = await extractVideoFrame(file);
-        if (frame) {
-          setAttachments((prev) => [...prev, { url: frame, label: `${file.name || "video"} (frame)` }]);
-        }
+        if (frame) setAttachments((prev) => [...prev, { url: frame, label: `${file.name || "video"} (frame)` }]);
       }
     }
   }, []);
@@ -124,12 +159,10 @@ export function AIPromptPanel() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (isAIPromptOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (isAIPromptOpen && inputRef.current) inputRef.current.focus();
   }, [isAIPromptOpen, currentChatId]);
 
-  // Global paste handler while panel is open — catches images from OS clipboard
+  // Paste images from OS clipboard while panel is open
   useEffect(() => {
     if (!isAIPromptOpen) return;
     const onPaste = (e: ClipboardEvent) => {
@@ -150,7 +183,6 @@ export function AIPromptPanel() {
     return () => window.removeEventListener("paste", onPaste);
   }, [isAIPromptOpen, handleFiles]);
 
-  // Load chat list when panel opens
   const loadChats = useCallback(async () => {
     setListLoading(true);
     try {
@@ -168,36 +200,18 @@ export function AIPromptPanel() {
     return [];
   }, []);
 
-  useEffect(() => {
-    if (!isAIPromptOpen) return;
-    loadChats().then((list) => {
-      // If no current chat, open the most recent — or create a new one if none exist
-      if (!currentChatId) {
-        if (list.length > 0) {
-          loadChat(list[0].id);
-        } else {
-          createNewChat();
-        }
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAIPromptOpen]);
-
-  const loadChat = async (id: string) => {
+  const loadChat = useCallback(async (id: string) => {
     setCurrentChatId(id);
-    setShowHistory(false);
     try {
       const res = await fetch(`/api/chats/${id}`);
       const data = await res.json();
-      if (data.chat) {
-        setMessages(data.chat.messages || []);
-      }
+      setMessages(data.chat?.messages || []);
     } catch {
       setMessages([]);
     }
-  };
+  }, []);
 
-  const createNewChat = async () => {
+  const createNewChat = useCallback(async () => {
     try {
       const res = await fetch("/api/chats", {
         method: "POST",
@@ -208,13 +222,23 @@ export function AIPromptPanel() {
       if (data.chat) {
         setCurrentChatId(data.chat.id);
         setMessages([]);
-        setShowHistory(false);
         loadChats();
       }
     } catch {
       // noop
     }
-  };
+  }, [loadChats]);
+
+  useEffect(() => {
+    if (!isAIPromptOpen) return;
+    loadChats().then((list) => {
+      if (!currentChatId) {
+        if (list.length > 0) loadChat(list[0].id);
+        else createNewChat();
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAIPromptOpen]);
 
   const deleteChat = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -234,7 +258,6 @@ export function AIPromptPanel() {
 
   const persistMessages = async (chatId: string, msgs: Message[]) => {
     try {
-      // Auto-derive title from first user message if still default
       const firstUser = msgs.find((m) => m.role === "user");
       const title = firstUser ? messageText(firstUser.content).slice(0, 50) : undefined;
       await fetch(`/api/chats/${chatId}`, {
@@ -253,7 +276,6 @@ export function AIPromptPanel() {
     const text = input.trim();
     if ((!text && attachments.length === 0) || loading || !currentChatId) return;
 
-    // Build multimodal content if there are attachments, else plain string
     const userMsg: Message = attachments.length > 0
       ? {
           role: "user",
@@ -281,7 +303,7 @@ export function AIPromptPanel() {
       const final = [...newMessages, { role: "assistant" as const, content: reply }];
       setMessages(final);
       await persistMessages(currentChatId, final);
-      loadChats(); // refresh list ordering
+      loadChats();
     } catch {
       const final = [...newMessages, { role: "assistant" as const, content: "Failed to connect. Try again." }];
       setMessages(final);
@@ -307,50 +329,35 @@ export function AIPromptPanel() {
   return (
     <div
       className={`fixed right-0 top-0 z-[55] h-screen flex flex-col border-l shadow-2xl ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}
-      style={{ width: SIDEBAR_WIDTH }}
+      style={{ width: panelWidth }}
     >
+      {/* Drag-to-resize handle on the LEFT edge */}
+      <div
+        onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
+        className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-[10] transition-colors ${
+          isResizing
+            ? "bg-[#f26522]"
+            : isDark ? "bg-transparent hover:bg-white/20" : "bg-transparent hover:bg-[#f26522]/40"
+        }`}
+        title="Drag to resize"
+      />
+
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${isDark ? "border-gray-700 bg-gradient-to-r from-[#161b22] to-[#1c2128]" : "border-gray-100 bg-gradient-to-r from-white to-gray-50"}`}>
         <div className="flex items-center gap-2.5 min-w-0">
-          {showHistory ? (
-            <button
-              type="button"
-              className={`rounded-lg p-1 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
-              onClick={() => setShowHistory(false)}
-              title="Back to chat"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          ) : (
-            <div className="relative shrink-0">
-              <img src="/aios-icon.png" alt="AI" className="h-7 w-7 rounded-lg" />
-              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-white" />
-            </div>
-          )}
+          <div className="relative shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/aios-icon.png" alt="AI" className="h-7 w-7 rounded-lg" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-white" />
+          </div>
           <div className="min-w-0">
             <h3 className={`text-xs font-bold truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-              {showHistory ? "Chat History" : currentChat?.title || "ADletic AI - Prompt Helper"}
+              {currentChat?.title || "ADletic AI - Prompt Helper"}
             </h3>
             <p className="text-[9px] text-green-500 font-medium">Online</p>
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
-            onClick={() => setShowHistory(!showHistory)}
-            title="Chat history"
-          >
-            <MessageSquare className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
-            onClick={createNewChat}
-            title="New chat"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
           <button
             type="button"
             className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
@@ -362,53 +369,65 @@ export function AIPromptPanel() {
         </div>
       </div>
 
-      {/* Chat history list */}
-      {showHistory && (
-        <div className="flex-1 overflow-y-auto">
-          {listLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-[#f26522]" />
-            </div>
-          ) : chats.length === 0 ? (
-            <p className={`text-center py-8 text-[11px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>No chats yet</p>
-          ) : (
-            <div className="p-2 space-y-1">
-              {chats.map((c) => (
+      {/* Body: chat list | conversation */}
+      <div className="flex-1 flex min-h-0">
+        {/* Chat list — always visible on the left */}
+        <div
+          className={`shrink-0 flex flex-col border-r ${isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-100 bg-gray-50"}`}
+          style={{ width: CHAT_LIST_WIDTH }}
+        >
+          <button
+            type="button"
+            onClick={createNewChat}
+            className={`flex items-center gap-2 mx-2 my-2 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
+              isDark ? "bg-[#f26522]/15 text-[#f26522] hover:bg-[#f26522]/25" : "bg-[#f26522]/10 text-[#f26522] hover:bg-[#f26522]/20"
+            }`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Chat
+          </button>
+          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
+            {listLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-[#f26522]" />
+              </div>
+            ) : chats.length === 0 ? (
+              <p className={`text-center py-6 text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>No chats yet</p>
+            ) : (
+              chats.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => loadChat(c.id)}
-                  className={`group flex items-center gap-2 w-full text-left rounded-lg px-3 py-2 transition-colors ${
+                  className={`group flex items-start gap-1.5 w-full text-left rounded-md px-2 py-1.5 transition-colors ${
                     c.id === currentChatId
                       ? isDark ? "bg-[#f26522]/15 text-white" : "bg-[#f26522]/10 text-[#0d1117]"
-                      : isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-700 hover:bg-gray-50"
+                      : isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-700 hover:bg-white"
                   }`}
                 >
-                  <MessageSquare className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                  <MessageSquare className="h-3 w-3 shrink-0 mt-0.5 text-gray-400" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium truncate">{c.title}</p>
-                    <p className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                      {new Date(c.updatedAt).toLocaleString()}
+                    <p className="text-[11px] font-medium truncate leading-tight">{c.title}</p>
+                    <p className={`text-[9px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                      {new Date(c.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={(e) => deleteChat(c.id, e)}
-                    className="opacity-0 group-hover:opacity-100 rounded p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                    className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-gray-400 hover:text-red-500 transition-all"
                     title="Delete"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-2.5 w-2.5" />
                   </button>
                 </button>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Conversation view */}
-      {!showHistory && (
-        <>
+        {/* Conversation column */}
+        <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {messages.length === 0 && !loading && (
               <div className="text-center py-8">
@@ -417,7 +436,7 @@ export function AIPromptPanel() {
                 </div>
                 <p className={`text-sm font-bold mb-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}>ADletic AI - Prompt Helper</p>
                 <p className={`text-[11px] mb-5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Describe what you want or paste an image and I&rsquo;ll craft the perfect prompt</p>
-                <div className="space-y-2">
+                <div className="space-y-2 max-w-sm mx-auto">
                   {[
                     "Cinematic drone shot of a city at sunset",
                     "Slow motion close-up of coffee being poured",
@@ -439,13 +458,14 @@ export function AIPromptPanel() {
             {messages.map((msg, i) => {
               const text = messageText(msg.content);
               const imgs = messageImages(msg.content);
+              const isUser = msg.role === "user";
               return (
-                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-[12px] leading-relaxed ${
-                      msg.role === "user"
+                    className={`max-w-[88%] rounded-2xl px-4 py-3 text-[12.5px] leading-relaxed ${
+                      isUser
                         ? "bg-[#f26522] text-white rounded-br-sm"
-                        : isDark ? "bg-[#0d1117] text-gray-200 rounded-bl-sm" : "bg-gray-100 text-[#0d1117] rounded-bl-sm"
+                        : isDark ? "bg-[#0d1117] border border-gray-700 text-gray-200 rounded-bl-sm" : "bg-gray-50 border border-gray-200 text-[#0d1117] rounded-bl-sm"
                     }`}
                   >
                     {imgs.length > 0 && (
@@ -456,9 +476,17 @@ export function AIPromptPanel() {
                         ))}
                       </div>
                     )}
-                    {text && <p className="whitespace-pre-wrap">{text}</p>}
-                    {msg.role === "assistant" && (
-                      <div className={`flex items-center gap-2 mt-2.5 pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-200/50"}`}>
+                    {text && (
+                      isUser ? (
+                        <p className="whitespace-pre-wrap">{text}</p>
+                      ) : (
+                        <div className={`markdown-body ${isDark ? "md-dark" : "md-light"}`}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                        </div>
+                      )
+                    )}
+                    {!isUser && (
+                      <div className={`flex items-center gap-2 mt-2.5 pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-200/70"}`}>
                         <button
                           type="button"
                           className={`flex items-center gap-1 text-[10px] transition-colors ${isDark ? "text-gray-500 hover:text-[#f26522]" : "text-gray-400 hover:text-[#f26522]"}`}
@@ -484,7 +512,7 @@ export function AIPromptPanel() {
 
             {loading && (
               <div className="flex justify-start">
-                <div className={`rounded-2xl px-4 py-3 rounded-bl-sm ${isDark ? "bg-[#0d1117]" : "bg-gray-100"}`}>
+                <div className={`rounded-2xl px-4 py-3 rounded-bl-sm ${isDark ? "bg-[#0d1117] border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
                   <div className="flex items-center gap-1.5">
                     <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                     <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -507,7 +535,6 @@ export function AIPromptPanel() {
               handleFiles(files);
             }}
           >
-            {/* Attachment previews */}
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {attachments.map((a, i) => (
@@ -585,8 +612,8 @@ export function AIPromptPanel() {
               </a>
             </div>
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

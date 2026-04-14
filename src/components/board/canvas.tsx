@@ -55,7 +55,23 @@ export function Canvas() {
     connectingFromId,
     isAIPromptOpen,
   } = useAppStore();
-  const AI_SIDEBAR_WIDTH = 420;
+
+  // AI panel is user-resizable; the panel dispatches ai-panel-width events.
+  // Start from localStorage so we don't flash the wrong width on mount.
+  const [aiPanelWidth, setAiPanelWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 640;
+    const saved = window.localStorage.getItem("motionboards_ai_panel_width");
+    const n = saved ? parseInt(saved, 10) : NaN;
+    return !isNaN(n) ? n : 640;
+  });
+  useEffect(() => {
+    const onWidth = (e: Event) => {
+      const detail = (e as CustomEvent<number>).detail;
+      if (typeof detail === "number") setAiPanelWidth(detail);
+    };
+    window.addEventListener("ai-panel-width", onWidth);
+    return () => window.removeEventListener("ai-panel-width", onWidth);
+  }, []);
 
   const isDark = theme === "dark";
 
@@ -608,7 +624,7 @@ export function Canvas() {
   return (
     <div
       className={`relative h-screen overflow-hidden transition-[width] duration-200 ${isDark ? "bg-[#0d1117]" : "bg-white"}`}
-      style={{ width: isAIPromptOpen ? `calc(100vw - ${AI_SIDEBAR_WIDTH}px)` : "100vw" }}
+      style={{ width: isAIPromptOpen ? `calc(100vw - ${aiPanelWidth}px)` : "100vw" }}
     >
       {/* Canvas area */}
       <div
