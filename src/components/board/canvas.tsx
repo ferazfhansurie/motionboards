@@ -448,6 +448,21 @@ export function Canvas() {
   // Paste from clipboard
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
+      // Ignore pastes that originate inside the AI panel or any text input —
+      // the AI panel has its own paste handler that should receive the file.
+      const active = document.activeElement as HTMLElement | null;
+      const target = e.target as HTMLElement | null;
+      const insideAIPanel = !!(
+        (active && active.closest?.("[data-ai-panel]")) ||
+        (target && target.closest?.("[data-ai-panel]"))
+      );
+      const inEditable = active && (
+        active.tagName === "INPUT" ||
+        active.tagName === "TEXTAREA" ||
+        (active as HTMLElement).isContentEditable
+      );
+      if (insideAIPanel || inEditable) return;
+
       const clipboardItems = e.clipboardData?.items;
       if (!clipboardItems) return;
 

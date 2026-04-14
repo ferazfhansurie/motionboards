@@ -363,6 +363,7 @@ export function AIPromptPanel() {
 
   return (
     <div
+      data-ai-panel="true"
       className={`fixed right-0 top-0 z-[55] h-screen flex flex-col border-l shadow-2xl ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}
       style={{ width: panelWidth }}
     >
