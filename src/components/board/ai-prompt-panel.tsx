@@ -115,6 +115,22 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
+// Shape of generation items the server returns after a Claude tool call
+interface AIGeneratedItem {
+  type: "generation";
+  outputType: "image" | "video";
+  status: "completed" | "processing";
+  prompt: string;
+  model: string;
+  modelName: string;
+  outputUrl?: string;
+  requestId?: string;
+  geminiVideo?: boolean;
+  openaiVideo?: boolean;
+  replicateVideo?: boolean;
+  creditCost?: number;
+}
+
 export function AIPromptPanel() {
   const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme, items: canvasItems, boards, activeBoardId, addItem, panX, panY, zoom } = useAppStore();
   const isDark = theme === "dark";
@@ -410,25 +426,8 @@ export function AIPromptPanel() {
     }
   };
 
-  if (!isAIPromptOpen) return null;
-
   // Server returns generatedItems when Claude used a tool. Each item gets
   // added to the canvas; processing video items spin up their own poll.
-  interface AIGeneratedItem {
-    type: "generation";
-    outputType: "image" | "video";
-    status: "completed" | "processing";
-    prompt: string;
-    model: string;
-    modelName: string;
-    outputUrl?: string;
-    requestId?: string;
-    geminiVideo?: boolean;
-    openaiVideo?: boolean;
-    replicateVideo?: boolean;
-    creditCost?: number;
-  }
-
   const addGeneratedItemToCanvas = useCallback((g: AIGeneratedItem) => {
     // Place near viewport center, with a small random offset so stacked items
     // don't overlap exactly
@@ -493,6 +492,8 @@ export function AIPromptPanel() {
       setTimeout(poll, 3000);
     }
   }, [addItem, panX, panY, zoom]);
+
+  if (!isAIPromptOpen) return null;
 
   const handleSend = async () => {
     const text = input.trim();
