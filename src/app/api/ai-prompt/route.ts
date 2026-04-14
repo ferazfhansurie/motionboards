@@ -124,8 +124,8 @@ export async function POST(req: NextRequest) {
     const converted = (messages.slice(-10) as Array<{ role: "user" | "assistant"; content: string | ClientPart[] }>).map(convertMessage);
 
     const response = await anthropic.messages.create({
-      // Claude Haiku 4.5 — cheapest multimodal Claude model
-      model: "claude-haiku-4-5-20251001",
+      // Claude Sonnet 4.5 — balanced multimodal model (3× Haiku price, noticeably smarter)
+      model: "claude-sonnet-4-5",
       max_tokens: 1000,
       temperature: 0.8,
       system: SYSTEM_PROMPT,
