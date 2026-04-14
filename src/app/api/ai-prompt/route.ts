@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { getUserFromToken } from "@/lib/db";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const SYSTEM_PROMPT = `You are ADletic AI — Prompt Helper. You are an expert cinematography prompt engineer that helps users create detailed, production-quality prompts for AI video and image generation models like Veo 3, Sora 2, Kling 3.0, Wan 2.1, FLUX, Nano Banana, and others.
 
@@ -46,6 +46,63 @@ Always respond with the prompt ready to copy-paste. If the user gives a vague id
 
 Respond concisely. No fluff. Just great prompts.`;
 
+// Convert the OpenAI-shaped messages the client sends into Anthropic's format.
+// Client sends:
+//   { role: "user" | "assistant", content: string }
+//   { role: "user", content: [ { type: "text", text }, { type: "image_url", image_url: { url } } ] }
+//
+// Anthropic expects:
+//   { role: "user" | "assistant", content: string }
+//   { role: "user", content: [ { type: "text", text }, { type: "image", source: {...} } ] }
+//
+// For image_url parts that are data: URLs (our client sends base64 data URLs),
+// we convert to Anthropic's base64 image source shape. For http(s) URLs we use
+// the url source variant.
+type ClientPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+type AnthropicMessage = {
+  role: "user" | "assistant";
+  content:
+    | string
+    | Array<
+        | { type: "text"; text: string }
+        | {
+            type: "image";
+            source:
+              | { type: "base64"; media_type: string; data: string }
+              | { type: "url"; url: string };
+          }
+      >;
+};
+
+function convertMessage(m: { role: "user" | "assistant"; content: string | ClientPart[] }): AnthropicMessage {
+  if (typeof m.content === "string") return { role: m.role, content: m.content };
+  const parts: AnthropicMessage["content"] extends Array<infer U> ? U[] : never = [] as never;
+  const out: AnthropicMessage["content"] = [];
+  for (const p of m.content) {
+    if (p.type === "text") {
+      out.push({ type: "text", text: p.text });
+    } else if (p.type === "image_url") {
+      const url = p.image_url.url;
+      // Data URL: data:<media_type>;base64,<data>
+      const match = url.match(/^data:([^;]+);base64,(.*)$/);
+      if (match) {
+        out.push({
+          type: "image",
+          source: { type: "base64", media_type: match[1], data: match[2] },
+        });
+      } else {
+        out.push({ type: "image", source: { type: "url", url } });
+      }
+    }
+  }
+  // Silence unused variable warning (kept for type-narrowing hygiene)
+  void parts;
+  return { role: m.role, content: out };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("session")?.value;
@@ -54,31 +111,32 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+    }
+
     const { messages } = await req.json();
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
 
-    // Messages from the client may include multimodal content for user turns:
-    // { role: "user", content: [ { type: "text", text }, { type: "image_url", image_url: { url } } ] }
-    // Use the multimodal-capable gpt-4o (not mini) when images are present so the
-    // model can actually "see" them, otherwise default to the cheaper mini.
-    const hasImages = messages.some((m: { content?: unknown }) =>
-      Array.isArray(m.content) && (m.content as Array<{ type?: string }>).some((part) => part.type === "image_url")
-    );
-    const model = hasImages ? "gpt-4o" : "gpt-4o-mini";
+    // Keep last 10 messages for context (same as before)
+    const converted = (messages.slice(-10) as Array<{ role: "user" | "assistant"; content: string | ClientPart[] }>).map(convertMessage);
 
-    const response = await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...messages.slice(-10), // Keep last 10 messages for context
-      ],
+    const response = await anthropic.messages.create({
+      // Claude Haiku 4.5 — cheapest multimodal Claude model
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1000,
       temperature: 0.8,
+      system: SYSTEM_PROMPT,
+      messages: converted as Parameters<typeof anthropic.messages.create>[0]["messages"],
     });
 
-    const reply = response.choices[0]?.message?.content || "Could not generate a prompt. Try again.";
+    // Concatenate text blocks from the response
+    const reply = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("\n") || "Could not generate a prompt. Try again.";
 
     return NextResponse.json({ reply });
   } catch (error) {

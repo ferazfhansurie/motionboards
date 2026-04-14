@@ -573,7 +573,7 @@ export function AIPromptPanel() {
             </div>
             <div className="flex items-center justify-between mt-2">
               <p className={`text-[8px] ${isDark ? "text-gray-600" : "text-gray-300"}`}>
-                Powered by GPT-4o · Auto-saved for 14 days
+                Powered by Claude Haiku · Auto-saved for 14 days
               </p>
               <a
                 href="https://wa.me/60112167672?text=Hi%2C%20I%20want%20to%20upgrade%20my%20AI%20on%20MotionBoards%20%F0%9F%9A%80"
