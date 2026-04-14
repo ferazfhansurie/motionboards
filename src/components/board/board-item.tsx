@@ -510,6 +510,39 @@ export function BoardItemCard({
         </div>
       )}
 
+      {/* Smart X button — clears reference role if any, otherwise deletes the item */}
+      {isSelected && (() => {
+        const hasRole = isStartFrame || isEndFrame || isInputRef || isAudioRef;
+        const handleClick = (e: React.MouseEvent) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const store = useAppStore.getState();
+          if (isStartFrame) store.setStartFrame(null);
+          else if (isEndFrame) store.setEndFrame(null);
+          else if (isInputRef) store.toggleInputRef(item.id);
+          else if (isAudioRef) store.setAudioInput(null);
+          else store.removeItem(item.id);
+        };
+        const tooltip = isStartFrame ? "Clear start frame" : isEndFrame ? "Clear end frame" : isInputRef ? "Remove as input" : isAudioRef ? "Remove as audio" : "Delete from canvas";
+        return (
+          <button
+            type="button"
+            onClick={handleClick}
+            onMouseDown={(e) => e.stopPropagation()}
+            title={tooltip}
+            className={`absolute -top-2 -right-2 z-20 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-colors ${
+              hasRole
+                ? "bg-[#f26522] text-white border-[#f26522] hover:bg-[#d9541a]"
+                : isDark
+                ? "bg-[#161b22] text-gray-400 border-gray-700 hover:bg-red-500 hover:text-white hover:border-red-500"
+                : "bg-white text-gray-400 border-gray-300 hover:bg-red-500 hover:text-white hover:border-red-500"
+            }`}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        );
+      })()}
+
       {/* Reference badges */}
       <div className={`absolute left-0 z-10 flex gap-1 ${item.type === "text" && isSelected ? "-top-[72px]" : "-top-7"}`}>
         {isStartFrame && (

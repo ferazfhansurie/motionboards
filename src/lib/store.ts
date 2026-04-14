@@ -469,11 +469,13 @@ export const useAppStore = create<AppState>((set) => {
       const minY = Math.min(...s.clipboard.map((i) => i.y));
       const offsetX = atX !== undefined ? atX - minX : 30;
       const offsetY = atY !== undefined ? atY - minY : 30;
-      const pasted = s.clipboard.map((src) => ({
-        ...src,
-        id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        x: src.x + offsetX,
-        y: src.y + offsetY,
+      // Guarantee unique IDs even when clipboard has multiple items pasted in one tick
+      const now = Date.now();
+      const pasted = s.clipboard.map((srcItem, i) => ({
+        ...srcItem,
+        id: `item_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+        x: srcItem.x + offsetX,
+        y: srcItem.y + offsetY,
         createdAt: new Date().toISOString(),
       }));
       return {

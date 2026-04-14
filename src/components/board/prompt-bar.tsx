@@ -698,9 +698,9 @@ export function PromptBar() {
 
   return (
     <div className="absolute bottom-0 left-0 right-0 flex flex-col pointer-events-none">
-      {/* Reference controls — only shown when item selected AND model needs references */}
+      {/* Reference controls — anchored to the right above the chatbox */}
       {canSetAsRef && showAnyRef && (
-        <div className="pointer-events-auto mx-auto mb-2 flex items-center gap-2 rounded-lg bg-white border border-gray-200 px-3 py-1.5 backdrop-blur-sm shadow-lg">
+        <div className="pointer-events-auto ml-auto mb-2 mr-2 flex items-center gap-2 rounded-lg bg-white border border-gray-200 px-3 py-1.5 backdrop-blur-sm shadow-lg" style={{ width: boxW }}>
           <span className="text-[10px] text-gray-400 mr-1">Set as:</span>
           {showStartFrame && (
             <button
