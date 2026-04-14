@@ -113,14 +113,21 @@ export function Canvas() {
       if ((e.key === "Delete" || e.key === "Backspace") && tag !== "INPUT" && tag !== "TEXTAREA") {
         useAppStore.getState().removeSelectedItems();
       }
-      // Copy: Ctrl+C
+      // Copy: Ctrl+C — only if we have a selection (otherwise let browser copy text)
       if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-        useAppStore.getState().copySelectedItems();
+        const s = useAppStore.getState();
+        if (s.selectedItemIds.length > 0 || s.selectedItemId) {
+          s.copySelectedItems();
+        }
       }
-      // Paste: Ctrl+V
+      // Paste: Ctrl+V — only intercept if we have in-app clipboard; otherwise let
+      // the browser "paste" event fire so OS-clipboard images can be pasted.
       if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-        e.preventDefault();
-        useAppStore.getState().pasteItems();
+        const s = useAppStore.getState();
+        if (s.clipboard.length > 0) {
+          e.preventDefault();
+          s.pasteItems();
+        }
       }
     };
     const up = (e: KeyboardEvent) => {
