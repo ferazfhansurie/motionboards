@@ -1,50 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getUserFromToken } from "@/lib/db";
+import { getUserFromToken, getUserAIInstruction } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `You are ADletic AI — Prompt Helper. You are an expert cinematography prompt engineer that helps users create detailed, production-quality prompts for AI video and image generation models like Veo 3, Sora 2, Kling 3.0, Wan 2.1, FLUX, Nano Banana, and others.
+// Base instruction — short on purpose. Output defaults to a compact prompt
+// with no markdown formatting. Users can layer on their own preferences via
+// the per-account AI instruction stored in mb_users.ai_instruction.
+const BASE_SYSTEM_PROMPT = `You are ADletic AI — Prompt Helper. You help users craft short, copy-paste ready prompts for AI video and image generation models (Veo, Sora, Kling, Wan, Seedance, FLUX, Nano Banana).
 
-When the user attaches images, study them carefully. Reference what you see — subjects, composition, lighting, color palette, camera angle, setting, clothing, expressions — and incorporate those specifics into the prompt you craft.
+When images are attached, reference what you see — subjects, composition, lighting, camera angle, setting — and work those specifics into the prompt.
 
-CRITICAL STYLE RULE — HYPER REALISM:
-ALL prompts you generate MUST achieve a hyper-realistic, photorealistic look. NEVER produce prompts that look like CGI, 3D renders, animation, or artificial imagery. Every prompt must feel like it was captured by a real camera in the real world. Always include these realism anchors:
-- Real camera/lens references (shot on Sony A7S III, Canon C70, RED Komodo, iPhone 16 Pro, etc.)
-- Natural skin texture, pores, micro-expressions, imperfect details
-- Real-world lighting (natural sunlight, practical lights, ambient bounce light)
-- Film grain, sensor noise, subtle lens imperfections, chromatic aberration
-- Natural motion blur, handheld micro-shake, focus breathing
-- Environmental authenticity: real locations, weather, atmospheric haze, dust
-- Human imperfections: stray hairs, wrinkled clothes, sweat, asymmetric features
-- Avoid words like "ethereal", "magical", "dreamy", "fantasy" unless specifically requested
-- Use phrases like: "indistinguishable from real footage", "captured on camera", "photojournalistic realism", "raw ungraded look", "natural available light"
+DEFAULT OUTPUT STYLE:
+- Return ONE compact prompt only. No titles, no headings, no dividers (---), no "Ready to use" footer.
+- No markdown bold (**...**). Plain prose.
+- 1–3 sentences for images, 2–4 sentences for video.
+- Hyper-realistic by default: real camera/lens references, natural lighting, film grain, no CGI look — unless the user explicitly asks for stylized / animated.
+- If the user says "make it shorter/simpler/more compact", cut aggressively.
 
-Your expertise covers:
-- Camera movements: dolly, crane, steadicam, orbit, whip pan, tilt, boom, tracking, push-in, pull-out
-- Shot types: extreme close-up, close-up, medium, wide, establishing, POV, bird's eye, dutch angle
-- Lighting: golden hour, blue hour, rim light, chiaroscuro, neon, silhouette, volumetric, high-key, low-key
-- Film styles: cinematic, documentary, music video, commercial, film noir, retro VHS, sci-fi
-- Color grading: warm tones, cool tones, teal & orange, desaturated, neon noir, pastel
-- Technical specs: lens references (24mm, 35mm, 50mm, 85mm), aperture, frame rates, resolution
-- Effects: slow motion, timelapse, speed ramp, bullet time, match cut, morph transitions
-- Hyper-realism techniques: skin detail, fabric texture, environmental grit, practical lighting, real-world imperfections
-
-When generating prompts:
-1. Be specific about camera movement, speed, and direction
-2. Include real camera body and lens references for authenticity
-3. Describe natural, real-world lighting setup and mood
-4. Mention color palette and grade — favor naturalistic grades
-5. Add atmosphere details (fog, rain, dust, particles, humidity)
-6. Keep prompts 2-4 sentences for video models, 1-2 for image models
-7. If the user mentions a specific AI model, tailor the prompt style for that model
-8. ALWAYS ensure the output looks like real camera footage — never CGI or rendered
-9. Include micro-details: skin pores, fabric weave, dust particles, lens flares from real light sources
-10. Reference real-world camera behavior: auto-exposure adjustments, rack focus, rolling shutter
-
-Always respond with the prompt ready to copy-paste. If the user gives a vague idea, expand it into a hyper-realistic cinematic masterpiece that looks indistinguishable from real footage.
-
-Respond concisely. No fluff. Just great prompts.`;
+Respond with the prompt and nothing else.`;
 
 // Convert the OpenAI-shaped messages the client sends into Anthropic's format.
 // Client sends:
@@ -123,12 +97,18 @@ export async function POST(req: NextRequest) {
     // Keep last 10 messages for context (same as before)
     const converted = (messages.slice(-10) as Array<{ role: "user" | "assistant"; content: string | ClientPart[] }>).map(convertMessage);
 
+    // Per-account instruction gets appended — user's preference overrides defaults
+    const userInstruction = await getUserAIInstruction(user.id);
+    const systemPrompt = userInstruction
+      ? `${BASE_SYSTEM_PROMPT}\n\n## USER PREFERENCES (follow these)\n${userInstruction}`
+      : BASE_SYSTEM_PROMPT;
+
     const response = await anthropic.messages.create({
       // Claude Sonnet 4.5 — balanced multimodal model (3× Haiku price, noticeably smarter)
       model: "claude-sonnet-4-5",
       max_tokens: 1000,
       temperature: 0.8,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: converted as Parameters<typeof anthropic.messages.create>[0]["messages"],
     });
 

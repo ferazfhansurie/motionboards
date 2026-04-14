@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip } from "lucide-react";
+import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip, Settings as SettingsIcon, Wand2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -167,6 +167,62 @@ export function AIPromptPanel() {
   const [loading, setLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [attachments, setAttachments] = useState<Array<{ url: string; label: string }>>([]);
+
+  // Per-account AI instruction / template (customizes the system prompt)
+  const [showSettings, setShowSettings] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [instructionSaving, setInstructionSaving] = useState(false);
+  const [instructionOptimizing, setInstructionOptimizing] = useState(false);
+  const [instructionStatus, setInstructionStatus] = useState<string | null>(null);
+
+  const loadInstruction = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ai-settings");
+      const data = await res.json();
+      if (typeof data.instruction === "string") setInstruction(data.instruction);
+    } catch {
+      // noop
+    }
+  }, []);
+
+  const saveInstruction = async () => {
+    setInstructionSaving(true);
+    setInstructionStatus(null);
+    try {
+      const res = await fetch("/api/ai-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction }),
+      });
+      if (res.ok) setInstructionStatus("Saved");
+      else setInstructionStatus("Failed to save");
+    } catch {
+      setInstructionStatus("Failed to save");
+    } finally {
+      setInstructionSaving(false);
+      setTimeout(() => setInstructionStatus(null), 2500);
+    }
+  };
+
+  const optimizeInstruction = async () => {
+    setInstructionOptimizing(true);
+    setInstructionStatus(null);
+    try {
+      const res = await fetch("/api/ai-settings/optimize", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && typeof data.instruction === "string") {
+        setInstruction(data.instruction);
+        setInstructionStatus("Suggestion loaded — review and click Save to apply");
+      } else {
+        setInstructionStatus(data.error || "Failed to optimize");
+      }
+    } catch {
+      setInstructionStatus("Failed to optimize");
+    } finally {
+      setInstructionOptimizing(false);
+      setTimeout(() => setInstructionStatus(null), 5000);
+    }
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -272,6 +328,7 @@ export function AIPromptPanel() {
         else createNewChat();
       }
     });
+    loadInstruction();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAIPromptOpen]);
 
@@ -396,6 +453,14 @@ export function AIPromptPanel() {
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
+            className={`rounded-lg p-1.5 transition-colors ${showSettings ? "bg-[#f26522]/15 text-[#f26522]" : isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
+            onClick={() => setShowSettings(!showSettings)}
+            title="Instruction / template"
+          >
+            <SettingsIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
             onClick={() => setAIPromptOpen(false)}
             title="Close panel"
@@ -462,8 +527,70 @@ export function AIPromptPanel() {
           </div>
         </div>
 
-        {/* Conversation column */}
+        {/* Conversation column — hidden when settings panel is showing */}
         <div className="flex-1 flex flex-col min-w-0">
+          {showSettings ? (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className={`px-4 py-3 border-b shrink-0 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
+                <h4 className={`text-xs font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>Your AI Instruction</h4>
+                <p className={`text-[10px] mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  Tell the assistant how you want prompts crafted. This is saved to your account and applied to every chat.
+                </p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-3">
+                <textarea
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  placeholder={`Examples:\n• Keep prompts to 1 sentence max\n• Always include Sony A7S III, 35mm lens\n• Anime style — not photorealistic\n• No markdown, no headers, just the prompt`}
+                  className={`w-full h-full min-h-[240px] border rounded-xl text-xs px-4 py-3 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+                />
+                {instructionStatus && (
+                  <p className={`mt-2 text-[10px] ${instructionStatus.toLowerCase().includes("fail") ? "text-red-500" : "text-emerald-500"}`}>
+                    {instructionStatus}
+                  </p>
+                )}
+              </div>
+
+              <div className={`px-4 py-3 border-t shrink-0 flex items-center gap-2 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
+                <button
+                  type="button"
+                  onClick={optimizeInstruction}
+                  disabled={instructionOptimizing}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                    instructionOptimizing
+                      ? isDark ? "bg-gray-700 text-gray-500" : "bg-gray-100 text-gray-400"
+                      : isDark ? "bg-white/10 text-white hover:bg-white/15" : "bg-gray-100 text-[#0d1117] hover:bg-gray-200"
+                  }`}
+                  title="Analyze past chats and suggest an improved instruction"
+                >
+                  {instructionOptimizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                  {instructionOptimizing ? "Analyzing..." : "Optimize from history"}
+                </button>
+                <div className="flex-1" />
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(false)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${isDark ? "text-gray-400 hover:bg-white/5 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-[#0d1117]"}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveInstruction}
+                  disabled={instructionSaving}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                    instructionSaving
+                      ? "bg-gray-200 text-gray-400"
+                      : "bg-[#f26522] text-white hover:bg-[#d9541a]"
+                  }`}
+                >
+                  {instructionSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin inline" /> : "Save"}
+                </button>
+              </div>
+            </div>
+          ) : (
+          <>
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {messages.length === 0 && !loading && (
               <div className="text-center py-8">
@@ -648,6 +775,8 @@ export function AIPromptPanel() {
               </a>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

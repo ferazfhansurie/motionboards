@@ -478,3 +478,30 @@ export async function deleteChat(id: string, userId: string): Promise<boolean> {
   `;
   return rows.length > 0;
 }
+
+// --- AI Prompt Helper per-user custom instruction ---
+//
+// Each user can store their own system-prompt tweak / template. This is
+// prepended to the base instructions on every AI request so the assistant
+// tailors its output (e.g. "keep prompts short and compact, no bold headers").
+
+let aiInstructionColumnInitialized = false;
+
+async function ensureAIInstructionColumn(): Promise<void> {
+  if (aiInstructionColumnInitialized) return;
+  // Lazy migration — safe to run repeatedly
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS ai_instruction TEXT`;
+  aiInstructionColumnInitialized = true;
+}
+
+export async function getUserAIInstruction(userId: string): Promise<string> {
+  await ensureAIInstructionColumn();
+  const rows = await sql`SELECT ai_instruction FROM mb_users WHERE id = ${userId}`;
+  if (rows.length === 0) return "";
+  return (rows[0].ai_instruction as string | null) || "";
+}
+
+export async function setUserAIInstruction(userId: string, instruction: string): Promise<void> {
+  await ensureAIInstructionColumn();
+  await sql`UPDATE mb_users SET ai_instruction = ${instruction} WHERE id = ${userId}`;
+}
