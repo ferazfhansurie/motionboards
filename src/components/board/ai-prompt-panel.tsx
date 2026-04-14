@@ -116,7 +116,7 @@ function readAsDataUrl(file: File): Promise<string> {
 }
 
 export function AIPromptPanel() {
-  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme, items: canvasItems } = useAppStore();
+  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme, items: canvasItems, boards, activeBoardId } = useAppStore();
   const isDark = theme === "dark";
 
   // Resizable width — persisted to localStorage
@@ -174,6 +174,33 @@ export function AIPromptPanel() {
   const [instructionSaving, setInstructionSaving] = useState(false);
   const [instructionOptimizing, setInstructionOptimizing] = useState(false);
   const [instructionStatus, setInstructionStatus] = useState<string | null>(null);
+  // Board selection for "Optimize from canvas" — default all boards selected
+  const [includedBoardIds, setIncludedBoardIds] = useState<string[] | null>(null);
+
+  // Helper: get generation prompts from a specific board (using live state.items
+  // for the active board since state.boards[activeBoardId].items may be stale).
+  const getBoardPrompts = useCallback((boardId: string): string[] => {
+    const itemSource = boardId === activeBoardId
+      ? canvasItems
+      : (boards.find((b) => b.id === boardId)?.items || []);
+    return itemSource
+      .filter((i) => i.type === "generation" && typeof i.prompt === "string" && i.prompt.trim().length > 0)
+      .map((i) => i.prompt as string);
+  }, [activeBoardId, boards, canvasItems]);
+
+  // Initialize selection to ALL boards the first time settings opens
+  useEffect(() => {
+    if (showSettings && includedBoardIds === null) {
+      setIncludedBoardIds(boards.map((b) => b.id));
+    }
+  }, [showSettings, includedBoardIds, boards]);
+
+  const toggleBoardIncluded = (boardId: string) => {
+    setIncludedBoardIds((prev) => {
+      const curr = prev ?? boards.map((b) => b.id);
+      return curr.includes(boardId) ? curr.filter((id) => id !== boardId) : [...curr, boardId];
+    });
+  };
 
   const loadInstruction = useCallback(async () => {
     try {
@@ -205,13 +232,18 @@ export function AIPromptPanel() {
   };
 
   const optimizeInstruction = async () => {
-    // Gather prompts from generation items currently on the canvas
-    const prompts = canvasItems
-      .filter((i) => i.type === "generation" && typeof i.prompt === "string" && i.prompt.trim().length > 0)
-      .map((i) => i.prompt as string);
+    const selected = includedBoardIds ?? boards.map((b) => b.id);
+    if (selected.length === 0) {
+      setInstructionStatus("Select at least one board to analyze.");
+      setTimeout(() => setInstructionStatus(null), 5000);
+      return;
+    }
+
+    // Gather prompts from generation items across all selected boards
+    const prompts = selected.flatMap((bid) => getBoardPrompts(bid));
 
     if (prompts.length === 0) {
-      setInstructionStatus("No generation prompts on canvas yet. Generate something first.");
+      setInstructionStatus("No generation prompts on the selected board(s) yet. Generate something first.");
       setTimeout(() => setInstructionStatus(null), 5000);
       return;
     }
@@ -562,10 +594,66 @@ export function AIPromptPanel() {
                   className={`w-full h-full min-h-[240px] border rounded-xl text-xs px-4 py-3 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
                 />
                 {instructionStatus && (
-                  <p className={`mt-2 text-[10px] ${instructionStatus.toLowerCase().includes("fail") ? "text-red-500" : "text-emerald-500"}`}>
+                  <p className={`mt-2 text-[10px] ${instructionStatus.toLowerCase().includes("fail") || instructionStatus.toLowerCase().includes("no generation") || instructionStatus.toLowerCase().includes("select at least") ? "text-red-500" : "text-emerald-500"}`}>
                     {instructionStatus}
                   </p>
                 )}
+
+                {/* Board selection for optimize — default all selected */}
+                <div className={`mt-4 pt-3 border-t ${isDark ? "border-gray-700" : "border-gray-100"}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className={`text-[10px] font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                      Boards to analyze
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="text-[9px] text-[#f26522] hover:underline"
+                        onClick={() => setIncludedBoardIds(boards.map((b) => b.id))}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        className={`text-[9px] hover:underline ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                        onClick={() => setIncludedBoardIds([])}
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    {boards.map((b) => {
+                      const count = getBoardPrompts(b.id).length;
+                      const current = includedBoardIds ?? boards.map((x) => x.id);
+                      const isIncluded = current.includes(b.id);
+                      return (
+                        <label
+                          key={b.id}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
+                            isDark ? "hover:bg-white/5" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isIncluded}
+                            onChange={() => toggleBoardIncluded(b.id)}
+                            className="h-3.5 w-3.5 rounded border-gray-300 accent-[#f26522]"
+                          />
+                          <span className={`flex-1 text-[11px] ${isDark ? "text-gray-200" : "text-[#0d1117]"}`}>
+                            {b.name}
+                            {b.id === activeBoardId && (
+                              <span className={`ml-1.5 text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>(current)</span>
+                            )}
+                          </span>
+                          <span className={`text-[10px] ${count === 0 ? (isDark ? "text-gray-600" : "text-gray-400") : "text-[#f26522]"}`}>
+                            {count} prompt{count === 1 ? "" : "s"}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className={`px-4 py-3 border-t shrink-0 flex items-center gap-2 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
