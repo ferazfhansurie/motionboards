@@ -1,12 +1,20 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, ChevronLeft } from "lucide-react";
+import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, ChevronLeft, Paperclip } from "lucide-react";
 import { useAppStore } from "@/lib/store";
+
+// Message content is either a plain string (simple turns) or an array of parts
+// when the user attaches images/videos. OpenAI's multimodal API accepts this
+// same shape for the "user" role.
+type MessagePart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+type MessageContent = string | MessagePart[];
 
 interface Message {
   role: "user" | "assistant";
-  content: string;
+  content: MessageContent;
 }
 
 interface ChatSummary {
@@ -14,6 +22,57 @@ interface ChatSummary {
   title: string;
   messages: Message[];
   updatedAt: string;
+}
+
+// Helper: render message content as plain text (for UI display + copy/paste)
+function messageText(content: MessageContent): string {
+  if (typeof content === "string") return content;
+  return content.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("\n");
+}
+
+function messageImages(content: MessageContent): string[] {
+  if (typeof content === "string") return [];
+  return content.filter((p) => p.type === "image_url").map((p) => (p as { image_url: { url: string } }).image_url.url);
+}
+
+// Extract the first frame of a video as a JPEG data URL
+async function extractVideoFrame(file: File): Promise<string | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = URL.createObjectURL(file);
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(0.1, (video.duration || 1) / 2);
+    };
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        URL.revokeObjectURL(video.src);
+        resolve(dataUrl);
+      } catch {
+        resolve(null);
+      }
+    };
+    video.onerror = () => resolve(null);
+  });
+}
+
+// Read a File into a base64 data URL
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 const SIDEBAR_WIDTH = 420;
@@ -33,8 +92,32 @@ export function AIPromptPanel() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  // Pending attachments — array of data URLs (images or extracted video frames)
+  const [attachments, setAttachments] = useState<Array<{ url: string; label: string }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle file attach (from button, drop, or paste)
+  const handleFiles = useCallback(async (files: File[]) => {
+    for (const file of files) {
+      if (file.type.startsWith("image/")) {
+        const url = await readAsDataUrl(file);
+        setAttachments((prev) => [...prev, { url, label: file.name || "image" }]);
+      } else if (file.type.startsWith("video/")) {
+        const frame = await extractVideoFrame(file);
+        if (frame) {
+          setAttachments((prev) => [...prev, { url: frame, label: `${file.name || "video"} (frame)` }]);
+        }
+      }
+    }
+  }, []);
+
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    handleFiles(files);
+    e.target.value = "";
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,6 +128,27 @@ export function AIPromptPanel() {
       inputRef.current.focus();
     }
   }, [isAIPromptOpen, currentChatId]);
+
+  // Global paste handler while panel is open — catches images from OS clipboard
+  useEffect(() => {
+    if (!isAIPromptOpen) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items || []);
+      const files: File[] = [];
+      for (const it of items) {
+        if (it.type.startsWith("image/") || it.type.startsWith("video/")) {
+          const f = it.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault();
+        handleFiles(files);
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [isAIPromptOpen, handleFiles]);
 
   // Load chat list when panel opens
   const loadChats = useCallback(async () => {
@@ -132,7 +236,7 @@ export function AIPromptPanel() {
     try {
       // Auto-derive title from first user message if still default
       const firstUser = msgs.find((m) => m.role === "user");
-      const title = firstUser ? firstUser.content.slice(0, 50) : undefined;
+      const title = firstUser ? messageText(firstUser.content).slice(0, 50) : undefined;
       await fetch(`/api/chats/${chatId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -146,12 +250,24 @@ export function AIPromptPanel() {
   if (!isAIPromptOpen) return null;
 
   const handleSend = async () => {
-    if (!input.trim() || loading || !currentChatId) return;
+    const text = input.trim();
+    if ((!text && attachments.length === 0) || loading || !currentChatId) return;
 
-    const userMsg: Message = { role: "user", content: input.trim() };
+    // Build multimodal content if there are attachments, else plain string
+    const userMsg: Message = attachments.length > 0
+      ? {
+          role: "user",
+          content: [
+            ...(text ? [{ type: "text" as const, text }] : []),
+            ...attachments.map((a) => ({ type: "image_url" as const, image_url: { url: a.url } })),
+          ],
+        }
+      : { role: "user", content: text };
+
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
+    setAttachments([]);
     setLoading(true);
 
     try {
@@ -213,7 +329,7 @@ export function AIPromptPanel() {
           )}
           <div className="min-w-0">
             <h3 className={`text-xs font-bold truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-              {showHistory ? "Chat History" : currentChat?.title || "AI Prompt Generator"}
+              {showHistory ? "Chat History" : currentChat?.title || "ADletic AI - Prompt Helper"}
             </h3>
             <p className="text-[9px] text-green-500 font-medium">Online</p>
           </div>
@@ -299,8 +415,8 @@ export function AIPromptPanel() {
                 <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#f26522] to-[#ec4899] flex items-center justify-center mx-auto mb-4">
                   <Sparkles className="h-7 w-7 text-white" />
                 </div>
-                <p className={`text-sm font-bold mb-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}>AI Cinematography Expert</p>
-                <p className={`text-[11px] mb-5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Describe what you want and I&rsquo;ll craft the perfect prompt</p>
+                <p className={`text-sm font-bold mb-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}>ADletic AI - Prompt Helper</p>
+                <p className={`text-[11px] mb-5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Describe what you want or paste an image and I&rsquo;ll craft the perfect prompt</p>
                 <div className="space-y-2">
                   {[
                     "Cinematic drone shot of a city at sunset",
@@ -320,39 +436,51 @@ export function AIPromptPanel() {
               </div>
             )}
 
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-[12px] leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-[#f26522] text-white rounded-br-sm"
-                      : isDark ? "bg-[#0d1117] text-gray-200 rounded-bl-sm" : "bg-gray-100 text-[#0d1117] rounded-bl-sm"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                  {msg.role === "assistant" && (
-                    <div className={`flex items-center gap-2 mt-2.5 pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-200/50"}`}>
-                      <button
-                        type="button"
-                        className={`flex items-center gap-1 text-[10px] transition-colors ${isDark ? "text-gray-500 hover:text-[#f26522]" : "text-gray-400 hover:text-[#f26522]"}`}
-                        onClick={() => handleCopy(msg.content, i)}
-                      >
-                        {copiedIdx === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                        {copiedIdx === i ? "Copied" : "Copy"}
-                      </button>
-                      <button
-                        type="button"
-                        className="flex items-center gap-1 text-[10px] text-[#f26522] font-semibold hover:text-[#d9541a] transition-colors"
-                        onClick={() => handleUsePrompt(msg.content)}
-                      >
-                        <Sparkles className="h-3 w-3" />
-                        Use as prompt
-                      </button>
-                    </div>
-                  )}
+            {messages.map((msg, i) => {
+              const text = messageText(msg.content);
+              const imgs = messageImages(msg.content);
+              return (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-[12px] leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-[#f26522] text-white rounded-br-sm"
+                        : isDark ? "bg-[#0d1117] text-gray-200 rounded-bl-sm" : "bg-gray-100 text-[#0d1117] rounded-bl-sm"
+                    }`}
+                  >
+                    {imgs.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {imgs.map((src, j) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={j} src={src} alt="" className="h-20 w-20 rounded-md object-cover border border-white/20" />
+                        ))}
+                      </div>
+                    )}
+                    {text && <p className="whitespace-pre-wrap">{text}</p>}
+                    {msg.role === "assistant" && (
+                      <div className={`flex items-center gap-2 mt-2.5 pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-200/50"}`}>
+                        <button
+                          type="button"
+                          className={`flex items-center gap-1 text-[10px] transition-colors ${isDark ? "text-gray-500 hover:text-[#f26522]" : "text-gray-400 hover:text-[#f26522]"}`}
+                          onClick={() => handleCopy(text, i)}
+                        >
+                          {copiedIdx === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                          {copiedIdx === i ? "Copied" : "Copy"}
+                        </button>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-[10px] text-[#f26522] font-semibold hover:text-[#d9541a] transition-colors"
+                          onClick={() => handleUsePrompt(text)}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          Use as prompt
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {loading && (
               <div className="flex justify-start">
@@ -370,7 +498,35 @@ export function AIPromptPanel() {
           </div>
 
           {/* Input */}
-          <div className={`border-t px-4 py-3 shrink-0 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
+          <div
+            className={`border-t px-4 py-3 shrink-0 ${isDark ? "border-gray-700" : "border-gray-100"}`}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const files = Array.from(e.dataTransfer.files);
+              handleFiles(files);
+            }}
+          >
+            {/* Attachment previews */}
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {attachments.map((a, i) => (
+                  <div key={i} className="relative group/att">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={a.url} alt={a.label} title={a.label} className="h-14 w-14 rounded-md object-cover border border-gray-300" />
+                    <button
+                      type="button"
+                      className="absolute -top-1.5 -right-1.5 bg-neutral-800 rounded-full p-0.5 text-neutral-300 hover:text-white opacity-0 group-hover/att:opacity-100 transition-opacity"
+                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      title="Remove"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="relative">
               <textarea
                 ref={inputRef}
@@ -382,16 +538,32 @@ export function AIPromptPanel() {
                     handleSend();
                   }
                 }}
-                placeholder="Describe your scene..."
-                className={`w-full border rounded-xl text-xs placeholder-gray-400 px-4 py-3 pr-12 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
+                placeholder="Describe your scene, drop or paste images…"
+                className={`w-full border rounded-xl text-xs placeholder-gray-400 pl-10 pr-12 py-3 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
                 rows={2}
               />
               <button
                 type="button"
-                disabled={loading || !input.trim()}
+                onClick={() => fileInputRef.current?.click()}
+                className={`absolute left-3 bottom-3 h-7 w-7 rounded-full flex items-center justify-center transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-[#f26522]" : "text-gray-400 hover:bg-gray-100 hover:text-[#f26522]"}`}
+                title="Attach image or video"
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                className="hidden"
+                onChange={onFileInputChange}
+              />
+              <button
+                type="button"
+                disabled={loading || (!input.trim() && attachments.length === 0)}
                 onClick={handleSend}
                 className={`absolute right-3 bottom-3 h-7 w-7 rounded-full flex items-center justify-center transition-all ${
-                  loading || !input.trim()
+                  loading || (!input.trim() && attachments.length === 0)
                     ? isDark ? "bg-gray-700 text-gray-500" : "bg-gray-200 text-gray-400"
                     : "bg-[#f26522] text-white hover:bg-[#d9541a] hover:scale-105"
                 }`}

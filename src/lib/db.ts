@@ -357,9 +357,18 @@ export async function deleteFile(id: string): Promise<boolean> {
 // full message transcript stored as JSONB so the backend (GPT-4o-mini) can
 // rebuild context on every reply. Chats share the same 14-day TTL as files.
 
+// Content is either a plain string (most assistant turns and simple user turns)
+// or an array of parts with text and/or images (when the user attaches media).
+export type ChatMessageContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    >;
+
 export interface ChatMessage {
   role: "user" | "assistant";
-  content: string;
+  content: ChatMessageContent;
 }
 
 export interface Chat {

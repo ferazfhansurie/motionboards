@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken, getChat, updateChat, deleteChat } from "@/lib/db";
+import { getUserFromToken, getChat, updateChat, deleteChat, type ChatMessage } from "@/lib/db";
 
 // GET /api/chats/:id — fetch a single chat with full message history
 export async function GET(
@@ -35,9 +35,9 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
-    const updates: { title?: string; messages?: Array<{ role: "user" | "assistant"; content: string }> } = {};
+    const updates: { title?: string; messages?: ChatMessage[] } = {};
     if (typeof body.title === "string") updates.title = body.title;
-    if (Array.isArray(body.messages)) updates.messages = body.messages;
+    if (Array.isArray(body.messages)) updates.messages = body.messages as ChatMessage[];
 
     const chat = await updateChat(id, user.id, updates);
     if (!chat) return NextResponse.json({ error: "Chat not found" }, { status: 404 });

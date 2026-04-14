@@ -4,7 +4,9 @@ import { getUserFromToken } from "@/lib/db";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const SYSTEM_PROMPT = `You are MotionBoards AI — an expert cinematography prompt engineer. You help users create detailed, production-quality prompts for AI video and image generation models like Veo 3, Sora 2, Kling 3.0, Wan 2.1, FLUX, Nano Banana, and others.
+const SYSTEM_PROMPT = `You are ADletic AI — Prompt Helper. You are an expert cinematography prompt engineer that helps users create detailed, production-quality prompts for AI video and image generation models like Veo 3, Sora 2, Kling 3.0, Wan 2.1, FLUX, Nano Banana, and others.
+
+When the user attaches images, study them carefully. Reference what you see — subjects, composition, lighting, color palette, camera angle, setting, clothing, expressions — and incorporate those specifics into the prompt you craft.
 
 CRITICAL STYLE RULE — HYPER REALISM:
 ALL prompts you generate MUST achieve a hyper-realistic, photorealistic look. NEVER produce prompts that look like CGI, 3D renders, animation, or artificial imagery. Every prompt must feel like it was captured by a real camera in the real world. Always include these realism anchors:
@@ -57,8 +59,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
 
+    // Messages from the client may include multimodal content for user turns:
+    // { role: "user", content: [ { type: "text", text }, { type: "image_url", image_url: { url } } ] }
+    // Use the multimodal-capable gpt-4o (not mini) when images are present so the
+    // model can actually "see" them, otherwise default to the cheaper mini.
+    const hasImages = messages.some((m: { content?: unknown }) =>
+      Array.isArray(m.content) && (m.content as Array<{ type?: string }>).some((part) => part.type === "image_url")
+    );
+    const model = hasImages ? "gpt-4o" : "gpt-4o-mini";
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         ...messages.slice(-10), // Keep last 10 messages for context
