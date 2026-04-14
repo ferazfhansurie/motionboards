@@ -493,7 +493,7 @@ export function AIPromptPanel() {
           </div>
           <div className="min-w-0">
             <h3 className={`text-xs font-bold truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-              {currentChat?.title || "ADletic AI - Prompt Helper"}
+              {currentChat?.title || "ADletic AI"}
             </h3>
             <p className="text-[9px] text-green-500 font-medium">Online</p>
           </div>
@@ -582,7 +582,7 @@ export function AIPromptPanel() {
               <div className={`px-4 py-3 border-b shrink-0 ${isDark ? "border-gray-700" : "border-gray-100"}`}>
                 <h4 className={`text-xs font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>Your AI Instruction</h4>
                 <p className={`text-[10px] mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                  Tell the assistant how you want prompts crafted. This is saved to your account and applied to every chat.
+                  Tell ADletic AI how you want it to behave — tone, style, length, anything. Saved to your account and applied to every conversation.
                 </p>
               </div>
 
@@ -590,7 +590,7 @@ export function AIPromptPanel() {
                 <textarea
                   value={instruction}
                   onChange={(e) => setInstruction(e.target.value)}
-                  placeholder={`Examples:\n• Keep prompts to 1 sentence max\n• Always include Sony A7S III, 35mm lens\n• Anime style — not photorealistic\n• No markdown, no headers, just the prompt`}
+                  placeholder={`Examples:\n• Be concise, no preambles\n• When crafting prompts: keep to 1 sentence, anime style\n• Always explain your reasoning before answering\n• Respond in bullet points`}
                   className={`w-full h-full min-h-[240px] border rounded-xl text-xs px-4 py-3 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
                 />
                 {instructionStatus && (
@@ -701,13 +701,13 @@ export function AIPromptPanel() {
                 <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#f26522] to-[#ec4899] flex items-center justify-center mx-auto mb-4">
                   <Sparkles className="h-7 w-7 text-white" />
                 </div>
-                <p className={`text-sm font-bold mb-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}>ADletic AI - Prompt Helper</p>
-                <p className={`text-[11px] mb-5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Describe what you want or paste an image and I&rsquo;ll craft the perfect prompt</p>
+                <p className={`text-sm font-bold mb-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}>ADletic AI</p>
+                <p className={`text-[11px] mb-5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Ask anything, brainstorm ideas, or describe a scene and I&rsquo;ll craft a prompt</p>
                 <div className="space-y-2 max-w-sm mx-auto">
                   {[
-                    "Cinematic drone shot of a city at sunset",
-                    "Slow motion close-up of coffee being poured",
-                    "Anime style fight scene with speed lines",
+                    "Write me a prompt for a cinematic drone shot of a city at sunset",
+                    "What makes a good Veo prompt?",
+                    "Help me brainstorm a 15-second product ad for coffee",
                   ].map((suggestion) => (
                     <button
                       key={suggestion}
@@ -832,7 +832,7 @@ export function AIPromptPanel() {
                     handleSend();
                   }
                 }}
-                placeholder="Describe your scene, drop or paste images…"
+                placeholder="Message ADletic AI… drop or paste images"
                 className={`w-full border rounded-xl text-xs placeholder-gray-400 pl-10 pr-12 py-3 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
                 rows={2}
               />
