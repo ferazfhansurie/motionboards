@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getUserFromToken, listChats, getUserAIInstruction, type ChatMessageContent } from "@/lib/db";
+import { getUserFromToken, getUserAIInstruction } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Convert multimodal content to plain text — we don't need images for the
-// optimization pass, just the textual back-and-forth to infer preferences.
-function flattenContent(content: ChatMessageContent): string {
-  if (typeof content === "string") return content;
-  return content
-    .filter((p) => p.type === "text")
-    .map((p) => (p as { text: string }).text)
-    .join(" ");
-}
-
-// POST /api/ai-settings/optimize — analyze this user's past chats and generate
-// an improved per-user AI instruction. Returns the suggestion; does NOT save
-// it automatically — the user reviews and saves manually.
+// POST /api/ai-settings/optimize
+// Body: { prompts: string[] }  — prompts from generation items currently on the canvas
+//
+// Analyzes those prompts (the ones the user actually acted on, not the chat
+// back-and-forth) and drafts an improved per-user AI instruction that will
+// steer future prompt generations toward the user's demonstrated taste.
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("session")?.value;
@@ -28,41 +21,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
     }
 
-    const [chats, currentInstruction] = await Promise.all([
-      listChats(user.id),
-      getUserAIInstruction(user.id),
-    ]);
+    const body = await req.json().catch(() => ({}));
+    const prompts = (Array.isArray(body.prompts) ? body.prompts : [])
+      .map((p: unknown) => (typeof p === "string" ? p.trim() : ""))
+      .filter((p: string) => p.length > 0);
 
-    if (chats.length === 0) {
-      return NextResponse.json({ error: "No chat history yet. Start some conversations first." }, { status: 400 });
+    if (prompts.length === 0) {
+      return NextResponse.json(
+        { error: "No generation prompts found on your canvas. Generate something first, then try optimizing." },
+        { status: 400 }
+      );
     }
 
-    // Collect up to 50 recent turns across the most recent chats
-    const transcript: string[] = [];
-    let turns = 0;
-    for (const chat of chats) {
-      for (const msg of chat.messages) {
-        if (turns >= 50) break;
-        const text = flattenContent(msg.content).trim();
-        if (!text) continue;
-        transcript.push(`${msg.role === "user" ? "USER" : "AI"}: ${text}`);
-        turns++;
-      }
-      if (turns >= 50) break;
-    }
+    const currentInstruction = await getUserAIInstruction(user.id);
 
-    const analysisPrompt = `You are analyzing a user's past conversations with an AI prompt-crafting assistant to infer how they prefer their prompts. Study what the user asked for, what they kept vs rejected, and any explicit style feedback they gave ("make it shorter", "no CGI", etc.).
+    // Trim total payload — keep newest N prompts, cap each at ~400 chars
+    const capped = prompts.slice(-30).map((p: string) => p.slice(0, 400));
 
-Produce a SHORT custom system-instruction (max 8 lines, no markdown headings or dividers) that the AI should follow when crafting prompts for THIS user going forward. Focus on:
-- Output length preference (compact? detailed?)
-- Style preference (realistic? stylized? specific camera/lens?)
-- Format preference (bullet points? plain paragraph? one sentence?)
-- Anything to avoid (long headers, bold markdown, filler text, etc.)
+    const analysisPrompt = `You are analyzing the prompts a user has ACTUALLY USED for their AI generations on MotionBoards. These are the prompts they committed to — what they ran through Veo, Sora, Seedance, Nano Banana, etc.
+
+Study them carefully and infer the user's taste:
+- Average length (short one-liners? long multi-sentence?)
+- Style preference (cinematic? anime? photorealistic? stylized?)
+- Specific technical vocabulary they repeat (lens refs, camera bodies, lighting terms, aspect ratios)
+- Tone (terse/technical? flowery/descriptive?)
+- Any recurring themes (character descriptions, locations, shot types)
+- Format: do they use bullet points, dividers, bold text — or plain prose?
+
+Produce a SHORT custom system-instruction (max 8 lines, no markdown headings or dividers) that tells the AI Prompt Helper how to craft prompts for THIS user going forward so they match what the user is already making.
 
 Current instruction (may be empty): ${currentInstruction || "(none)"}
 
-Past conversation excerpt (newest first):
-${transcript.join("\n")}
+Prompts the user has generated with (${capped.length} total, newest last):
+${capped.map((p: string, i: number) => `${i + 1}. ${p}`).join("\n")}
 
 Respond with ONLY the new instruction text — no preamble, no explanation, no markdown formatting. Start with a line like "Keep prompts…" or "Always produce…"`;
 
@@ -83,7 +74,7 @@ Respond with ONLY the new instruction text — no preamble, no explanation, no m
       return NextResponse.json({ error: "Could not generate a suggestion" }, { status: 500 });
     }
 
-    return NextResponse.json({ instruction: suggestion });
+    return NextResponse.json({ instruction: suggestion, analyzed: capped.length });
   } catch (error) {
     console.error("Optimize AI settings error:", error);
     const msg = error instanceof Error ? error.message : "Failed to optimize";

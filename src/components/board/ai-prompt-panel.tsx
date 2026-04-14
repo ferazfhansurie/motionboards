@@ -116,7 +116,7 @@ function readAsDataUrl(file: File): Promise<string> {
 }
 
 export function AIPromptPanel() {
-  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme } = useAppStore();
+  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme, items: canvasItems } = useAppStore();
   const isDark = theme === "dark";
 
   // Resizable width — persisted to localStorage
@@ -205,14 +205,30 @@ export function AIPromptPanel() {
   };
 
   const optimizeInstruction = async () => {
+    // Gather prompts from generation items currently on the canvas
+    const prompts = canvasItems
+      .filter((i) => i.type === "generation" && typeof i.prompt === "string" && i.prompt.trim().length > 0)
+      .map((i) => i.prompt as string);
+
+    if (prompts.length === 0) {
+      setInstructionStatus("No generation prompts on canvas yet. Generate something first.");
+      setTimeout(() => setInstructionStatus(null), 5000);
+      return;
+    }
+
     setInstructionOptimizing(true);
     setInstructionStatus(null);
     try {
-      const res = await fetch("/api/ai-settings/optimize", { method: "POST" });
+      const res = await fetch("/api/ai-settings/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompts }),
+      });
       const data = await res.json();
       if (res.ok && typeof data.instruction === "string") {
         setInstruction(data.instruction);
-        setInstructionStatus("Suggestion loaded — review and click Save to apply");
+        const count = typeof data.analyzed === "number" ? data.analyzed : prompts.length;
+        setInstructionStatus(`Suggestion loaded from ${count} canvas prompts — review and click Save to apply`);
       } else {
         setInstructionStatus(data.error || "Failed to optimize");
       }
@@ -220,7 +236,7 @@ export function AIPromptPanel() {
       setInstructionStatus("Failed to optimize");
     } finally {
       setInstructionOptimizing(false);
-      setTimeout(() => setInstructionStatus(null), 5000);
+      setTimeout(() => setInstructionStatus(null), 6000);
     }
   };
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -562,10 +578,10 @@ export function AIPromptPanel() {
                       ? isDark ? "bg-gray-700 text-gray-500" : "bg-gray-100 text-gray-400"
                       : isDark ? "bg-white/10 text-white hover:bg-white/15" : "bg-gray-100 text-[#0d1117] hover:bg-gray-200"
                   }`}
-                  title="Analyze past chats and suggest an improved instruction"
+                  title="Analyze generation prompts on your canvas and suggest an improved instruction"
                 >
                   {instructionOptimizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                  {instructionOptimizing ? "Analyzing..." : "Optimize from history"}
+                  {instructionOptimizing ? "Analyzing..." : "Optimize from canvas"}
                 </button>
                 <div className="flex-1" />
                 <button
