@@ -38,6 +38,40 @@ function messageText(content: MessageContent): string {
   return content.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("\n");
 }
 
+// Turn Claude's markdown-formatted reply into a clean plain-text prompt ready
+// to paste into a video generator. Drops horizontal rules, strips bold/italic
+// markers (keeping the content), removes heading hashes and list bullets, and
+// prunes common "meta" lines like "Ready to use." or standalone title headers.
+function toPlainPrompt(markdown: string): string {
+  const lines = markdown.split(/\r?\n/);
+  const cleaned: string[] = [];
+  for (let line of lines) {
+    // Horizontal rules
+    if (/^\s*([-*_])\1{2,}\s*$/.test(line)) continue;
+    // Heading hashes
+    line = line.replace(/^\s*#{1,6}\s+/, "");
+    // Leading list bullets
+    line = line.replace(/^\s*[-*+]\s+/, "");
+    // Bold **x**
+    line = line.replace(/\*\*(.+?)\*\*/g, "$1");
+    // Italic *x* and _x_ (avoid nuking bare asterisks inside words)
+    line = line.replace(/(^|\s)\*([^*\n]+?)\*(?=\s|$|[.,!?])/g, "$1$2");
+    line = line.replace(/(^|\s)_([^_\n]+?)_(?=\s|$|[.,!?])/g, "$1$2");
+    // Inline code `x`
+    line = line.replace(/`(.+?)`/g, "$1");
+    cleaned.push(line);
+  }
+
+  // Drop obvious AI meta lines (standalone footers / confirmations)
+  const metaPattern = /^(copy[- ]?paste ready|ready to use|here(?:'s| is) your prompt|prompt ready|use this prompt)[\s.:!]*$/i;
+  const pruned = cleaned.filter((l) => !metaPattern.test(l.trim()));
+
+  return pruned
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function messageImages(content: MessageContent): string[] {
   if (typeof content === "string") return [];
   return content.filter((p) => p.type === "image_url").map((p) => (p as { image_url: { url: string } }).image_url.url);
@@ -491,7 +525,7 @@ export function AIPromptPanel() {
                         <button
                           type="button"
                           className={`flex items-center gap-1 text-[10px] transition-colors ${isDark ? "text-gray-500 hover:text-[#f26522]" : "text-gray-400 hover:text-[#f26522]"}`}
-                          onClick={() => handleCopy(text, i)}
+                          onClick={() => handleCopy(toPlainPrompt(text), i)}
                         >
                           {copiedIdx === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                           {copiedIdx === i ? "Copied" : "Copy"}
@@ -499,7 +533,7 @@ export function AIPromptPanel() {
                         <button
                           type="button"
                           className="flex items-center gap-1 text-[10px] text-[#f26522] font-semibold hover:text-[#d9541a] transition-colors"
-                          onClick={() => handleUsePrompt(text)}
+                          onClick={() => handleUsePrompt(toPlainPrompt(text))}
                         >
                           <Sparkles className="h-3 w-3" />
                           Use as prompt
