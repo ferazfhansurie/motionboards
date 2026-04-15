@@ -166,7 +166,9 @@ export function AIPromptPanel() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [attachments, setAttachments] = useState<Array<{ url: string; label: string }>>([]);
+  // Each attachment is uploaded to Neon before sending so the chat payload
+  // stays small. `uploading` shows a spinner until the URL comes back.
+  const [attachments, setAttachments] = useState<Array<{ id: string; url: string; label: string; uploading?: boolean }>>([]);
 
   // Per-account AI instruction / template (customizes the system prompt)
   const [showSettings, setShowSettings] = useState(false);
@@ -277,12 +279,44 @@ export function AIPromptPanel() {
 
   const handleFiles = useCallback(async (files: File[]) => {
     for (const file of files) {
+      const id = `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      let uploadFile: File | null = null;
+      let label = file.name || "attachment";
+      let previewDataUrl: string | null = null;
+
       if (file.type.startsWith("image/")) {
-        const url = await readAsDataUrl(file);
-        setAttachments((prev) => [...prev, { url, label: file.name || "image" }]);
+        uploadFile = file;
+        previewDataUrl = await readAsDataUrl(file);
       } else if (file.type.startsWith("video/")) {
         const frame = await extractVideoFrame(file);
-        if (frame) setAttachments((prev) => [...prev, { url: frame, label: `${file.name || "video"} (frame)` }]);
+        if (!frame) continue;
+        previewDataUrl = frame;
+        label = `${file.name || "video"} (frame)`;
+        // Convert the frame data URL into a real File for the upload
+        const blob = await (await fetch(frame)).blob();
+        uploadFile = new File([blob], `${file.name || "video"}-frame.jpg`, { type: "image/jpeg" });
+      } else {
+        continue;
+      }
+
+      // Show a placeholder immediately using the data URL as a local preview
+      setAttachments((prev) => [...prev, { id, url: previewDataUrl || "", label, uploading: true }]);
+
+      try {
+        const form = new FormData();
+        form.append("file", uploadFile);
+        const res = await fetch("/api/upload", { method: "POST", body: form });
+        const data = await res.json();
+        if (data.url) {
+          setAttachments((prev) =>
+            prev.map((a) => (a.id === id ? { ...a, url: data.url as string, uploading: false } : a))
+          );
+        } else {
+          // Upload failed — drop the attachment
+          setAttachments((prev) => prev.filter((a) => a.id !== id));
+        }
+      } catch {
+        setAttachments((prev) => prev.filter((a) => a.id !== id));
       }
     }
   }, []);
@@ -415,6 +449,8 @@ export function AIPromptPanel() {
   const handleSend = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || loading || !currentChatId) return;
+    // Don't send while an attachment is still uploading
+    if (attachments.some((a) => a.uploading)) return;
 
     const userMsg: Message = attachments.length > 0
       ? {
@@ -816,14 +852,19 @@ export function AIPromptPanel() {
           >
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {attachments.map((a, i) => (
-                  <div key={i} className="relative group/att">
+                {attachments.map((a) => (
+                  <div key={a.id} className="relative group/att">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={a.url} alt={a.label} title={a.label} className="h-14 w-14 rounded-md object-cover border border-gray-300" />
+                    <img src={a.url} alt={a.label} title={a.label} className={`h-14 w-14 rounded-md object-cover border border-gray-300 ${a.uploading ? "opacity-60" : ""}`} />
+                    {a.uploading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-md">
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="absolute -top-1.5 -right-1.5 bg-neutral-800 rounded-full p-0.5 text-neutral-300 hover:text-white opacity-0 group-hover/att:opacity-100 transition-opacity"
-                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
                       title="Remove"
                     >
                       <X className="h-2.5 w-2.5" />
@@ -866,10 +907,10 @@ export function AIPromptPanel() {
               />
               <button
                 type="button"
-                disabled={loading || (!input.trim() && attachments.length === 0)}
+                disabled={loading || (!input.trim() && attachments.length === 0) || attachments.some((a) => a.uploading)}
                 onClick={handleSend}
                 className={`absolute right-3 bottom-3 h-7 w-7 rounded-full flex items-center justify-center transition-all ${
-                  loading || (!input.trim() && attachments.length === 0)
+                  loading || (!input.trim() && attachments.length === 0) || attachments.some((a) => a.uploading)
                     ? isDark ? "bg-gray-700 text-gray-500" : "bg-gray-200 text-gray-400"
                     : "bg-[#f26522] text-white hover:bg-[#d9541a] hover:scale-105"
                 }`}
