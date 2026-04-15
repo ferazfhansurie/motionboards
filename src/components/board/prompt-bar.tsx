@@ -356,7 +356,8 @@ export function PromptBar() {
       // Some failures (Vercel's 413, gateway errors) return HTML, not JSON.
       // Parse defensively so the user sees a clear message instead of
       // "Unexpected token 'R', 'Request En'..."
-      let data: Record<string, unknown> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any;
       try {
         data = await res.json();
       } catch {
@@ -369,7 +370,7 @@ export function PromptBar() {
       if (!res.ok) {
         useAppStore.getState().removeItem(genItem.id);
         if (res.status === 401) { window.location.href = "/signup"; return; }
-        alert((data.error as string) || "Generation failed");
+        alert(data.error || "Generation failed");
         return;
       }
 
@@ -413,7 +414,8 @@ export function PromptBar() {
             url += `&ttsInput=${encodeURIComponent(JSON.stringify(ttsStep.input))}&ttsModelId=${encodeURIComponent(ttsStep.modelId)}`;
           }
           const statusRes = await fetch(url);
-          let statusData: Record<string, unknown> = {};
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let statusData: any;
           try {
             statusData = await statusRes.json();
           } catch {
