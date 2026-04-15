@@ -141,11 +141,14 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
             <video
               src={mediaSrc}
               controls
+              controlsList="nodownload"
+              disablePictureInPicture
               autoPlay
               loop
               preload="auto"
               className="max-h-[85vh] max-w-[90vw] rounded-xl"
               onClick={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.preventDefault()}
             />
           )}
           {isAudio && (
