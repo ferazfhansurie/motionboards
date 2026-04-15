@@ -301,27 +301,32 @@ export function PromptBar() {
       const endItem = endFrameId ? items.find((i) => i.id === endFrameId) : null;
       const refItems = inputRefs.map((id) => items.find((i) => i.id === id)).filter(Boolean);
 
-      // Resolve image URLs — wait for blob: URLs to finish uploading
-      const hasBlob = [...refItems, startItem, endItem, audioItem].some((it) => {
+      // Resolve image URLs — wait for blob: / data: URLs to finish uploading.
+      // Sending raw data: URIs to /api/generate would balloon the body past
+      // Vercel's 4.5MB limit (the user sees an HTML "Request Entity Too
+      // Large" page that fails to JSON-parse).
+      const isUnfinalized = (u: string | null | undefined) =>
+        !!u && (u.startsWith("blob:") || u.startsWith("data:"));
+      const hasUnfinalized = [...refItems, startItem, endItem, audioItem].some((it) => {
         const u = it?.outputUrl || it?.src;
-        return u && u.startsWith("blob:");
+        return isUnfinalized(u);
       });
-      if (hasBlob) {
+      if (hasUnfinalized) {
         useAppStore.getState().updateItem(genItem.id, { progressText: "Waiting for file upload..." });
       }
       const resolveUrl = async (item: BoardItem | null | undefined): Promise<string | null> => {
         if (!item) return null;
         let url = item.outputUrl || item.src || null;
         if (!url) return null;
-        if (url.startsWith("blob:")) {
-          // Wait up to 15s for upload to complete
+        if (isUnfinalized(url)) {
+          // Wait up to 15s for the background upload to swap in a real URL
           for (let i = 0; i < 30; i++) {
             await new Promise((r) => setTimeout(r, 500));
             const fresh = useAppStore.getState().items.find((it) => it.id === item.id);
             const freshUrl = fresh?.outputUrl || fresh?.src || null;
-            if (freshUrl && !freshUrl.startsWith("blob:")) return freshUrl;
+            if (freshUrl && !isUnfinalized(freshUrl)) return freshUrl;
           }
-          throw new Error("File upload timed out. Please try again.");
+          throw new Error("File upload didn't finish in time. Try again in a moment.");
         }
         return url;
       };
@@ -348,12 +353,23 @@ export function PromptBar() {
         }),
       });
 
-      const data = await res.json();
+      // Some failures (Vercel's 413, gateway errors) return HTML, not JSON.
+      // Parse defensively so the user sees a clear message instead of
+      // "Unexpected token 'R', 'Request En'..."
+      let data: Record<string, unknown> = {};
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text().catch(() => "");
+        if (res.status === 413) data = { error: "Request too large. Try smaller images or wait for uploads to finish." };
+        else if (text) data = { error: text.slice(0, 200) };
+        else data = { error: `HTTP ${res.status}` };
+      }
 
       if (!res.ok) {
         useAppStore.getState().removeItem(genItem.id);
         if (res.status === 401) { window.location.href = "/signup"; return; }
-        alert(data.error || "Generation failed");
+        alert((data.error as string) || "Generation failed");
         return;
       }
 
@@ -397,7 +413,13 @@ export function PromptBar() {
             url += `&ttsInput=${encodeURIComponent(JSON.stringify(ttsStep.input))}&ttsModelId=${encodeURIComponent(ttsStep.modelId)}`;
           }
           const statusRes = await fetch(url);
-          const statusData = await statusRes.json();
+          let statusData: Record<string, unknown> = {};
+          try {
+            statusData = await statusRes.json();
+          } catch {
+            const text = await statusRes.text().catch(() => "");
+            statusData = { status: "failed", error: text ? text.slice(0, 200) : `HTTP ${statusRes.status}` };
+          }
 
           // Voice Clone: clone step done, now poll the TTS step
           if (statusData.nextRequestId) {
