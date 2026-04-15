@@ -154,6 +154,7 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
         playsInline
         preload="auto"
         draggable={false}
+        onContextMenu={(e) => e.preventDefault()}
         onLoadedData={() => setLoaded(true)}
       />
       {loaded && (
@@ -624,6 +625,7 @@ export function BoardItemCard({
               playsInline
               preload="auto"
               draggable={false}
+              onContextMenu={(e) => e.preventDefault()}
             />
             <div className="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5">
               <Play className="h-3 w-3 text-white" fill="white" />
