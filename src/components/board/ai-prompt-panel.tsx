@@ -521,8 +521,19 @@ export function AIPromptPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages }),
       });
-      const data = await res.json();
-      const reply = data.reply || data.error || "Something went wrong";
+
+      // Try to parse JSON; if the server returned HTML (timeout page, etc),
+      // fall back to a readable error using the response text.
+      let data: { reply?: string; error?: string; generatedItems?: AIGeneratedItem[] } = {};
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text().catch(() => "");
+        data = { error: text ? text.slice(0, 200) : `HTTP ${res.status}` };
+      }
+
+      const reply = data.reply
+        || (data.error ? `Error: ${data.error}` : `Request failed (HTTP ${res.status}). If you just used a generation tool, the server may have timed out — try again.`);
       const final = [...newMessages, { role: "assistant" as const, content: reply }];
       setMessages(final);
       await persistMessages(currentChatId, final);
@@ -530,12 +541,13 @@ export function AIPromptPanel() {
 
       // If Claude invoked a generation tool, add the resulting items to the canvas
       if (Array.isArray(data.generatedItems) && data.generatedItems.length > 0) {
-        for (const g of data.generatedItems as AIGeneratedItem[]) {
+        for (const g of data.generatedItems) {
           addGeneratedItemToCanvas(g);
         }
       }
-    } catch {
-      const final = [...newMessages, { role: "assistant" as const, content: "Failed to connect. Try again." }];
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const final = [...newMessages, { role: "assistant" as const, content: `Failed to connect: ${msg}. Try again.` }];
       setMessages(final);
       await persistMessages(currentChatId, final);
     } finally {

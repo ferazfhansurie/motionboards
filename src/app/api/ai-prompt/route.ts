@@ -5,6 +5,10 @@ import { models } from "@/lib/models";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Tool use chains multiple Claude calls + an internal /api/generate call,
+// which can easily blow past the default 10s Vercel serverless limit.
+export const maxDuration = 60;
+
 // ADletic AI is a general-purpose assistant inside MotionBoards. It can hold
 // normal conversations, answer questions, brainstorm, explain things — AND it
 // specializes in crafting AI-generation prompts (Veo, Sora, Kling, Wan,
