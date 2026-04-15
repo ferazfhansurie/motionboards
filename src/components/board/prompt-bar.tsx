@@ -282,6 +282,20 @@ export function PromptBar() {
 
     addItem(genItem);
 
+    // Auto-link the generation back to its source frames/inputs/audio so the
+    // user can see what fed into each generation. Toggleable from Profile.
+    const store = useAppStore.getState();
+    if (store.autoConnectGenerations) {
+      const sourceIds = new Set<string>();
+      if (startFrameId) sourceIds.add(startFrameId);
+      if (endFrameId) sourceIds.add(endFrameId);
+      for (const refId of inputRefs) sourceIds.add(refId);
+      if (audioInputId) sourceIds.add(audioInputId);
+      for (const sid of sourceIds) {
+        if (sid !== genItem.id) store.addConnection(sid, genItem.id);
+      }
+    }
+
     try {
       const startItem = startFrameId ? items.find((i) => i.id === startFrameId) : null;
       const endItem = endFrameId ? items.find((i) => i.id === endFrameId) : null;

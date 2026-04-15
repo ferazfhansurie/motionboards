@@ -14,7 +14,7 @@ interface UserData {
 
 // ============ PROFILE PANEL ============
 export function ProfilePanel() {
-  const { isProfileOpen, setProfileOpen, theme } = useAppStore();
+  const { isProfileOpen, setProfileOpen, theme, autoConnectGenerations, setAutoConnectGenerations } = useAppStore();
   const isDark = theme === "dark";
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -156,6 +156,25 @@ export function ProfilePanel() {
                     Uploaded images, videos, audio, and AI-generated outputs are stored temporarily. Download anything you want to keep before it expires.
                   </p>
                 </div>
+              </div>
+
+              {/* Settings */}
+              <div className="space-y-2">
+                <p className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? "text-gray-500" : "text-gray-400"}`}>Settings</p>
+                <label className={`flex items-center justify-between gap-3 cursor-pointer px-2.5 py-2 rounded-lg border transition-colors ${isDark ? "border-gray-700 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"}`}>
+                  <div className="min-w-0">
+                    <p className={`text-[11px] font-semibold ${isDark ? "text-white" : "text-[#0d1117]"}`}>Auto-link generations</p>
+                    <p className={`text-[9px] mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                      Draw lines from input refs / start &amp; end frames into each new generation card.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoConnectGenerations}
+                    onChange={(e) => setAutoConnectGenerations(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-gray-300 accent-[#f26522] shrink-0"
+                  />
+                </label>
               </div>
 
               {/* Logout */}

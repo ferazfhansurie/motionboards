@@ -265,6 +265,9 @@ export interface AppState {
   connections: Connection[];
   theme: "light" | "dark";
   connectingFromId: string | null;
+  // When true, every new generation automatically draws connection lines from
+  // its input refs (start frame, end frame, input refs, audio) to the generation
+  autoConnectGenerations: boolean;
 
   // Timeline
   isTimelineOpen: boolean;
@@ -318,6 +321,7 @@ export interface AppState {
   addConnection: (fromId: string, toId: string) => void;
   removeConnection: (id: string) => void;
   setTheme: (theme: "light" | "dark") => void;
+  setAutoConnectGenerations: (v: boolean) => void;
   setConnectingFromId: (id: string | null) => void;
   setTimelineOpen: (open: boolean) => void;
   addTimelineClip: (clip: TimelineClip) => void;
@@ -378,6 +382,7 @@ export const useAppStore = create<AppState>((set) => {
   drawingStrokeWidth: 3,
   connections: startBoard.connections || [],
   theme: (typeof window !== "undefined" && localStorage.getItem("motionboards_theme") as "light" | "dark") || "light",
+  autoConnectGenerations: typeof window !== "undefined" ? localStorage.getItem("motionboards_autoconnect") !== "false" : true,
   connectingFromId: null,
   isTimelineOpen: false,
   timelineClips: [],
@@ -418,6 +423,10 @@ export const useAppStore = create<AppState>((set) => {
   setTheme: (theme) => {
     if (typeof window !== "undefined") localStorage.setItem("motionboards_theme", theme);
     set({ theme });
+  },
+  setAutoConnectGenerations: (v) => {
+    if (typeof window !== "undefined") localStorage.setItem("motionboards_autoconnect", String(v));
+    set({ autoConnectGenerations: v });
   },
   setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
   setTimelineOpen: (isTimelineOpen) => set({ isTimelineOpen }),
