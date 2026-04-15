@@ -166,9 +166,10 @@ export function AIPromptPanel() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  // Each attachment is uploaded to Neon before sending so the chat payload
-  // stays small. `uploading` shows a spinner until the URL comes back.
-  const [attachments, setAttachments] = useState<Array<{ id: string; url: string; label: string; uploading?: boolean }>>([]);
+  // Attachments are stored as inline base64 data URLs (no upload). We track
+  // the byte size so the panel can warn / block sends when the request body
+  // would exceed Vercel's serverless limit (~4.5MB).
+  const [attachments, setAttachments] = useState<Array<{ id: string; url: string; label: string; size: number }>>([]);
 
   // Per-account AI instruction / template (customizes the system prompt)
   const [showSettings, setShowSettings] = useState(false);
@@ -280,43 +281,17 @@ export function AIPromptPanel() {
   const handleFiles = useCallback(async (files: File[]) => {
     for (const file of files) {
       const id = `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      let uploadFile: File | null = null;
-      let label = file.name || "attachment";
-      let previewDataUrl: string | null = null;
-
       if (file.type.startsWith("image/")) {
-        uploadFile = file;
-        previewDataUrl = await readAsDataUrl(file);
+        const url = await readAsDataUrl(file);
+        // Approximate JSON-encoded size: base64 string length is the dominant cost
+        setAttachments((prev) => [...prev, { id, url, label: file.name || "image", size: url.length }]);
       } else if (file.type.startsWith("video/")) {
         const frame = await extractVideoFrame(file);
         if (!frame) continue;
-        previewDataUrl = frame;
-        label = `${file.name || "video"} (frame)`;
-        // Convert the frame data URL into a real File for the upload
-        const blob = await (await fetch(frame)).blob();
-        uploadFile = new File([blob], `${file.name || "video"}-frame.jpg`, { type: "image/jpeg" });
-      } else {
-        continue;
-      }
-
-      // Show a placeholder immediately using the data URL as a local preview
-      setAttachments((prev) => [...prev, { id, url: previewDataUrl || "", label, uploading: true }]);
-
-      try {
-        const form = new FormData();
-        form.append("file", uploadFile);
-        const res = await fetch("/api/upload", { method: "POST", body: form });
-        const data = await res.json();
-        if (data.url) {
-          setAttachments((prev) =>
-            prev.map((a) => (a.id === id ? { ...a, url: data.url as string, uploading: false } : a))
-          );
-        } else {
-          // Upload failed — drop the attachment
-          setAttachments((prev) => prev.filter((a) => a.id !== id));
-        }
-      } catch {
-        setAttachments((prev) => prev.filter((a) => a.id !== id));
+        setAttachments((prev) => [
+          ...prev,
+          { id, url: frame, label: `${file.name || "video"} (frame)`, size: frame.length },
+        ]);
       }
     }
   }, []);
@@ -446,11 +421,33 @@ export function AIPromptPanel() {
 
   if (!isAIPromptOpen) return null;
 
+  // Vercel serverless functions accept up to ~4.5MB request bodies. We cap the
+  // visible budget at 3.5MB to leave headroom for JSON overhead and the rest
+  // of the request (history, system prompt is server-side).
+  const PAYLOAD_LIMIT = 3.5 * 1024 * 1024;
+  // Estimate cost of the existing chat history that will be re-sent (last 10
+  // messages). Image data URLs in old turns are the dominant cost.
+  let historySize = 0;
+  for (const m of messages.slice(-10)) {
+    if (typeof m.content === "string") {
+      historySize += m.content.length;
+    } else {
+      for (const part of m.content) {
+        if (part.type === "text") historySize += part.text.length;
+        else if (part.type === "image_url") historySize += part.image_url.url.length;
+      }
+    }
+  }
+  const attachmentsSize = attachments.reduce((sum, a) => sum + (a.size || 0), 0);
+  const totalSize = historySize + attachmentsSize + input.length;
+  const overLimit = totalSize > PAYLOAD_LIMIT;
+  const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
+  const limitMB = (PAYLOAD_LIMIT / 1024 / 1024).toFixed(1);
+
   const handleSend = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || loading || !currentChatId) return;
-    // Don't send while an attachment is still uploading
-    if (attachments.some((a) => a.uploading)) return;
+    if (overLimit) return;
 
     const userMsg: Message = attachments.length > 0
       ? {
@@ -855,12 +852,7 @@ export function AIPromptPanel() {
                 {attachments.map((a) => (
                   <div key={a.id} className="relative group/att">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={a.url} alt={a.label} title={a.label} className={`h-14 w-14 rounded-md object-cover border border-gray-300 ${a.uploading ? "opacity-60" : ""}`} />
-                    {a.uploading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-md">
-                        <Loader2 className="h-4 w-4 animate-spin text-white" />
-                      </div>
-                    )}
+                    <img src={a.url} alt={a.label} title={`${a.label} (${(a.size / 1024 / 1024).toFixed(2)} MB)`} className="h-14 w-14 rounded-md object-cover border border-gray-300" />
                     <button
                       type="button"
                       className="absolute -top-1.5 -right-1.5 bg-neutral-800 rounded-full p-0.5 text-neutral-300 hover:text-white opacity-0 group-hover/att:opacity-100 transition-opacity"
@@ -907,10 +899,10 @@ export function AIPromptPanel() {
               />
               <button
                 type="button"
-                disabled={loading || (!input.trim() && attachments.length === 0) || attachments.some((a) => a.uploading)}
+                disabled={loading || overLimit || (!input.trim() && attachments.length === 0)}
                 onClick={handleSend}
                 className={`absolute right-3 bottom-3 h-7 w-7 rounded-full flex items-center justify-center transition-all ${
-                  loading || (!input.trim() && attachments.length === 0) || attachments.some((a) => a.uploading)
+                  loading || overLimit || (!input.trim() && attachments.length === 0)
                     ? isDark ? "bg-gray-700 text-gray-500" : "bg-gray-200 text-gray-400"
                     : "bg-[#f26522] text-white hover:bg-[#d9541a] hover:scale-105"
                 }`}
@@ -918,6 +910,14 @@ export function AIPromptPanel() {
                 {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               </button>
             </div>
+            {/* Payload size detector — warns before we hit Vercel's 4.5MB body limit */}
+            {(attachments.length > 0 || totalSize > PAYLOAD_LIMIT * 0.6) && (
+              <div className={`mt-1.5 flex items-center gap-1.5 text-[9px] ${overLimit ? "text-red-500" : totalSize > PAYLOAD_LIMIT * 0.85 ? "text-amber-500" : isDark ? "text-gray-500" : "text-gray-400"}`}>
+                <span className="font-semibold">{sizeMB} MB</span>
+                <span>/ {limitMB} MB</span>
+                {overLimit && <span>— too large, remove an attachment to send</span>}
+              </div>
+            )}
             <div className="flex items-center justify-between mt-2">
               <p className={`text-[8px] ${isDark ? "text-gray-600" : "text-gray-300"}`}>
                 Powered by Claude Sonnet · Auto-saved for 14 days
