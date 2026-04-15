@@ -115,24 +115,8 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-// Shape of generation items the server returns after a Claude tool call
-interface AIGeneratedItem {
-  type: "generation";
-  outputType: "image" | "video";
-  status: "completed" | "processing";
-  prompt: string;
-  model: string;
-  modelName: string;
-  outputUrl?: string;
-  requestId?: string;
-  geminiVideo?: boolean;
-  openaiVideo?: boolean;
-  replicateVideo?: boolean;
-  creditCost?: number;
-}
-
 export function AIPromptPanel() {
-  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme, items: canvasItems, boards, activeBoardId, addItem, panX, panY, zoom } = useAppStore();
+  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme, items: canvasItems, boards, activeBoardId } = useAppStore();
   const isDark = theme === "dark";
 
   // Resizable width — persisted to localStorage
@@ -426,73 +410,6 @@ export function AIPromptPanel() {
     }
   };
 
-  // Server returns generatedItems when Claude used a tool. Each item gets
-  // added to the canvas; processing video items spin up their own poll.
-  const addGeneratedItemToCanvas = useCallback((g: AIGeneratedItem) => {
-    // Place near viewport center, with a small random offset so stacked items
-    // don't overlap exactly
-    const jitter = Math.floor(Math.random() * 40) - 20;
-    const defaultW = g.outputType === "video" ? 360 : 300;
-    const defaultH = g.outputType === "video" ? 202 : 300;
-    const x = (-panX + window.innerWidth / 2 - defaultW / 2) / zoom + jitter;
-    const y = (-panY + window.innerHeight / 2 - defaultH / 2) / zoom + jitter;
-    const itemId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-
-    addItem({
-      id: itemId,
-      type: "generation",
-      x, y,
-      width: defaultW,
-      height: defaultH,
-      src: "",
-      prompt: g.prompt,
-      model: g.model,
-      modelName: g.modelName,
-      status: g.status,
-      outputType: g.outputType,
-      outputUrl: g.outputUrl,
-      cost: typeof g.creditCost === "number" ? `RM${(g.creditCost / 100).toFixed(2)}` : undefined,
-      progressText: g.status === "processing" ? "Queued..." : undefined,
-      createdAt: new Date().toISOString(),
-    });
-
-    // If video is still processing, poll the status endpoint until done
-    if (g.status === "processing" && g.requestId) {
-      const poll = async () => {
-        try {
-          let url = `/api/generate/status?requestId=${encodeURIComponent(g.requestId!)}&modelId=${encodeURIComponent(g.model)}&generationId=${itemId}`;
-          if (g.geminiVideo) url += "&geminiVideo=true";
-          if (g.openaiVideo) url += "&openaiVideo=true";
-          if (g.replicateVideo) url += "&replicateVideo=true";
-          const r = await fetch(url);
-          const d = await r.json();
-          if (d.status === "completed" && d.outputUrl) {
-            useAppStore.getState().updateItem(itemId, {
-              status: "completed",
-              outputUrl: d.outputUrl,
-              cost: d.actualCost,
-              progressText: undefined,
-            });
-            return;
-          }
-          if (d.status === "failed") {
-            useAppStore.getState().updateItem(itemId, {
-              status: "failed",
-              error: d.error || "Generation failed",
-              progressText: undefined,
-            });
-            return;
-          }
-          if (d.log) useAppStore.getState().updateItem(itemId, { progressText: d.log });
-          setTimeout(poll, 5000);
-        } catch {
-          setTimeout(poll, 8000);
-        }
-      };
-      setTimeout(poll, 3000);
-    }
-  }, [addItem, panX, panY, zoom]);
-
   if (!isAIPromptOpen) return null;
 
   const handleSend = async () => {
@@ -524,7 +441,7 @@ export function AIPromptPanel() {
 
       // Try to parse JSON; if the server returned HTML (timeout page, etc),
       // fall back to a readable error using the response text.
-      let data: { reply?: string; error?: string; generatedItems?: AIGeneratedItem[] } = {};
+      let data: { reply?: string; error?: string } = {};
       try {
         data = await res.json();
       } catch {
@@ -533,18 +450,11 @@ export function AIPromptPanel() {
       }
 
       const reply = data.reply
-        || (data.error ? `Error: ${data.error}` : `Request failed (HTTP ${res.status}). If you just used a generation tool, the server may have timed out — try again.`);
+        || (data.error ? `Error: ${data.error}` : `Request failed (HTTP ${res.status}). Try again.`);
       const final = [...newMessages, { role: "assistant" as const, content: reply }];
       setMessages(final);
       await persistMessages(currentChatId, final);
       loadChats();
-
-      // If Claude invoked a generation tool, add the resulting items to the canvas
-      if (Array.isArray(data.generatedItems) && data.generatedItems.length > 0) {
-        for (const g of data.generatedItems) {
-          addGeneratedItemToCanvas(g);
-        }
-      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const final = [...newMessages, { role: "assistant" as const, content: `Failed to connect: ${msg}. Try again.` }];
