@@ -316,19 +316,40 @@ export function PromptBar() {
       }
       const resolveUrl = async (item: BoardItem | null | undefined): Promise<string | null> => {
         if (!item) return null;
-        let url = item.outputUrl || item.src || null;
+        const url = item.outputUrl || item.src || null;
         if (!url) return null;
-        if (isUnfinalized(url)) {
-          // Wait up to 15s for the background upload to swap in a real URL
-          for (let i = 0; i < 30; i++) {
-            await new Promise((r) => setTimeout(r, 500));
-            const fresh = useAppStore.getState().items.find((it) => it.id === item.id);
-            const freshUrl = fresh?.outputUrl || fresh?.src || null;
-            if (freshUrl && !isUnfinalized(freshUrl)) return freshUrl;
-          }
-          throw new Error("File upload didn't finish in time. Try again in a moment.");
+        if (!isUnfinalized(url)) return url;
+
+        // First wait up to 5s for any background upload to swap in a real URL
+        for (let i = 0; i < 10; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          const fresh = useAppStore.getState().items.find((it) => it.id === item.id);
+          const freshUrl = fresh?.outputUrl || fresh?.src || null;
+          if (freshUrl && !isUnfinalized(freshUrl)) return freshUrl;
         }
-        return url;
+
+        // Background upload didn't finish (or failed) — try uploading right now.
+        // Works for both data: URIs (turn the base64 into a Blob) and blob: URLs
+        // (fetch returns the Blob directly).
+        try {
+          const blobRes = await fetch(url);
+          const blob = await blobRes.blob();
+          const ext = blob.type.split("/")[1] || "bin";
+          const file = new File([blob], `${item.id}.${ext}`, { type: blob.type || "application/octet-stream" });
+          const form = new FormData();
+          form.append("file", file);
+          const upRes = await fetch("/api/upload", { method: "POST", body: form });
+          if (upRes.ok) {
+            const upData = await upRes.json();
+            if (upData.url && !isUnfinalized(upData.url)) {
+              useAppStore.getState().updateItem(item.id, { src: upData.url });
+              return upData.url as string;
+            }
+          }
+        } catch {
+          // fall through to error
+        }
+        throw new Error("File upload didn't finish in time. Try again in a moment.");
       };
 
       const inputImage = (await resolveUrl(refItems[0])) || (await resolveUrl(startItem));
