@@ -521,19 +521,39 @@ export function AIPromptPanel() {
         body: JSON.stringify({ messages: newMessages }),
       });
 
-      // Try to parse JSON; if the server returned HTML (timeout page, etc),
-      // fall back to a readable error using the response text.
-      let data: { reply?: string; error?: string } = {};
-      try {
-        data = await res.json();
-      } catch {
-        const text = await res.text().catch(() => "");
-        data = { error: text ? text.slice(0, 200) : `HTTP ${res.status}` };
+      // If server returned an error JSON (no stream), surface it
+      if (!res.ok || !res.body) {
+        let errMsg = `HTTP ${res.status}`;
+        try {
+          const data = await res.json();
+          if (data?.error) errMsg = data.error;
+        } catch {
+          const text = await res.text().catch(() => "");
+          if (text) errMsg = text.slice(0, 200);
+        }
+        const final = [...newMessages, { role: "assistant" as const, content: `Error: ${errMsg}` }];
+        setMessages(final);
+        await persistMessages(currentChatId, final);
+        return;
       }
 
-      const reply = data.reply
-        || (data.error ? `Error: ${data.error}` : `Request failed (HTTP ${res.status}). Try again.`);
-      const final = [...newMessages, { role: "assistant" as const, content: reply }];
+      // Stream tokens straight into the assistant bubble — only push the bubble
+      // once the FIRST chunk arrives so the loading dots show until then.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+        accumulated += chunk;
+        setMessages([...newMessages, { role: "assistant", content: accumulated }]);
+      }
+      // Flush any final buffered bytes
+      accumulated += decoder.decode();
+      const final = [...newMessages, { role: "assistant" as const, content: accumulated || "Could not generate a response. Try again." }];
       setMessages(final);
       await persistMessages(currentChatId, final);
       loadChats();
@@ -871,17 +891,23 @@ export function AIPromptPanel() {
               );
             })}
 
-            {loading && (
-              <div className="flex justify-start">
-                <div className={`rounded-2xl px-4 py-3 rounded-bl-sm ${isDark ? "bg-[#0d1117] border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            {/* Loading dots — only show until the first streamed token arrives */}
+            {loading && (() => {
+              const last = messages[messages.length - 1];
+              const alreadyStreaming = last && last.role === "assistant" && messageText(last.content).length > 0;
+              if (alreadyStreaming) return null;
+              return (
+                <div className="flex justify-start">
+                  <div className={`rounded-2xl px-4 py-3 rounded-bl-sm ${isDark ? "bg-[#0d1117] border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <div className="h-2 w-2 bg-[#f26522] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div ref={messagesEndRef} />
           </div>

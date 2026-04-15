@@ -97,7 +97,8 @@ export async function POST(req: NextRequest) {
       ? `${BASE_SYSTEM_PROMPT}\n\n## USER PREFERENCES (follow these)\n${userInstruction}`
       : BASE_SYSTEM_PROMPT;
 
-    const response = await anthropic.messages.create({
+    // Stream the response so the panel can render text as Claude generates it
+    const claudeStream = anthropic.messages.stream({
       model: "claude-sonnet-4-5",
       max_tokens: 1500,
       temperature: 0.8,
@@ -105,12 +106,34 @@ export async function POST(req: NextRequest) {
       messages: converted as Parameters<typeof anthropic.messages.create>[0]["messages"],
     });
 
-    const reply = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("\n") || "Could not generate a response. Try again.";
+    const encoder = new TextEncoder();
+    const body = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of claudeStream) {
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta"
+            ) {
+              controller.enqueue(encoder.encode(event.delta.text));
+            }
+          }
+          controller.close();
+        } catch (streamErr) {
+          const msg = streamErr instanceof Error ? streamErr.message : "stream failed";
+          controller.enqueue(encoder.encode(`\n\n[Error: ${msg}]`));
+          controller.close();
+        }
+      },
+    });
 
-    return NextResponse.json({ reply });
+    return new Response(body, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch (error) {
     console.error("AI prompt error:", error);
     const msg = error instanceof Error ? error.message : "AI prompt generation failed";
