@@ -478,19 +478,37 @@ export const useAppStore = create<AppState>((set) => {
       const minY = Math.min(...s.clipboard.map((i) => i.y));
       const offsetX = atX !== undefined ? atX - minX : 30;
       const offsetY = atY !== undefined ? atY - minY : 30;
-      // Guarantee unique IDs even when clipboard has multiple items pasted in one tick
+      // Guarantee unique IDs even when clipboard has multiple items pasted in one tick.
+      // Track an old→new ID map so we can also clone connections that were
+      // entirely between copied items (preserving the visual relationship).
       const now = Date.now();
-      const pasted = s.clipboard.map((srcItem, i) => ({
-        ...srcItem,
-        id: `item_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`,
-        x: srcItem.x + offsetX,
-        y: srcItem.y + offsetY,
-        createdAt: new Date().toISOString(),
-      }));
+      const idMap = new Map<string, string>();
+      const pasted = s.clipboard.map((srcItem, i) => {
+        const newId = `item_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`;
+        idMap.set(srcItem.id, newId);
+        return {
+          ...srcItem,
+          id: newId,
+          x: srcItem.x + offsetX,
+          y: srcItem.y + offsetY,
+          createdAt: new Date().toISOString(),
+        };
+      });
+      // Duplicate any connection where BOTH endpoints are inside the pasted set.
+      // Connections that crossed in/out of the copied group are not duplicated —
+      // those would create misleading lines from external items the user didn't pick.
+      const newConnections = s.connections
+        .filter((c) => idMap.has(c.fromId) && idMap.has(c.toId))
+        .map((c, i) => ({
+          id: `conn_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+          fromId: idMap.get(c.fromId)!,
+          toId: idMap.get(c.toId)!,
+        }));
       return {
         undoStack: [...s.undoStack.slice(-49), s.items],
         redoStack: [],
         items: [...s.items, ...pasted],
+        connections: [...s.connections, ...newConnections],
         selectedItemIds: pasted.map((p) => p.id),
         selectedItemId: pasted[0]?.id || null,
       };
