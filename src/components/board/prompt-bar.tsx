@@ -333,23 +333,41 @@ export function PromptBar() {
         // (fetch returns the Blob directly).
         try {
           const blobRes = await fetch(url);
+          if (!blobRes.ok) throw new Error(`Couldn't read source (${blobRes.status})`);
           const blob = await blobRes.blob();
-          const ext = blob.type.split("/")[1] || "bin";
+          if (blob.size === 0) throw new Error("Source is empty — paste/upload may have failed");
+          const ext = (blob.type.split("/")[1] || "bin").split(";")[0];
           const file = new File([blob], `${item.id}.${ext}`, { type: blob.type || "application/octet-stream" });
           const form = new FormData();
           form.append("file", file);
           const upRes = await fetch("/api/upload", { method: "POST", body: form });
-          if (upRes.ok) {
-            const upData = await upRes.json();
-            if (upData.url && !isUnfinalized(upData.url)) {
-              useAppStore.getState().updateItem(item.id, { src: upData.url });
-              return upData.url as string;
+          if (!upRes.ok) {
+            // Try to read the error message from the response
+            let detail = `HTTP ${upRes.status}`;
+            try {
+              const errData = await upRes.json();
+              if (errData?.error) detail = errData.error;
+            } catch {
+              const text = await upRes.text().catch(() => "");
+              if (text) detail = text.slice(0, 120);
             }
+            console.error("[resolveUrl] /api/upload failed:", detail, { url: url.slice(0, 80), size: blob.size, type: blob.type });
+            // Special-case the common ones
+            if (upRes.status === 401) throw new Error("Session expired — please refresh and try again.");
+            if (upRes.status === 413) throw new Error(`Image too large (${(blob.size / 1024 / 1024).toFixed(1)}MB). Use a smaller image.`);
+            throw new Error(`Upload failed: ${detail}`);
           }
-        } catch {
-          // fall through to error
+          const upData = await upRes.json();
+          if (upData.url && !isUnfinalized(upData.url)) {
+            useAppStore.getState().updateItem(item.id, { src: upData.url });
+            return upData.url as string;
+          }
+          throw new Error("Upload returned no URL");
+        } catch (uploadErr) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : "unknown";
+          console.error("[resolveUrl] active upload failed for item", item.id, msg);
+          throw new Error(msg);
         }
-        throw new Error("File upload didn't finish in time. Try again in a moment.");
       };
 
       const inputImage = (await resolveUrl(refItems[0])) || (await resolveUrl(startItem));
