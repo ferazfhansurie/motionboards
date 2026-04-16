@@ -31,6 +31,7 @@ function getStageIndex(text?: string): number {
 
 function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean }) {
   const [elapsed, setElapsed] = useState(0);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   useEffect(() => {
     const start = new Date(item.createdAt).getTime();
     setElapsed(Math.floor((Date.now() - start) / 1000));
@@ -93,14 +94,33 @@ function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean
         </p>
       </div>
 
-      {/* Cancel button — shows after 30s */}
-      {elapsed > 30 && (
+      {/* Cancel button — shows after 30s, two-step confirm to prevent misclicks */}
+      {elapsed > 30 && !confirmingCancel && (
         <button
-          onClick={(e) => { e.stopPropagation(); handleCancel(); }}
+          onClick={(e) => { e.stopPropagation(); setConfirmingCancel(true); }}
           className={`text-[9px] px-3 py-1 rounded-lg transition-colors ${isDark ? "text-gray-500 hover:text-red-400 hover:bg-red-500/10" : "text-gray-400 hover:text-red-500 hover:bg-red-50"}`}
         >
           Cancel
         </button>
+      )}
+      {elapsed > 30 && confirmingCancel && (
+        <div className="flex flex-col items-center gap-1.5">
+          <p className={`text-[9px] ${isDark ? "text-gray-400" : "text-gray-500"}`}>Cancel this generation?</p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCancel(); }}
+              className="text-[9px] px-3 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-semibold"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmingCancel(false); }}
+              className={`text-[9px] px-3 py-1 rounded-lg transition-colors ${isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-500 hover:bg-gray-100"}`}
+            >
+              Abort
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
