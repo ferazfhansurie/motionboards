@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useEffect, useState } from "react";
+import { Download, Copy, Trash2, X } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { BoardItemCard } from "./board-item";
 import { PromptBar } from "./prompt-bar";
@@ -815,6 +816,90 @@ export function Canvas() {
             height: Math.abs(marquee.y2 - marquee.y1),
           }}
         />
+      )}
+
+      {/* Bulk action bar — appears when multiple items are selected */}
+      {selectedItemIds.length > 1 && !marquee && (
+        <div
+          className={`fixed top-20 left-1/2 -translate-x-1/2 z-[45] flex items-center gap-1 rounded-xl border px-2 py-1.5 shadow-xl backdrop-blur-md pointer-events-auto ${
+            isDark ? "bg-[#161b22]/90 border-gray-700" : "bg-white/90 border-gray-200"
+          }`}
+        >
+          <span className={`text-[11px] font-semibold px-2 ${isDark ? "text-white" : "text-[#0d1117]"}`}>
+            {selectedItemIds.length} selected
+          </span>
+          <div className={`h-4 w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+          <button
+            type="button"
+            title="Download all"
+            onClick={async () => {
+              const selected = items.filter((it) => selectedItemIds.includes(it.id));
+              for (let i = 0; i < selected.length; i++) {
+                const it = selected[i];
+                const url = it.outputUrl || it.src;
+                if (!url) continue;
+                try {
+                  const res = await fetch(url);
+                  const blob = await res.blob();
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  const ext = it.type === "video" || it.outputType === "video" ? "mp4"
+                    : it.type === "audio" || it.outputType === "audio" ? "mp3" : "png";
+                  a.download = it.fileName || `motionboards-${it.id}.${ext}`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(a.href);
+                  // Stagger so the browser doesn't block the bulk download
+                  await new Promise((r) => setTimeout(r, 250));
+                } catch {
+                  // skip silently
+                }
+              }
+            }}
+            className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+              isDark ? "text-gray-300 hover:bg-white/10 hover:text-white" : "text-gray-600 hover:bg-gray-100 hover:text-[#0d1117]"
+            }`}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+          </button>
+          <button
+            type="button"
+            title="Copy (Ctrl+C)"
+            onClick={() => useAppStore.getState().copySelectedItems()}
+            className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+              isDark ? "text-gray-300 hover:bg-white/10 hover:text-white" : "text-gray-600 hover:bg-gray-100 hover:text-[#0d1117]"
+            }`}
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy
+          </button>
+          <button
+            type="button"
+            title="Delete (Del)"
+            onClick={() => {
+              if (confirm(`Delete ${selectedItemIds.length} items?`)) {
+                useAppStore.getState().removeSelectedItems();
+              }
+            }}
+            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+          <div className={`h-4 w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+          <button
+            type="button"
+            title="Deselect all (Esc)"
+            onClick={() => useAppStore.getState().selectItems([])}
+            className={`rounded-lg p-1.5 transition-colors ${
+              isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"
+            }`}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
 
       {/* Zoom preview */}
