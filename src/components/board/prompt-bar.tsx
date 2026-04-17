@@ -45,6 +45,20 @@ export function PromptBar() {
   const [boardIoBusy, setBoardIoBusy] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importAbortRef = useRef<AbortController | null>(null);
+  // Active background export jobs — polled while the menu is open so the user
+  // sees live progress without having to open the Profile panel.
+  interface ExportJob {
+    id: string;
+    boardName: string;
+    status: "pending" | "processing" | "completed" | "failed";
+    progress: number;
+    total: number;
+    fileId: string | null;
+    fileName: string | null;
+    error: string | null;
+    createdAt: string;
+  }
+  const [exportJobs, setExportJobs] = useState<ExportJob[]>([]);
   const [boxW, setBoxW] = useState(320);
   const [boxMinH, setBoxMinH] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
@@ -226,6 +240,41 @@ export function PromptBar() {
     return (m ? parseInt(m[1]) * 60 : 0) + (s ? parseInt(s[1]) : 0) || 60;
   };
 
+  // Load export jobs + auto-poll while the board menu is open
+  const loadExportJobs = async () => {
+    try {
+      const res = await fetch("/api/board-exports");
+      const data = await res.json();
+      if (Array.isArray(data.jobs)) setExportJobs(data.jobs);
+    } catch {
+      // noop
+    }
+  };
+
+  useEffect(() => {
+    if (!boardMenuOpen) return;
+    loadExportJobs();
+    const interval = setInterval(() => {
+      setExportJobs((prev) => {
+        // Only poll if something is still running, OR we haven't loaded yet
+        if (prev.length === 0 || prev.some((j) => j.status === "pending" || j.status === "processing")) {
+          loadExportJobs();
+        }
+        return prev;
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [boardMenuOpen]);
+
+  const handleDeleteExportJob = async (id: string) => {
+    try {
+      await fetch(`/api/board-exports/${id}`, { method: "DELETE" });
+      setExportJobs((prev) => prev.filter((j) => j.id !== id));
+    } catch {
+      // noop
+    }
+  };
+
   const handleExportBoard = async () => {
     const store = useAppStore.getState();
     const active = store.boards.find((b) => b.id === store.activeBoardId);
@@ -253,8 +302,9 @@ export function PromptBar() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       setBoardIoBusy(null);
-      setBoardMenuOpen(false);
-      alert(`Export queued! It will keep running even if you close this tab. Check Profile → Recent exports to download when it's ready.`);
+      // Optimistically add the job to the list so the user sees it immediately
+      if (data.job) setExportJobs((prev) => [data.job, ...prev]);
+      // Keep the menu open so the user can watch progress
     } catch (err) {
       setBoardIoBusy(null);
       alert(err instanceof Error ? err.message : "Export failed");
@@ -1094,11 +1144,82 @@ export function PromptBar() {
                   className={`flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-600 hover:bg-gray-50"}`}
                   onClick={handleExportBoard}
                   disabled={!!boardIoBusy}
-                  title="Download the current board as a portable .mbboard.json file (media embedded)"
+                  title="Queue a background export — keeps running if you close the tab"
                 >
                   <Download className="w-3 h-3" />
-                  {boardIoBusy?.startsWith("Exporting") ? boardIoBusy : "Export current board"}
+                  {boardIoBusy?.toLowerCase().includes("queue") ? boardIoBusy : "Export current board"}
                 </button>
+
+                {/* Inline progress for active export jobs — lets the user watch
+                    without having to open the Profile panel */}
+                {exportJobs.length > 0 && (
+                  <div className={`mt-1 rounded-lg border ${isDark ? "border-gray-700 bg-white/5" : "border-gray-100 bg-gray-50/50"}`}>
+                    {exportJobs.slice(0, 4).map((job) => (
+                      <div key={job.id} className="flex items-center gap-1.5 px-2 py-1.5 group/exp">
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[10px] font-medium truncate ${isDark ? "text-gray-200" : "text-[#0d1117]"}`}>
+                            {job.boardName}
+                          </p>
+                          {job.status === "pending" && (
+                            <p className="text-[9px] text-[#f26522]">Queued…</p>
+                          )}
+                          {job.status === "processing" && (
+                            <div className="mt-0.5">
+                              <div className="flex items-center justify-between">
+                                <p className="text-[9px] text-[#f26522]">Processing {job.progress}/{job.total}</p>
+                                <p className="text-[9px] text-[#f26522]">
+                                  {job.total > 0 ? Math.round((job.progress / job.total) * 100) : 0}%
+                                </p>
+                              </div>
+                              <div className={`mt-0.5 h-0.5 rounded-full overflow-hidden ${isDark ? "bg-gray-700" : "bg-gray-200"}`}>
+                                <div
+                                  className="h-full bg-[#f26522] transition-all duration-300"
+                                  style={{ width: `${job.total > 0 ? (job.progress / job.total) * 100 : 0}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {job.status === "completed" && (
+                            <p className="text-[9px] text-emerald-500">
+                              Ready · {new Date(job.createdAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                            </p>
+                          )}
+                          {job.status === "failed" && (
+                            <p className="text-[9px] text-red-500 truncate" title={job.error || undefined}>
+                              Failed: {job.error || "unknown"}
+                            </p>
+                          )}
+                        </div>
+                        {job.status === "processing" && (
+                          <Loader2 className="h-3 w-3 animate-spin text-[#f26522] shrink-0" />
+                        )}
+                        {job.status === "completed" && job.fileId && (
+                          <a
+                            href={`/api/files/${job.fileId}`}
+                            download={job.fileName || `${job.boardName}.mbboard.json`}
+                            className="rounded p-1 text-[#f26522] hover:bg-[#f26522]/10 transition-colors shrink-0"
+                            title="Download"
+                          >
+                            <Download className="h-3 w-3" />
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteExportJob(job.id); }}
+                          className="opacity-0 group-hover/exp:opacity-100 rounded p-1 text-gray-400 hover:text-red-500 transition-all shrink-0"
+                          title="Remove"
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {exportJobs.length > 4 && (
+                      <p className={`text-[9px] text-center py-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                        +{exportJobs.length - 4} more in Profile → Recent exports
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-1">
                   <button
                     className={`flex-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-600 hover:bg-gray-50"}`}
