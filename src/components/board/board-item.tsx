@@ -357,7 +357,12 @@ export function BoardItemCard({
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      const ext = item.type === "video" ? "mp4" : item.type === "audio" ? "mp3" : "png";
+      // Prefer the real content-type from the blob (most reliable), then fall
+      // back to the item's media kind. Generation cards have item.type ===
+      // "generation" with the actual media in outputType.
+      const isVideo = blob.type.startsWith("video/") || item.type === "video" || item.outputType === "video";
+      const isAudio = blob.type.startsWith("audio/") || item.type === "audio" || item.outputType === "audio";
+      const ext = isVideo ? "mp4" : isAudio ? "mp3" : "png";
       a.download = item.fileName || `motionboards-${item.id}.${ext}`;
       document.body.appendChild(a);
       a.click();
