@@ -1,8 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle } from "lucide-react";
-import { useAppStore } from "@/lib/store";
+import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle, RotateCcw, Trash2, Save } from "lucide-react";
+import { useAppStore, saveBoardSnapshotWithLabel } from "@/lib/store";
+
+interface VersionSummary {
+  id: string;
+  label: string;
+  itemCount: number;
+  boardCount: number;
+  createdAt: string;
+}
 
 interface UserData {
   id: string;
@@ -14,10 +22,79 @@ interface UserData {
 
 // ============ PROFILE PANEL ============
 export function ProfilePanel() {
-  const { isProfileOpen, setProfileOpen, theme, autoConnectGenerations, setAutoConnectGenerations } = useAppStore();
+  const { isProfileOpen, setProfileOpen, theme, autoConnectGenerations, setAutoConnectGenerations, restoreBoardsSnapshot } = useAppStore();
   const isDark = theme === "dark";
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Version history
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<VersionSummary[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [savingVersion, setSavingVersion] = useState(false);
+  const [versionStatus, setVersionStatus] = useState<string | null>(null);
+
+  const loadVersions = async () => {
+    setVersionsLoading(true);
+    try {
+      const res = await fetch("/api/board-versions");
+      const data = await res.json();
+      if (Array.isArray(data.versions)) setVersions(data.versions);
+    } catch {
+      // noop
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
+
+  const handleRestore = async (id: string, label: string) => {
+    if (!confirm(`Restore snapshot "${label}"? Your current canvas will be replaced.`)) return;
+    setRestoringId(id);
+    try {
+      const res = await fetch(`/api/board-versions/${id}`);
+      const data = await res.json();
+      if (res.ok && data.version?.data) {
+        restoreBoardsSnapshot(data.version.data);
+        setVersionStatus("Restored — canvas has been replaced with the snapshot.");
+      } else {
+        setVersionStatus(data.error || "Restore failed");
+      }
+    } catch {
+      setVersionStatus("Restore failed");
+    } finally {
+      setRestoringId(null);
+      setTimeout(() => setVersionStatus(null), 4000);
+    }
+  };
+
+  const handleDeleteVersion = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Delete this snapshot?")) return;
+    try {
+      await fetch(`/api/board-versions/${id}`, { method: "DELETE" });
+      setVersions((prev) => prev.filter((v) => v.id !== id));
+    } catch {
+      // noop
+    }
+  };
+
+  const handleSaveNow = async () => {
+    setSavingVersion(true);
+    setVersionStatus(null);
+    const { ok, error } = await saveBoardSnapshotWithLabel(useAppStore.getState(), "Manual checkpoint");
+    if (ok) {
+      setVersionStatus("Checkpoint saved");
+      loadVersions();
+    } else {
+      setVersionStatus(error || "Save failed");
+    }
+    setSavingVersion(false);
+    setTimeout(() => setVersionStatus(null), 3000);
+  };
+
+  useEffect(() => {
+    if (showVersions) loadVersions();
+  }, [showVersions]);
   const [topupLoading, setTopupLoading] = useState(false);
   const [topupAmount, setTopupAmount] = useState("10");
 
@@ -175,6 +252,89 @@ export function ProfilePanel() {
                     className="h-3.5 w-3.5 rounded border-gray-300 accent-[#f26522] shrink-0"
                   />
                 </label>
+              </div>
+
+              {/* Version history */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? "text-gray-500" : "text-gray-400"}`}>Version history</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowVersions(!showVersions)}
+                    className={`text-[10px] transition-colors ${isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-[#0d1117]"}`}
+                  >
+                    {showVersions ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <p className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Snapshots of your canvas. Auto-saved every 15 min of activity, kept for 14 days.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleSaveNow}
+                  disabled={savingVersion}
+                  className={`w-full flex items-center justify-center gap-1.5 text-[11px] px-2.5 py-2 rounded-lg border font-semibold transition-colors ${
+                    savingVersion
+                      ? isDark ? "border-gray-700 text-gray-500" : "border-gray-200 text-gray-400"
+                      : isDark ? "border-gray-700 text-white hover:bg-white/5" : "border-gray-200 text-[#0d1117] hover:bg-gray-50"
+                  }`}
+                >
+                  {savingVersion ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                  Save checkpoint now
+                </button>
+
+                {versionStatus && (
+                  <p className={`text-[9px] ${versionStatus.toLowerCase().includes("fail") || versionStatus.toLowerCase().includes("error") ? "text-red-500" : "text-emerald-500"}`}>
+                    {versionStatus}
+                  </p>
+                )}
+
+                {showVersions && (
+                  <div className={`rounded-lg border max-h-[200px] overflow-y-auto ${isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-200 bg-gray-50"}`}>
+                    {versionsLoading ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#f26522]" />
+                      </div>
+                    ) : versions.length === 0 ? (
+                      <p className={`text-center py-4 text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                        No snapshots yet — keep editing and they&rsquo;ll appear here.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {versions.map((v) => (
+                          <div key={v.id} className="flex items-center gap-1.5 px-2 py-1.5 group">
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[11px] font-medium truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
+                                {v.label}
+                              </p>
+                              <p className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                                {v.boardCount} board{v.boardCount === 1 ? "" : "s"} · {v.itemCount} item{v.itemCount === 1 ? "" : "s"} · {new Date(v.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={restoringId === v.id}
+                              onClick={() => handleRestore(v.id, v.label)}
+                              className={`rounded p-1 transition-colors ${restoringId === v.id ? "text-gray-400" : "text-[#f26522] hover:bg-[#f26522]/10"}`}
+                              title="Restore this snapshot"
+                            >
+                              {restoringId === v.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteVersion(v.id, e)}
+                              className="opacity-0 group-hover:opacity-100 rounded p-1 text-gray-400 hover:text-red-500 transition-all"
+                              title="Delete snapshot"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Logout */}

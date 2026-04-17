@@ -505,3 +505,114 @@ export async function setUserAIInstruction(userId: string, instruction: string):
   await ensureAIInstructionColumn();
   await sql`UPDATE mb_users SET ai_instruction = ${instruction} WHERE id = ${userId}`;
 }
+
+// --- Board version history ---
+//
+// Periodic snapshots of the user's full board state so they can recover from
+// accidental cache clears, browser crashes, or silent DB save failures. Each
+// snapshot is stored as JSONB in mb_board_versions with the same 14-day TTL
+// sweep as files. Snapshots are also deduplicated by a short summary of the
+// data so we don't flood storage when nothing changed.
+
+export interface BoardVersion {
+  id: string;
+  userId: string;
+  label: string;          // human-readable — "Auto 3:42 PM", "Manual checkpoint", etc
+  itemCount: number;      // quick preview count without loading the full snapshot
+  boardCount: number;
+  data: unknown;          // full { boards, activeBoardId, selectedModelId }
+  createdAt: string;
+}
+
+let boardVersionsTableInitialized = false;
+let lastBoardVersionSweepAt = 0;
+
+async function ensureBoardVersionsTable(): Promise<void> {
+  if (boardVersionsTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_board_versions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      item_count INTEGER NOT NULL DEFAULT 0,
+      board_count INTEGER NOT NULL DEFAULT 0,
+      data JSONB NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_board_versions_user_created_idx ON mb_board_versions (user_id, created_at DESC)`;
+  boardVersionsTableInitialized = true;
+}
+
+async function sweepExpiredBoardVersions(): Promise<void> {
+  const now = Date.now();
+  if (now - lastBoardVersionSweepAt < CLEANUP_THROTTLE_MS) return;
+  lastBoardVersionSweepAt = now;
+  try {
+    await sql`
+      DELETE FROM mb_board_versions
+      WHERE created_at < NOW() - (${FILE_TTL_DAYS}::int * INTERVAL '1 day')
+    `;
+  } catch (err) {
+    console.error("Board version TTL sweep failed:", err);
+  }
+}
+
+function rowToBoardVersion(row: Record<string, unknown>, includeData: boolean): BoardVersion {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    label: (row.label as string) || "",
+    itemCount: (row.item_count as number) || 0,
+    boardCount: (row.board_count as number) || 0,
+    data: includeData ? row.data : null,
+    createdAt: (row.created_at as Date).toISOString(),
+  };
+}
+
+export async function createBoardVersion(
+  userId: string,
+  data: unknown,
+  label: string,
+  itemCount: number,
+  boardCount: number
+): Promise<BoardVersion> {
+  await ensureBoardVersionsTable();
+  const id = `bv_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const rows = await sql`
+    INSERT INTO mb_board_versions (id, user_id, label, item_count, board_count, data)
+    VALUES (${id}, ${userId}, ${label}, ${itemCount}, ${boardCount}, ${JSON.stringify(data)}::jsonb)
+    RETURNING *
+  `;
+  sweepExpiredBoardVersions().catch(() => {});
+  return rowToBoardVersion(rows[0], true);
+}
+
+export async function listBoardVersions(userId: string): Promise<BoardVersion[]> {
+  await ensureBoardVersionsTable();
+  // Exclude the heavy `data` column from the list view — versions can be 1–3MB each
+  const rows = await sql`
+    SELECT id, user_id, label, item_count, board_count, created_at
+    FROM mb_board_versions
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return rows.map((r) => rowToBoardVersion(r, false));
+}
+
+export async function getBoardVersion(id: string, userId: string): Promise<BoardVersion | null> {
+  await ensureBoardVersionsTable();
+  const rows = await sql`
+    SELECT * FROM mb_board_versions WHERE id = ${id} AND user_id = ${userId}
+  `;
+  return rows.length > 0 ? rowToBoardVersion(rows[0], true) : null;
+}
+
+export async function deleteBoardVersion(id: string, userId: string): Promise<boolean> {
+  await ensureBoardVersionsTable();
+  const rows = await sql`
+    DELETE FROM mb_board_versions WHERE id = ${id} AND user_id = ${userId} RETURNING id
+  `;
+  return rows.length > 0;
+}

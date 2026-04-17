@@ -322,6 +322,7 @@ export interface AppState {
   removeConnection: (id: string) => void;
   setTheme: (theme: "light" | "dark") => void;
   setAutoConnectGenerations: (v: boolean) => void;
+  restoreBoardsSnapshot: (snapshot: unknown) => void;
   setConnectingFromId: (id: string | null) => void;
   setTimelineOpen: (open: boolean) => void;
   addTimelineClip: (clip: TimelineClip) => void;
@@ -428,6 +429,36 @@ export const useAppStore = create<AppState>((set) => {
     if (typeof window !== "undefined") localStorage.setItem("motionboards_autoconnect", String(v));
     set({ autoConnectGenerations: v });
   },
+  restoreBoardsSnapshot: (snapshot) =>
+    set(() => {
+      const snap = snapshot as { boards?: Board[]; activeBoardId?: string; selectedModelId?: string | null };
+      const nextBoards = Array.isArray(snap.boards) && snap.boards.length > 0
+        ? snap.boards
+        : [{ id: "board_1", name: "Board 1", items: [], connections: [], panX: 0, panY: 0, zoom: 1 }];
+      const targetId = snap.activeBoardId && nextBoards.find((b) => b.id === snap.activeBoardId)
+        ? snap.activeBoardId
+        : nextBoards[0].id;
+      const active = nextBoards.find((b) => b.id === targetId) || nextBoards[0];
+      return {
+        boards: nextBoards,
+        activeBoardId: active.id,
+        items: active.items || [],
+        connections: active.connections || [],
+        panX: active.panX || 0,
+        panY: active.panY || 0,
+        zoom: active.zoom || 1,
+        boardName: active.name || "Board 1",
+        selectedModelId: snap.selectedModelId ?? null,
+        selectedItemId: null,
+        selectedItemIds: [],
+        startFrameId: null,
+        endFrameId: null,
+        inputRefs: [],
+        audioInputId: null,
+        undoStack: [],
+        redoStack: [],
+      };
+    }),
   setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
   setTimelineOpen: (isTimelineOpen) => set({ isTimelineOpen }),
   addTimelineClip: (clip) => set((s) => ({
@@ -513,6 +544,7 @@ export const useAppStore = create<AppState>((set) => {
         selectedItemId: pasted[0]?.id || null,
       };
     }),
+
   removeSelectedItems: () =>
     set((s) => {
       const ids = s.selectedItemIds.length > 0 ? s.selectedItemIds : (s.selectedItemId ? [s.selectedItemId] : []);
@@ -678,6 +710,54 @@ let dbSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let lsSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let dbLoadedOnce = false; // prevent overwriting DB before initial load completes
 
+// Auto-snapshot: captures a version to mb_board_versions every 15 minutes of
+// activity, giving the user a safety net if local state or the main DB row
+// gets wiped. Snapshots auto-expire after 14 days via the DB sweep.
+let lastSnapshotAt = 0;
+const SNAPSHOT_INTERVAL_MS = 15 * 60 * 1000;
+
+async function createAutoSnapshot(state: AppState): Promise<void> {
+  await saveBoardSnapshotWithLabel(state);
+}
+
+// Exported so the Profile panel can trigger a manual checkpoint without
+// having to wrangle the store's getCurrentBoards helper itself.
+export async function saveBoardSnapshotWithLabel(
+  state: AppState,
+  label?: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (typeof window === "undefined") return { ok: false, error: "No window" };
+  try {
+    const boards = getCurrentBoards(state).map((b) => ({
+      ...b,
+      items: b.items.map((item) => {
+        const src = item.src || "";
+        // Don't send huge data: URIs to the snapshot endpoint (would 413)
+        if (src.startsWith("data:") || src.startsWith("blob:")) return { ...item, src: "" };
+        return item;
+      }),
+    }));
+    const payload = {
+      boards,
+      activeBoardId: state.activeBoardId,
+      selectedModelId: state.selectedModelId,
+      savedAt: Date.now(),
+    };
+    const res = await fetch("/api/board-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: payload, ...(label ? { label } : {}) }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { ok: false, error: err?.error || `HTTP ${res.status}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed" };
+  }
+}
+
 useAppStore.subscribe((state) => {
   // localStorage: short debounce (300ms) — fast enough to survive most refreshes
   if (lsSaveTimeout) clearTimeout(lsSaveTimeout);
@@ -687,6 +767,13 @@ useAppStore.subscribe((state) => {
   if (dbLoadedOnce) {
     if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
     dbSaveTimeout = setTimeout(() => saveToDb(state), 2000);
+
+    // Auto-snapshot every 15 minutes while the user is active
+    const now = Date.now();
+    if (now - lastSnapshotAt > SNAPSHOT_INTERVAL_MS) {
+      lastSnapshotAt = now;
+      createAutoSnapshot(state);
+    }
   }
 });
 
