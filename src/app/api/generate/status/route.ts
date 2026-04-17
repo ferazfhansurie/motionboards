@@ -212,6 +212,12 @@ export async function GET(req: NextRequest) {
 
         if (pred.status === "failed" || pred.status === "canceled") {
           const errMsg = (pred.error as string) || "Generation failed on Replicate";
+          // Log the full prediction so we can see what Replicate actually complained about
+          console.error("[Replicate] Prediction failed", JSON.stringify({
+            status: pred.status,
+            error: pred.error,
+            logs: (pred.logs as string)?.slice(-500),
+          }));
           await updateGeneration(generationId, { status: "failed", error: errMsg, duration: 0 });
           return NextResponse.json({ status: "failed", error: errMsg });
         }

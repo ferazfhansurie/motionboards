@@ -431,9 +431,12 @@ export async function POST(req: NextRequest) {
         // Strip /i2v or /s2e suffixes to get the Replicate model slug
         const replicateModel = modelId.replace(/\/(i2v|s2e)$/, "");
 
-        // Build Replicate input
+        // Build Replicate input. Random seed so retries don't repeat the same
+        // dice roll (Seedance content filter can be non-deterministic around
+        // borderline prompts — a fresh seed sometimes clears).
         const repInput: Record<string, unknown> = {
           prompt: prompt?.trim() || "Generate a video",
+          seed: Math.floor(Math.random() * 2_147_483_647),
         };
 
         // Options passthrough — fall back to model defaults if user didn't override
@@ -452,6 +455,9 @@ export async function POST(req: NextRequest) {
         if (input.first_frame_url) repInput.image = input.first_frame_url;
         if (input.last_frame_url) repInput.last_frame_image = input.last_frame_url;
 
+        // Log the exact payload so we can diagnose content-filter rejections
+        console.log("[Replicate] Submitting", replicateModel, JSON.stringify(repInput).slice(0, 500));
+
         const predRes = await fetch(`https://api.replicate.com/v1/models/${replicateModel}/predictions`, {
           method: "POST",
           headers: {
@@ -462,7 +468,12 @@ export async function POST(req: NextRequest) {
         });
         const predData = await predRes.json() as Record<string, unknown>;
         if (!predRes.ok) {
-          const errMsg = (predData.detail as string) || "Replicate submission failed";
+          // Replicate returns either a string "detail" or a structured error object
+          let errMsg = "Replicate submission failed";
+          if (typeof predData.detail === "string") errMsg = predData.detail;
+          else if (predData.detail && typeof predData.detail === "object") errMsg = JSON.stringify(predData.detail);
+          else if (typeof predData.error === "string") errMsg = predData.error;
+          console.error("[Replicate] Submission rejected", predRes.status, JSON.stringify(predData).slice(0, 500));
           await updateGeneration(generation.id, { status: "failed", error: errMsg, duration: 0 });
           return NextResponse.json({ error: errMsg }, { status: 400 });
         }
