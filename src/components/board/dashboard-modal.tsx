@@ -20,6 +20,18 @@ interface UserData {
   role: string;
 }
 
+interface ExportJob {
+  id: string;
+  boardName: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  progress: number;
+  total: number;
+  fileId: string | null;
+  fileName: string | null;
+  error: string | null;
+  createdAt: string;
+}
+
 // ============ PROFILE PANEL ============
 export function ProfilePanel() {
   const { isProfileOpen, setProfileOpen, theme, autoConnectGenerations, setAutoConnectGenerations, restoreBoardsSnapshot } = useAppStore();
@@ -95,6 +107,50 @@ export function ProfilePanel() {
   useEffect(() => {
     if (showVersions) loadVersions();
   }, [showVersions]);
+
+  // Recent exports (background board exports run via after())
+  const [showExports, setShowExports] = useState(false);
+  const [exports, setExports] = useState<ExportJob[]>([]);
+  const [exportsLoading, setExportsLoading] = useState(false);
+
+  const loadExports = async () => {
+    setExportsLoading(true);
+    try {
+      const res = await fetch("/api/board-exports");
+      const data = await res.json();
+      if (Array.isArray(data.jobs)) setExports(data.jobs);
+    } catch {
+      // noop
+    } finally {
+      setExportsLoading(false);
+    }
+  };
+
+  const handleDeleteExport = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Remove this export from your history?")) return;
+    try {
+      await fetch(`/api/board-exports/${id}`, { method: "DELETE" });
+      setExports((prev) => prev.filter((j) => j.id !== id));
+    } catch {
+      // noop
+    }
+  };
+
+  // Load on open + poll while any job is pending/processing
+  useEffect(() => {
+    if (!showExports) return;
+    loadExports();
+    const interval = setInterval(() => {
+      setExports((prev) => {
+        if (prev.some((j) => j.status === "pending" || j.status === "processing")) {
+          loadExports();
+        }
+        return prev;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [showExports]);
 
   // Change password
   const [showChangePw, setShowChangePw] = useState(false);
@@ -363,6 +419,76 @@ export function ProfilePanel() {
                               onClick={(e) => handleDeleteVersion(v.id, e)}
                               className="opacity-0 group-hover:opacity-100 rounded p-1 text-gray-400 hover:text-red-500 transition-all"
                               title="Delete snapshot"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent exports (background export jobs) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? "text-gray-500" : "text-gray-400"}`}>Recent exports</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowExports(!showExports)}
+                    className={`text-[10px] transition-colors ${isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-[#0d1117]"}`}
+                  >
+                    {showExports ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <p className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Background board exports — keep running if you close the tab. Files auto-delete after 14 days.
+                </p>
+                {showExports && (
+                  <div className={`rounded-lg border max-h-[200px] overflow-y-auto ${isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-200 bg-gray-50"}`}>
+                    {exportsLoading && exports.length === 0 ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#f26522]" />
+                      </div>
+                    ) : exports.length === 0 ? (
+                      <p className={`text-center py-4 text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                        No exports yet. Kick one off from the board menu.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {exports.map((job) => (
+                          <div key={job.id} className="flex items-center gap-1.5 px-2 py-1.5 group">
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[11px] font-medium truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
+                                {job.boardName}
+                              </p>
+                              <p className={`text-[9px] ${
+                                job.status === "failed" ? "text-red-500"
+                                : job.status === "completed" ? "text-emerald-500"
+                                : "text-[#f26522]"
+                              }`}>
+                                {job.status === "pending" && "Queued..."}
+                                {job.status === "processing" && `Processing ${job.progress}/${job.total}...`}
+                                {job.status === "completed" && `Ready · ${new Date(job.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
+                                {job.status === "failed" && `Failed: ${job.error || "unknown"}`}
+                              </p>
+                            </div>
+                            {job.status === "completed" && job.fileId && (
+                              <a
+                                href={`/api/files/${job.fileId}`}
+                                download={job.fileName || `${job.boardName}.mbboard.json`}
+                                className="rounded p-1 text-[#f26522] hover:bg-[#f26522]/10 transition-colors"
+                                title="Download"
+                              >
+                                <Save className="h-3 w-3" />
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteExport(job.id, e)}
+                              className="opacity-0 group-hover:opacity-100 rounded p-1 text-gray-400 hover:text-red-500 transition-all"
+                              title="Delete"
                             >
                               <Trash2 className="h-3 w-3" />
                             </button>

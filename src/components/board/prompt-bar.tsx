@@ -19,7 +19,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
-import { exportBoardToFile, importBoardFromFile, ImportCancelled } from "@/lib/board-io";
+import { importBoardFromFile, ImportCancelled } from "@/lib/board-io";
 import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
 
@@ -230,15 +230,31 @@ export function PromptBar() {
     const store = useAppStore.getState();
     const active = store.boards.find((b) => b.id === store.activeBoardId);
     if (!active) return;
-    // Use live items/connections for the active board (state.items is fresher)
-    const liveBoard = { ...active, items: store.items, connections: store.connections };
-    setBoardIoBusy("Exporting...");
+    const liveBoard = {
+      name: active.name,
+      items: store.items,
+      connections: store.connections,
+      panX: store.panX,
+      panY: store.panY,
+      zoom: store.zoom,
+    };
+    setBoardIoBusy("Queueing export...");
     try {
-      await exportBoardToFile(liveBoard, (done, total) => {
-        setBoardIoBusy(`Exporting ${done}/${total}...`);
-      });
+      const json = JSON.stringify({ board: liveBoard });
+      // gzip large payloads so we fit under Vercel's 4.5MB request limit
+      let bodyInit: BodyInit = json;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (typeof CompressionStream !== "undefined") {
+        const encoded = new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"));
+        bodyInit = await new Response(encoded).arrayBuffer();
+        headers["Content-Encoding"] = "gzip";
+      }
+      const res = await fetch("/api/board-exports", { method: "POST", headers, body: bodyInit });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       setBoardIoBusy(null);
       setBoardMenuOpen(false);
+      alert(`Export queued! It will keep running even if you close this tab. Check Profile → Recent exports to download when it's ready.`);
     } catch (err) {
       setBoardIoBusy(null);
       alert(err instanceof Error ? err.message : "Export failed");

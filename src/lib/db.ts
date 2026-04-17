@@ -658,3 +658,143 @@ export async function deleteBoardVersion(id: string, userId: string): Promise<bo
   `;
   return rows.length > 0;
 }
+
+// --- Background board exports ---
+//
+// Each row represents a user-initiated export job. The job starts as `pending`,
+// flips to `processing` while the server fetches media + builds the JSON, and
+// ends as `completed` (with file_id pointing at the stored export) or `failed`.
+// Closing the tab doesn't cancel the job — Next.js's after() keeps the work
+// running past the response. Jobs auto-expire after 14 days.
+
+export type BoardExportStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface BoardExportJob {
+  id: string;
+  userId: string;
+  boardName: string;
+  status: BoardExportStatus;
+  progress: number;       // items processed
+  total: number;          // total items to process
+  fileId: string | null;  // mb_files.id when completed
+  fileName: string | null;// filename for download
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+let boardExportsTableInitialized = false;
+let lastBoardExportSweepAt = 0;
+
+async function ensureBoardExportsTable(): Promise<void> {
+  if (boardExportsTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_board_exports (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      board_name TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      progress INTEGER NOT NULL DEFAULT 0,
+      total INTEGER NOT NULL DEFAULT 0,
+      file_id TEXT,
+      file_name TEXT,
+      error TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_board_exports_user_created_idx ON mb_board_exports (user_id, created_at DESC)`;
+  boardExportsTableInitialized = true;
+}
+
+async function sweepExpiredBoardExports(): Promise<void> {
+  const now = Date.now();
+  if (now - lastBoardExportSweepAt < CLEANUP_THROTTLE_MS) return;
+  lastBoardExportSweepAt = now;
+  try {
+    await sql`
+      DELETE FROM mb_board_exports
+      WHERE created_at < NOW() - (${FILE_TTL_DAYS}::int * INTERVAL '1 day')
+    `;
+  } catch (err) {
+    console.error("Board export TTL sweep failed:", err);
+  }
+}
+
+function rowToBoardExportJob(row: Record<string, unknown>): BoardExportJob {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    boardName: (row.board_name as string) || "",
+    status: (row.status as BoardExportStatus) || "pending",
+    progress: (row.progress as number) || 0,
+    total: (row.total as number) || 0,
+    fileId: (row.file_id as string | null) || null,
+    fileName: (row.file_name as string | null) || null,
+    error: (row.error as string | null) || null,
+    createdAt: (row.created_at as Date).toISOString(),
+    updatedAt: (row.updated_at as Date).toISOString(),
+  };
+}
+
+export async function createBoardExportJob(userId: string, boardName: string, total: number): Promise<BoardExportJob> {
+  await ensureBoardExportsTable();
+  const id = `be_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const rows = await sql`
+    INSERT INTO mb_board_exports (id, user_id, board_name, status, progress, total)
+    VALUES (${id}, ${userId}, ${boardName}, 'pending', 0, ${total})
+    RETURNING *
+  `;
+  sweepExpiredBoardExports().catch(() => {});
+  return rowToBoardExportJob(rows[0]);
+}
+
+export async function updateBoardExportJob(
+  id: string,
+  updates: Partial<{
+    status: BoardExportStatus;
+    progress: number;
+    total: number;
+    fileId: string | null;
+    fileName: string | null;
+    error: string | null;
+  }>
+): Promise<void> {
+  await ensureBoardExportsTable();
+  // Use NULL fallback trick so we can leave fields alone when not provided
+  await sql`
+    UPDATE mb_board_exports SET
+      status = COALESCE(${updates.status ?? null}, status),
+      progress = COALESCE(${updates.progress ?? null}, progress),
+      total = COALESCE(${updates.total ?? null}, total),
+      file_id = COALESCE(${updates.fileId ?? null}, file_id),
+      file_name = COALESCE(${updates.fileName ?? null}, file_name),
+      error = ${updates.error ?? null},
+      updated_at = NOW()
+    WHERE id = ${id}
+  `;
+}
+
+export async function listBoardExportJobs(userId: string): Promise<BoardExportJob[]> {
+  await ensureBoardExportsTable();
+  const rows = await sql`
+    SELECT * FROM mb_board_exports WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 30
+  `;
+  return rows.map(rowToBoardExportJob);
+}
+
+export async function getBoardExportJob(id: string, userId: string): Promise<BoardExportJob | null> {
+  await ensureBoardExportsTable();
+  const rows = await sql`
+    SELECT * FROM mb_board_exports WHERE id = ${id} AND user_id = ${userId}
+  `;
+  return rows.length > 0 ? rowToBoardExportJob(rows[0]) : null;
+}
+
+export async function deleteBoardExportJob(id: string, userId: string): Promise<boolean> {
+  await ensureBoardExportsTable();
+  const rows = await sql`
+    DELETE FROM mb_board_exports WHERE id = ${id} AND user_id = ${userId} RETURNING id
+  `;
+  return rows.length > 0;
+}
