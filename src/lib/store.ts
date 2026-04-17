@@ -312,6 +312,7 @@ export interface AppState {
   resetEditState: (id: string) => void;
   applyEditState: (id: string, newSrc: string) => void;
   addBoard: () => void;
+  insertImportedBoard: (board: Board) => void;
   switchBoard: (boardId: string) => void;
   deleteBoard: (boardId: string) => void;
   renameBoard: (boardId: string, name: string) => void;
@@ -645,6 +646,35 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: null,
         inputRefs: [],
         audioInputId: null,
+      };
+    }),
+  insertImportedBoard: (board) =>
+    set((s) => {
+      // Persist the currently-active board's live state, then append + switch
+      // to the imported one. IDs on the imported board are already unique
+      // (minted by importBoardFromFile) so no collision with existing boards.
+      const updatedBoards = s.boards.map((b) =>
+        b.id === s.activeBoardId
+          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom }
+          : b
+      );
+      return {
+        boards: [...updatedBoards, board],
+        activeBoardId: board.id,
+        items: board.items,
+        connections: board.connections || [],
+        selectedItemId: null,
+        selectedItemIds: [],
+        panX: board.panX || 0,
+        panY: board.panY || 0,
+        zoom: board.zoom || 1,
+        boardName: board.name,
+        startFrameId: null,
+        endFrameId: null,
+        inputRefs: [],
+        audioInputId: null,
+        undoStack: [],
+        redoStack: [],
       };
     }),
   switchBoard: (boardId) =>

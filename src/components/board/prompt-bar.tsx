@@ -15,8 +15,11 @@ import {
   Trash2,
   History,
   Music,
+  Download,
+  Upload,
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
+import { exportBoardToFile, importBoardFromFile } from "@/lib/board-io";
 import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
 
@@ -39,6 +42,8 @@ function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>):
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
+  const [boardIoBusy, setBoardIoBusy] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [boxW, setBoxW] = useState(320);
   const [boxMinH, setBoxMinH] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
@@ -218,6 +223,44 @@ export function PromptBar() {
     const m = speed.match(/(\d+)\s*m/);
     const s = speed.match(/(\d+)\s*s/);
     return (m ? parseInt(m[1]) * 60 : 0) + (s ? parseInt(s[1]) : 0) || 60;
+  };
+
+  const handleExportBoard = async () => {
+    const store = useAppStore.getState();
+    const active = store.boards.find((b) => b.id === store.activeBoardId);
+    if (!active) return;
+    // Use live items/connections for the active board (state.items is fresher)
+    const liveBoard = { ...active, items: store.items, connections: store.connections };
+    setBoardIoBusy("Exporting...");
+    try {
+      await exportBoardToFile(liveBoard, (done, total) => {
+        setBoardIoBusy(`Exporting ${done}/${total}...`);
+      });
+      setBoardIoBusy(null);
+      setBoardMenuOpen(false);
+    } catch (err) {
+      setBoardIoBusy(null);
+      alert(err instanceof Error ? err.message : "Export failed");
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so the same file can be re-picked later
+    if (!file) return;
+    setBoardIoBusy("Reading file...");
+    try {
+      const { board, skipped } = await importBoardFromFile(file, (done, total) => {
+        setBoardIoBusy(`Importing ${done}/${total}...`);
+      });
+      useAppStore.getState().insertImportedBoard(board);
+      setBoardIoBusy(null);
+      setBoardMenuOpen(false);
+      if (skipped > 0) alert(`Imported with ${skipped} media items that couldn't be uploaded (kept as data URIs).`);
+    } catch (err) {
+      setBoardIoBusy(null);
+      alert(err instanceof Error ? err.message : "Import failed");
+    }
   };
 
   const handleGenerate = async () => {
@@ -1008,14 +1051,40 @@ export function PromptBar() {
                   </div>
                 ))}
               </div>
-              <div className="border-t border-gray-100 p-1.5">
+              <div className="border-t border-gray-100 p-1.5 space-y-0.5">
                 <button
                   className="flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[#f26522] hover:bg-[#f26522]/5 transition-colors"
                   onClick={() => { addBoard(); setBoardMenuOpen(false); }}
+                  disabled={!!boardIoBusy}
                 >
                   <Plus className="w-3 h-3" />
                   New Board
                 </button>
+                <button
+                  className={`flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-600 hover:bg-gray-50"}`}
+                  onClick={handleExportBoard}
+                  disabled={!!boardIoBusy}
+                  title="Download the current board as a portable .mbboard.json file (media embedded)"
+                >
+                  <Download className="w-3 h-3" />
+                  {boardIoBusy?.startsWith("Exporting") ? boardIoBusy : "Export current board"}
+                </button>
+                <button
+                  className={`flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-600 hover:bg-gray-50"}`}
+                  onClick={() => importInputRef.current?.click()}
+                  disabled={!!boardIoBusy}
+                  title="Import a .mbboard.json file — media is uploaded to your account"
+                >
+                  <Upload className="w-3 h-3" />
+                  {boardIoBusy && !boardIoBusy.startsWith("Exporting") ? boardIoBusy : "Import board from file"}
+                </button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={handleImportFile}
+                />
               </div>
             </div>
           )}
