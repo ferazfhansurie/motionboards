@@ -728,11 +728,14 @@ export async function saveBoardSnapshotWithLabel(
 ): Promise<{ ok: boolean; error?: string }> {
   if (typeof window === "undefined") return { ok: false, error: "No window" };
   try {
+    // Save EVERY board, with the active board's live items merged in.
+    // Non-active boards use their last snapshot from state.boards.
     const boards = getCurrentBoards(state).map((b) => ({
       ...b,
       items: b.items.map((item) => {
         const src = item.src || "";
-        // Don't send huge data: URIs to the snapshot endpoint (would 413)
+        // Don't persist huge data: URIs in snapshots (they'd blow the body limit
+        // even after gzip; the user can re-upload from the image cache on refresh).
         if (src.startsWith("data:") || src.startsWith("blob:")) return { ...item, src: "" };
         return item;
       }),
@@ -743,10 +746,22 @@ export async function saveBoardSnapshotWithLabel(
       selectedModelId: state.selectedModelId,
       savedAt: Date.now(),
     };
+    const json = JSON.stringify({ data: payload, ...(label ? { label } : {}) });
+
+    // gzip the body client-side so big canvases (multi-MB JSON) fit under
+    // Vercel's 4.5MB request limit. JSON typically compresses ~85%.
+    let bodyInit: BodyInit = json;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (typeof CompressionStream !== "undefined") {
+      const encoded = new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"));
+      const buffer = await new Response(encoded).arrayBuffer();
+      bodyInit = buffer;
+      headers["Content-Encoding"] = "gzip";
+    }
     const res = await fetch("/api/board-versions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: payload, ...(label ? { label } : {}) }),
+      headers,
+      body: bodyInit,
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

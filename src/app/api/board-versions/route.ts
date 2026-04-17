@@ -25,6 +25,10 @@ export async function GET(req: NextRequest) {
 // Body: { data, label? }
 //   data: same shape as /api/boards ({ boards, activeBoardId, selectedModelId })
 //   label: optional human-readable tag; defaults to timestamp
+//
+// Accepts gzipped bodies via Content-Encoding: gzip so huge canvases
+// (many boards, long prompts) stay under Vercel's 4.5MB request limit.
+// JSON typically compresses ~85% — a 4MB snapshot becomes ~600KB.
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("session")?.value;
@@ -32,10 +36,25 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const body = await req.json();
+    // Decompress if the client sent a gzipped body
+    let body: { data?: unknown; label?: string };
+    const encoding = req.headers.get("content-encoding");
+    if (encoding === "gzip" && req.body) {
+      try {
+        const decompressed = req.body.pipeThrough(new DecompressionStream("gzip"));
+        const text = await new Response(decompressed).text();
+        body = JSON.parse(text);
+      } catch (err) {
+        console.error("Failed to decompress snapshot body:", err);
+        return NextResponse.json({ error: "Malformed gzipped body" }, { status: 400 });
+      }
+    } else {
+      body = await req.json();
+    }
     if (!body?.data) return NextResponse.json({ error: "Missing data" }, { status: 400 });
 
-    const boards = Array.isArray(body.data.boards) ? body.data.boards : [];
+    const data = body.data as { boards?: unknown[] };
+    const boards = Array.isArray(data.boards) ? data.boards : [];
     const itemCount = boards.reduce(
       (sum: number, b: { items?: unknown[] }) => sum + (Array.isArray(b.items) ? b.items.length : 0),
       0
