@@ -100,11 +100,17 @@ async function dataUriToUploadedUrl(dataUri: string): Promise<string> {
   }
 }
 
+export class ImportCancelled extends Error {
+  constructor() { super("Import cancelled"); this.name = "ImportCancelled"; }
+}
+
 export async function importBoardFromFile(
   file: File,
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  signal?: AbortSignal
 ): Promise<{ board: Board; skipped: number }> {
   const text = await file.text();
+  if (signal?.aborted) throw new ImportCancelled();
   let parsed: BoardExport;
   try {
     parsed = JSON.parse(text);
@@ -124,13 +130,16 @@ export async function importBoardFromFile(
   const items: BoardItem[] = [];
 
   for (let i = 0; i < parsed.board.items.length; i++) {
+    if (signal?.aborted) throw new ImportCancelled();
     const src = parsed.board.items[i];
     const newId = `item_${now}_${i}_${Math.random().toString(36).slice(2, 6)}`;
     idMap.set(src.id, newId);
 
     // Upload any data: URIs to the current user's account
     const newSrc = src.src ? await dataUriToUploadedUrl(src.src) : src.src;
+    if (signal?.aborted) throw new ImportCancelled();
     const newOut = src.outputUrl ? await dataUriToUploadedUrl(src.outputUrl) : src.outputUrl;
+    if (signal?.aborted) throw new ImportCancelled();
     if (src.src && src.src.startsWith("data:") && !newSrc.startsWith("/") && !newSrc.startsWith("http")) {
       skipped++;
     }

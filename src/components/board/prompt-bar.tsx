@@ -19,7 +19,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
-import { exportBoardToFile, importBoardFromFile } from "@/lib/board-io";
+import { exportBoardToFile, importBoardFromFile, ImportCancelled } from "@/lib/board-io";
 import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
 
@@ -44,6 +44,7 @@ export function PromptBar() {
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
   const [boardIoBusy, setBoardIoBusy] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const importAbortRef = useRef<AbortController | null>(null);
   const [boxW, setBoxW] = useState(320);
   const [boxMinH, setBoxMinH] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
@@ -248,19 +249,32 @@ export function PromptBar() {
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so the same file can be re-picked later
     if (!file) return;
+    const controller = new AbortController();
+    importAbortRef.current = controller;
     setBoardIoBusy("Reading file...");
     try {
-      const { board, skipped } = await importBoardFromFile(file, (done, total) => {
-        setBoardIoBusy(`Importing ${done}/${total}...`);
-      });
+      const { board, skipped } = await importBoardFromFile(
+        file,
+        (done, total) => setBoardIoBusy(`Importing ${done}/${total}...`),
+        controller.signal
+      );
       useAppStore.getState().insertImportedBoard(board);
       setBoardIoBusy(null);
       setBoardMenuOpen(false);
       if (skipped > 0) alert(`Imported with ${skipped} media items that couldn't be uploaded (kept as data URIs).`);
     } catch (err) {
       setBoardIoBusy(null);
+      if (err instanceof ImportCancelled) return; // silent cancel
       alert(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      importAbortRef.current = null;
     }
+  };
+
+  const cancelImport = () => {
+    importAbortRef.current?.abort();
+    importAbortRef.current = null;
+    setBoardIoBusy(null);
   };
 
   const handleGenerate = async () => {
@@ -1069,15 +1083,27 @@ export function PromptBar() {
                   <Download className="w-3 h-3" />
                   {boardIoBusy?.startsWith("Exporting") ? boardIoBusy : "Export current board"}
                 </button>
-                <button
-                  className={`flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-600 hover:bg-gray-50"}`}
-                  onClick={() => importInputRef.current?.click()}
-                  disabled={!!boardIoBusy}
-                  title="Import a .mbboard.json file — media is uploaded to your account"
-                >
-                  <Upload className="w-3 h-3" />
-                  {boardIoBusy && !boardIoBusy.startsWith("Exporting") ? boardIoBusy : "Import board from file"}
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    className={`flex-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-600 hover:bg-gray-50"}`}
+                    onClick={() => importInputRef.current?.click()}
+                    disabled={!!boardIoBusy}
+                    title="Import a .mbboard.json file — media is uploaded to your account"
+                  >
+                    <Upload className="w-3 h-3" />
+                    {boardIoBusy && !boardIoBusy.startsWith("Exporting") ? boardIoBusy : "Import board from file"}
+                  </button>
+                  {boardIoBusy && !boardIoBusy.startsWith("Exporting") && (
+                    <button
+                      type="button"
+                      onClick={cancelImport}
+                      className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-red-500 hover:bg-red-50 transition-colors"
+                      title="Cancel import"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
                 <input
                   ref={importInputRef}
                   type="file"
