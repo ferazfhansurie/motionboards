@@ -570,6 +570,12 @@ function rowToBoardVersion(row: Record<string, unknown>, includeData: boolean): 
   };
 }
 
+// Keep at most this many snapshots per user; oldest beyond this are pruned
+// right after each insert so storage stays bounded even for heavy editors.
+// Combined with the 14-day TTL sweep, a user never holds more than ~50 × the
+// size of one snapshot.
+const MAX_BOARD_VERSIONS_PER_USER = 50;
+
 export async function createBoardVersion(
   userId: string,
   data: unknown,
@@ -584,6 +590,22 @@ export async function createBoardVersion(
     VALUES (${id}, ${userId}, ${label}, ${itemCount}, ${boardCount}, ${JSON.stringify(data)}::jsonb)
     RETURNING *
   `;
+
+  // Trim oldest snapshots beyond the cap (by created_at DESC, then delete tail)
+  try {
+    await sql`
+      DELETE FROM mb_board_versions
+      WHERE id IN (
+        SELECT id FROM mb_board_versions
+        WHERE user_id = ${userId}
+        ORDER BY created_at DESC
+        OFFSET ${MAX_BOARD_VERSIONS_PER_USER}
+      )
+    `;
+  } catch (err) {
+    console.error("Board version cap trim failed:", err);
+  }
+
   sweepExpiredBoardVersions().catch(() => {});
   return rowToBoardVersion(rows[0], true);
 }

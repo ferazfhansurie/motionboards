@@ -710,36 +710,66 @@ let dbSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let lsSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let dbLoadedOnce = false; // prevent overwriting DB before initial load completes
 
-// Auto-snapshot: captures a version to mb_board_versions every 15 minutes of
-// activity, giving the user a safety net if local state or the main DB row
-// gets wiped. Snapshots auto-expire after 14 days via the DB sweep.
+// Auto-snapshot: piggybacks on the autosave flow. We try to save a version
+// after every DB save, but only actually POST when:
+//   1. The content has changed since the previous snapshot (hash dedupe)
+//   2. At least 5 minutes have passed since the last snapshot
+// Server caps snapshots at 50 per user (trims oldest on insert) and the
+// 14-day TTL sweep still runs, so storage stays bounded.
 let lastSnapshotAt = 0;
-const SNAPSHOT_INTERVAL_MS = 15 * 60 * 1000;
+let lastSnapshotHash = "";
+const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60 * 1000;
+
+// Fast non-cryptographic string hash (djb2) — good enough to detect whether
+// anything in the serialized board state has changed since last snapshot.
+function cheapHash(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return h.toString(36);
+}
 
 async function createAutoSnapshot(state: AppState): Promise<void> {
-  await saveBoardSnapshotWithLabel(state);
+  // Skip if too soon since last snapshot
+  const now = Date.now();
+  if (now - lastSnapshotAt < SNAPSHOT_MIN_INTERVAL_MS) return;
+
+  // Compute cheap hash of the current boards — skip if nothing changed.
+  // We hash the same stripped shape we'd send to the server so the dedupe
+  // decision matches the persisted payload.
+  const boards = stripSnapshotBoards(state);
+  const shape = JSON.stringify({ boards, activeBoardId: state.activeBoardId, selectedModelId: state.selectedModelId });
+  const hash = cheapHash(shape);
+  if (hash === lastSnapshotHash) return;
+
+  const result = await saveBoardSnapshotWithLabel(state);
+  if (result.ok) {
+    lastSnapshotAt = now;
+    lastSnapshotHash = hash;
+  }
+}
+
+// Strip transient/oversized fields that don't need to live in a snapshot.
+function stripSnapshotBoards(state: AppState): ReturnType<typeof getCurrentBoards> {
+  return getCurrentBoards(state).map((b) => ({
+    ...b,
+    items: b.items.map((item) => {
+      const src = item.src || "";
+      if (src.startsWith("data:") || src.startsWith("blob:")) return { ...item, src: "" };
+      return item;
+    }),
+  }));
 }
 
 // Exported so the Profile panel can trigger a manual checkpoint without
-// having to wrangle the store's getCurrentBoards helper itself.
+// having to wrangle the store's getCurrentBoards helper itself. Manual
+// checkpoints bypass the hash + interval dedupe (user explicitly asked).
 export async function saveBoardSnapshotWithLabel(
   state: AppState,
   label?: string
 ): Promise<{ ok: boolean; error?: string }> {
   if (typeof window === "undefined") return { ok: false, error: "No window" };
   try {
-    // Save EVERY board, with the active board's live items merged in.
-    // Non-active boards use their last snapshot from state.boards.
-    const boards = getCurrentBoards(state).map((b) => ({
-      ...b,
-      items: b.items.map((item) => {
-        const src = item.src || "";
-        // Don't persist huge data: URIs in snapshots (they'd blow the body limit
-        // even after gzip; the user can re-upload from the image cache on refresh).
-        if (src.startsWith("data:") || src.startsWith("blob:")) return { ...item, src: "" };
-        return item;
-      }),
-    }));
+    const boards = stripSnapshotBoards(state);
     const payload = {
       boards,
       activeBoardId: state.activeBoardId,
@@ -767,6 +797,10 @@ export async function saveBoardSnapshotWithLabel(
       const err = await res.json().catch(() => ({}));
       return { ok: false, error: err?.error || `HTTP ${res.status}` };
     }
+    // Update the dedupe state so the next auto-snapshot doesn't immediately
+    // save the same content again.
+    lastSnapshotAt = Date.now();
+    lastSnapshotHash = cheapHash(JSON.stringify({ boards, activeBoardId: state.activeBoardId, selectedModelId: state.selectedModelId }));
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed" };
@@ -778,17 +812,16 @@ useAppStore.subscribe((state) => {
   if (lsSaveTimeout) clearTimeout(lsSaveTimeout);
   lsSaveTimeout = setTimeout(() => saveToLocalStorage(state), 300);
 
-  // DB: longer debounce (2s), only after initial DB load completes
+  // DB: longer debounce (2s), only after initial DB load completes.
+  // Version snapshot tries to piggyback on this; it's deduped by content
+  // hash and a 5-minute minimum interval so it only persists meaningful
+  // changes (see createAutoSnapshot).
   if (dbLoadedOnce) {
     if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
-    dbSaveTimeout = setTimeout(() => saveToDb(state), 2000);
-
-    // Auto-snapshot every 15 minutes while the user is active
-    const now = Date.now();
-    if (now - lastSnapshotAt > SNAPSHOT_INTERVAL_MS) {
-      lastSnapshotAt = now;
+    dbSaveTimeout = setTimeout(() => {
+      saveToDb(state);
       createAutoSnapshot(state);
-    }
+    }, 2000);
   }
 });
 
