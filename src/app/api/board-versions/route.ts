@@ -53,10 +53,10 @@ export async function POST(req: NextRequest) {
     }
     if (!body?.data) return NextResponse.json({ error: "Missing data" }, { status: 400 });
 
-    const data = body.data as { boards?: unknown[] };
-    const boards = Array.isArray(data.boards) ? data.boards : [];
-    const itemCount = boards.reduce(
-      (sum: number, b: { items?: unknown[] }) => sum + (Array.isArray(b.items) ? b.items.length : 0),
+    const data = body.data as { boards?: Array<{ items?: unknown[] }> };
+    const boards: Array<{ items?: unknown[] }> = Array.isArray(data.boards) ? data.boards : [];
+    const itemCount = boards.reduce<number>(
+      (sum, b) => sum + (Array.isArray(b.items) ? b.items.length : 0),
       0
     );
     const boardCount = boards.length;
