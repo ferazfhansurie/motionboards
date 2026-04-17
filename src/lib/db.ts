@@ -82,6 +82,26 @@ export async function createUser(name: string, email: string, password: string):
   return rowToUser(rows[0]);
 }
 
+// Change a user's password. Requires the current password for verification,
+// so a stolen session cookie alone can't lock the user out.
+export async function changeUserPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!newPassword || newPassword.length < 8) {
+    return { ok: false, error: "New password must be at least 8 characters" };
+  }
+  const rows = await sql`SELECT password_hash FROM mb_users WHERE id = ${userId}`;
+  if (rows.length === 0) return { ok: false, error: "User not found" };
+  if ((rows[0].password_hash as string) !== hashPassword(currentPassword)) {
+    return { ok: false, error: "Current password is incorrect" };
+  }
+  const newHash = hashPassword(newPassword);
+  await sql`UPDATE mb_users SET password_hash = ${newHash} WHERE id = ${userId}`;
+  return { ok: true };
+}
+
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
   const rows = await sql`SELECT * FROM mb_users WHERE LOWER(email) = LOWER(${email})`;
   if (rows.length === 0) return null;

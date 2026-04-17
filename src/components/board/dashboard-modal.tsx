@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle, RotateCcw, Trash2, Save } from "lucide-react";
+import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle, RotateCcw, Trash2, Save, Lock, Eye, EyeOff } from "lucide-react";
 import { useAppStore, saveBoardSnapshotWithLabel } from "@/lib/store";
 
 interface VersionSummary {
@@ -95,6 +95,43 @@ export function ProfilePanel() {
   useEffect(() => {
     if (showVersions) loadVersions();
   }, [showVersions]);
+
+  // Change password
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [changingPw, setChangingPw] = useState(false);
+  const [pwStatus, setPwStatus] = useState<string | null>(null);
+
+  const handleChangePassword = async () => {
+    setPwStatus(null);
+    if (!currentPw) { setPwStatus("Enter your current password"); return; }
+    if (newPw.length < 8) { setPwStatus("New password must be at least 8 characters"); return; }
+    if (newPw !== confirmPw) { setPwStatus("Passwords don't match"); return; }
+    setChangingPw(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setPwStatus("Password updated");
+        setCurrentPw(""); setNewPw(""); setConfirmPw("");
+        setTimeout(() => { setShowChangePw(false); setPwStatus(null); }, 1500);
+      } else {
+        setPwStatus(data.error || "Failed to change password");
+      }
+    } catch {
+      setPwStatus("Failed to change password");
+    } finally {
+      setChangingPw(false);
+    }
+  };
   const [topupLoading, setTopupLoading] = useState(false);
   const [topupAmount, setTopupAmount] = useState("10");
 
@@ -333,6 +370,84 @@ export function ProfilePanel() {
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Change password */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowChangePw(!showChangePw)}
+                  className={`w-full flex items-center justify-center gap-1.5 text-[11px] px-2.5 py-2 rounded-lg border font-semibold transition-colors ${
+                    isDark ? "border-gray-700 text-white hover:bg-white/5" : "border-gray-200 text-[#0d1117] hover:bg-gray-50"
+                  }`}
+                >
+                  <Lock className="h-3 w-3" />
+                  {showChangePw ? "Cancel" : "Change password"}
+                </button>
+                {showChangePw && (
+                  <div className={`rounded-lg border p-3 space-y-2 ${isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-200 bg-gray-50"}`}>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPw ? "text" : "password"}
+                        placeholder="Current password"
+                        value={currentPw}
+                        onChange={(e) => setCurrentPw(e.target.value)}
+                        className={`w-full rounded-md border text-[11px] px-2.5 py-1.5 pr-7 focus:outline-none focus:border-[#f26522] focus:ring-1 focus:ring-[#f26522]/20 ${
+                          isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-200 text-[#0d1117] placeholder-gray-400"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPw(!showCurrentPw)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showCurrentPw ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showNewPw ? "text" : "password"}
+                        placeholder="New password (min 8 chars)"
+                        value={newPw}
+                        onChange={(e) => setNewPw(e.target.value)}
+                        className={`w-full rounded-md border text-[11px] px-2.5 py-1.5 pr-7 focus:outline-none focus:border-[#f26522] focus:ring-1 focus:ring-[#f26522]/20 ${
+                          isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-200 text-[#0d1117] placeholder-gray-400"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPw(!showNewPw)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showNewPw ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <input
+                      type={showNewPw ? "text" : "password"}
+                      placeholder="Confirm new password"
+                      value={confirmPw}
+                      onChange={(e) => setConfirmPw(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleChangePassword(); }}
+                      className={`w-full rounded-md border text-[11px] px-2.5 py-1.5 focus:outline-none focus:border-[#f26522] focus:ring-1 focus:ring-[#f26522]/20 ${
+                        isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-200 text-[#0d1117] placeholder-gray-400"
+                      }`}
+                    />
+                    {pwStatus && (
+                      <p className={`text-[10px] ${pwStatus.toLowerCase().includes("updated") ? "text-emerald-500" : "text-red-500"}`}>
+                        {pwStatus}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleChangePassword}
+                      disabled={changingPw}
+                      className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-white bg-[#f26522] hover:bg-[#d9541a] transition-colors disabled:opacity-50"
+                    >
+                      {changingPw ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                      Update password
+                    </button>
                   </div>
                 )}
               </div>
