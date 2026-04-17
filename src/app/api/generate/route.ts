@@ -185,19 +185,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Gemini: Vertex AI for video (Veo), AI Studio API key for images (Nano Banana 2)
+    // Gemini: prefer Vertex AI (direct Google Cloud, service-account auth) for
+    // both video and images when the GCP env vars are set. Falls back to the
+    // AI Studio API key if only that's configured.
     if (modelInfo.provider === "gemini") {
       const gcpProject = process.env.GOOGLE_PROJECT_ID;
       const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
       const hasVertexAI = !!(gcpProject && gcpServiceAccount);
       const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
-      const useVertexAI = isVideo && hasVertexAI;
+      // Vertex AI for everything when it's available; otherwise fall back to the API key
+      const useVertexAI = hasVertexAI;
       const gcpLocation = process.env.GOOGLE_LOCATION || "global";
 
       if (!useVertexAI && !settings.geminiApiKey) {
-        return NextResponse.json({ error: isVideo
-          ? "Google API not configured. Set GOOGLE_PROJECT_ID + GOOGLE_SERVICE_ACCOUNT_KEY env vars for Veo."
-          : "Gemini API key not configured." }, { status: 500 });
+        return NextResponse.json({
+          error: "Google API not configured. Set GOOGLE_PROJECT_ID + GOOGLE_SERVICE_ACCOUNT_KEY for Vertex AI, or a GEMINI_API_KEY for AI Studio.",
+        }, { status: 500 });
       }
       try {
         const { GoogleGenAI } = await import("@google/genai");
