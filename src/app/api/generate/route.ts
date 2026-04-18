@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     }
 
     // OpenAI Sora: async video generation via openai.videos.create
-    if (modelInfo.provider === "openai") {
+    if (modelInfo.provider === "openai" && ["t2v", "i2v", "s2e"].includes(modelInfo.type)) {
       if (!settings.openaiApiKey) {
         return NextResponse.json({ error: "OpenAI API key not configured." }, { status: 500 });
       }
@@ -348,6 +348,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // OpenAI: handles both Sora (async, existing) AND TTS (synchronous, new)
+    if (modelInfo.provider === "openai" && modelInfo.type === "audio") {
+      if (!settings.openaiApiKey) {
+        return NextResponse.json({ error: "OpenAI API key not configured." }, { status: 500 });
+      }
+      try {
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({ apiKey: settings.openaiApiKey });
+        // aspect_ratio option is reused to carry the voice name (UI constraint)
+        const voice = (input.aspect_ratio as string) || "alloy";
+        const text = (input.text as string) || prompt || "";
+        if (!text.trim()) {
+          return NextResponse.json({ error: "Text is required for TTS." }, { status: 400 });
+        }
+        const speech = await openai.audio.speech.create({
+          model: modelId, // "tts-1" or "tts-1-hd"
+          voice: voice as "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer",
+          input: text,
+        });
+        const buffer = Buffer.from(await speech.arrayBuffer());
+        const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "audio/mpeg", user.id);
+        await deductCredits(user.id, creditCost);
+        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
+      } catch (ttsErr) {
+        const msg = ttsErr instanceof Error ? ttsErr.message : "OpenAI TTS error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
     // Fish Audio: voice clone + TTS in one synchronous flow
     if (modelInfo.provider === "fish") {
       if (!settings.fishApiKey) {
@@ -433,30 +464,39 @@ export async function POST(req: NextRequest) {
       try {
         // Strip /i2v or /s2e suffixes to get the Replicate model slug
         const replicateModel = modelId.replace(/\/(i2v|s2e)$/, "");
+        const isSfx = modelInfo.type === "sfx";
+        const isImage = ["t2i", "i2i"].includes(modelInfo.type);
 
-        // Build Replicate input. Random seed so retries don't repeat the same
-        // dice roll (Seedance content filter can be non-deterministic around
-        // borderline prompts — a fresh seed sometimes clears).
         const repInput: Record<string, unknown> = {
-          prompt: prompt?.trim() || "Generate a video",
+          prompt: prompt?.trim() || (isSfx ? "Generate audio" : isImage ? "Generate an image" : "Generate a video"),
           seed: Math.floor(Math.random() * 2_147_483_647),
         };
 
-        // Options passthrough — fall back to model defaults if user didn't override
-        repInput.aspect_ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "16:9";
-        repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "720p";
-        repInput.generate_audio = input.generate_audio !== undefined ? !!input.generate_audio : (modelInfo.options?.generate_audio?.default ?? true);
-        const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "5s";
-        const dur = parseInt(durStr.replace("s", ""));
-        if (dur > 0) repInput.duration = dur;
+        if (isImage) {
+          // FLUX Schnell, etc. — aspect_ratio only (duration/resolution irrelevant)
+          repInput.aspect_ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "1:1";
+        } else if (isSfx) {
+          // MMAudio can take a video reference; Stable Audio is text-only.
+          const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "8s";
+          const dur = parseInt(durStr.replace("s", ""));
+          if (dur > 0) repInput.duration = dur;
+          if (replicateModel === "zsxkib/mmaudio" && input.video_url) {
+            repInput.video = input.video_url;
+          }
+        } else {
+          // Video pipeline (Seedance)
+          repInput.aspect_ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "16:9";
+          repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "720p";
+          repInput.generate_audio = input.generate_audio !== undefined ? !!input.generate_audio : (modelInfo.options?.generate_audio?.default ?? true);
+          const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "5s";
+          const dur = parseInt(durStr.replace("s", ""));
+          if (dur > 0) repInput.duration = dur;
 
-        // I2V: map image_url → "image" (Replicate's Seedance field name for first frame)
-        const imageUrl = input.image_url as string | undefined;
-        if (imageUrl) repInput.image = imageUrl;
-
-        // S2E: "image" = first frame, "last_frame_image" = last frame
-        if (input.first_frame_url) repInput.image = input.first_frame_url;
-        if (input.last_frame_url) repInput.last_frame_image = input.last_frame_url;
+          const imageUrl = input.image_url as string | undefined;
+          if (imageUrl) repInput.image = imageUrl;
+          if (input.first_frame_url) repInput.image = input.first_frame_url;
+          if (input.last_frame_url) repInput.last_frame_image = input.last_frame_url;
+        }
 
         // Log the exact payload so we can diagnose content-filter rejections
         console.log("[Replicate] Submitting", replicateModel, JSON.stringify(repInput).slice(0, 500));

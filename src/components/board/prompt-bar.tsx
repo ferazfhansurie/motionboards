@@ -367,7 +367,7 @@ export function PromptBar() {
     // Create item IMMEDIATELY at center of screen — zero latency
 
     const outputType =
-      selectedModel.type === "audio" || selectedModel.type === "a2a"
+      selectedModel.type === "audio" || selectedModel.type === "a2a" || selectedModel.type === "sfx"
         ? "audio"
         : ["t2i", "i2i", "upscale"].includes(selectedModel.type)
         ? "image"
