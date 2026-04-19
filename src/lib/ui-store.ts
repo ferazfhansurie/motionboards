@@ -17,6 +17,12 @@ export interface Toast {
 type FolderPickerResolver = (folderId: string | null) => void;
 type ConfirmResolver = (ok: boolean) => void;
 type PromptResolver = (value: string | null) => void;
+export interface SharePayload {
+  title: string;
+  body: string;
+  category: "General" | "Showcase" | "Help" | "Wins" | "Feedback";
+}
+type ShareResolver = (payload: SharePayload | null) => void;
 
 interface UIState {
   toasts: Toast[];
@@ -67,6 +73,21 @@ interface UIState {
     resolve: PromptResolver;
   }) => void;
   closePrompt: (value: string | null) => void;
+
+  share: {
+    open: boolean;
+    mediaType: "image" | "video";
+    defaultTitle: string;
+    defaultBody: string;
+    resolve: ShareResolver | null;
+  };
+  openShare: (opts: {
+    mediaType: "image" | "video";
+    defaultTitle?: string;
+    defaultBody?: string;
+    resolve: ShareResolver;
+  }) => void;
+  closeShare: (payload: SharePayload | null) => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -151,6 +172,32 @@ export const useUIStore = create<UIState>((set, get) => ({
     if (r) r(value);
     set((s) => ({ prompt: { ...s.prompt, open: false, resolve: null } }));
   },
+
+  share: {
+    open: false,
+    mediaType: "image",
+    defaultTitle: "",
+    defaultBody: "",
+    resolve: null,
+  },
+  openShare: ({ mediaType, defaultTitle, defaultBody, resolve }) => {
+    const prev = get().share.resolve;
+    if (prev) prev(null);
+    set({
+      share: {
+        open: true,
+        mediaType,
+        defaultTitle: defaultTitle || "",
+        defaultBody: defaultBody || "",
+        resolve,
+      },
+    });
+  },
+  closeShare: (payload) => {
+    const r = get().share.resolve;
+    if (r) r(payload);
+    set((s) => ({ share: { ...s.share, open: false, resolve: null } }));
+  },
 }));
 
 // --- Convenience API (callable from anywhere) -------------------------------
@@ -221,5 +268,16 @@ export function askPrompt(opts: {
 }): Promise<string | null> {
   return new Promise((resolve) => {
     useUIStore.getState().openPrompt({ ...opts, resolve });
+  });
+}
+
+// Collect title + body + category for a community post.
+export function askShareToCommunity(opts: {
+  mediaType: "image" | "video";
+  defaultTitle?: string;
+  defaultBody?: string;
+}): Promise<SharePayload | null> {
+  return new Promise((resolve) => {
+    useUIStore.getState().openShare({ ...opts, resolve });
   });
 }

@@ -6,7 +6,7 @@ import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
-import { askPrompt, pickFolder, showToast, updateToast } from "@/lib/ui-store";
+import { askShareToCommunity, pickFolder, showToast, updateToast } from "@/lib/ui-store";
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
@@ -905,21 +905,27 @@ export function BoardItemCard({
                   const mediaType: "image" | "video" =
                     item.type === "video" || item.outputType === "video" ? "video" : "image";
                   if (!mediaUrl) return;
-                  const caption = await askPrompt({
-                    title: "Share to community",
-                    description: "Add a caption so other creators know what they're looking at.",
-                    placeholder: "Say something…",
-                    defaultValue: item.prompt || "",
-                    multiline: true,
-                    confirmLabel: "Share",
+                  const defaultTitle = item.prompt
+                    ? item.prompt.slice(0, 80)
+                    : item.fileName || "";
+                  const payload = await askShareToCommunity({
+                    mediaType,
+                    defaultTitle,
+                    defaultBody: item.prompt || "",
                   });
-                  if (caption === null) return;
+                  if (!payload) return;
                   const toastId = showToast("Sharing to community…", { kind: "loading" });
                   try {
                     const res = await fetch("/api/community/posts", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ mediaUrl, mediaType, caption }),
+                      body: JSON.stringify({
+                        title: payload.title,
+                        body: payload.body,
+                        category: payload.category,
+                        mediaUrl,
+                        mediaType,
+                      }),
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) {

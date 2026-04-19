@@ -5,6 +5,8 @@ import {
   createCommunityPost,
   getFile,
   putFile,
+  COMMUNITY_CATEGORIES,
+  type CommunityCategory,
 } from "@/lib/db";
 
 export const maxDuration = 30;
@@ -15,9 +17,17 @@ export async function GET(req: NextRequest) {
     const user = token ? await getUserFromToken(token) : null;
     const isAdmin = user?.role === "admin";
     const { searchParams } = req.nextUrl;
+    const rawCategory = searchParams.get("category") || "All";
+    const category = (COMMUNITY_CATEGORIES as readonly string[]).includes(rawCategory)
+      ? (rawCategory as CommunityCategory)
+      : "All";
     const limit = Math.min(parseInt(searchParams.get("limit") || "60"), 100);
     const offset = Math.max(parseInt(searchParams.get("offset") || "0"), 0);
-    const posts = await listCommunityPosts(user?.id ?? null, isAdmin, limit, offset);
+    const posts = await listCommunityPosts(user?.id ?? null, isAdmin, {
+      category: category as CommunityCategory | "All",
+      limit,
+      offset,
+    });
     return NextResponse.json({ posts });
   } catch (err) {
     console.error("Community GET error:", err);
@@ -33,49 +43,69 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Session expired" }, { status: 401 });
 
     const body = await req.json();
-    const { mediaUrl, mediaType, caption } = body as {
+    const {
+      title,
+      body: postBody,
+      category,
+      mediaUrl,
+      mediaType,
+    } = body as {
+      title?: string;
+      body?: string;
+      category?: string;
       mediaUrl?: string;
       mediaType?: string;
-      caption?: string;
     };
-    if (!mediaUrl || typeof mediaUrl !== "string") {
-      return NextResponse.json({ error: "mediaUrl is required" }, { status: 400 });
-    }
-    if (mediaType !== "image" && mediaType !== "video") {
-      return NextResponse.json({ error: "mediaType must be 'image' or 'video'" }, { status: 400 });
-    }
 
-    // Resolve mediaUrl → a stable file id we can reuse. If the URL already points
-    // at /api/files/:id, just reuse that row; otherwise fetch the bytes and put
-    // them into mb_files so the post survives even if the original source rotates.
+    const safeTitle = (title || "").toString().trim().slice(0, 200);
+    if (!safeTitle) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    }
+    const safeBody = (postBody || "").toString().slice(0, 10_000);
+    const safeCategory: CommunityCategory = (COMMUNITY_CATEGORIES as readonly string[]).includes(category || "")
+      ? (category as CommunityCategory)
+      : "General";
+
+    // Optional attachment: resolve mediaUrl → a file id. Skip when no url given.
     let fileId: string | null = null;
-    const url = new URL(mediaUrl, req.nextUrl.origin);
-    const filesMatch = url.pathname.match(/\/api\/files\/([^/]+)$/);
-    if (filesMatch) {
-      const existing = await getFile(filesMatch[1]);
-      if (existing) fileId = existing.id;
-    }
-    if (!fileId) {
-      const res = await fetch(url.toString());
-      if (!res.ok) {
-        return NextResponse.json({ error: "Could not fetch media" }, { status: 400 });
+    let safeMediaType: "image" | "video" | null = null;
+    if (mediaUrl && typeof mediaUrl === "string") {
+      if (mediaType !== "image" && mediaType !== "video") {
+        return NextResponse.json(
+          { error: "mediaType must be 'image' or 'video' when attaching media" },
+          { status: 400 }
+        );
       }
-      const buf = Buffer.from(await res.arrayBuffer());
-      const mime =
-        res.headers.get("content-type") ||
-        (mediaType === "video" ? "video/mp4" : "image/png");
-      const put = await putFile(buf, mime, user.id);
-      fileId = put.id;
+      safeMediaType = mediaType;
+      const url = new URL(mediaUrl, req.nextUrl.origin);
+      const filesMatch = url.pathname.match(/\/api\/files\/([^/]+)$/);
+      if (filesMatch) {
+        const existing = await getFile(filesMatch[1]);
+        if (existing) fileId = existing.id;
+      }
+      if (!fileId) {
+        const res = await fetch(url.toString());
+        if (!res.ok) {
+          return NextResponse.json({ error: "Could not fetch media" }, { status: 400 });
+        }
+        const buf = Buffer.from(await res.arrayBuffer());
+        const mime =
+          res.headers.get("content-type") ||
+          (mediaType === "video" ? "video/mp4" : "image/png");
+        const put = await putFile(buf, mime, user.id);
+        fileId = put.id;
+      }
     }
 
-    const safeCaption = (caption || "").toString().slice(0, 500);
-    const post = await createCommunityPost(
-      user.id,
-      user.name || "Creator",
+    const post = await createCommunityPost({
+      userId: user.id,
+      authorName: user.name || "Creator",
+      title: safeTitle,
+      body: safeBody,
+      category: safeCategory,
       fileId,
-      mediaType,
-      safeCaption
-    );
+      mediaType: safeMediaType,
+    });
     return NextResponse.json({ post });
   } catch (err) {
     console.error("Community POST error:", err);

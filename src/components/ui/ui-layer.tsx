@@ -6,7 +6,7 @@ import { useUIStore, type Toast } from "@/lib/ui-store";
 import { useAppStore } from "@/lib/store";
 
 // <UILayer /> mounts once (from the canvas root) and renders every in-app
-// primitive: toast stack, folder picker, confirm dialog, prompt dialog.
+// primitive: toast stack, folder picker, confirm dialog, prompt dialog, share.
 export function UILayer() {
   return (
     <>
@@ -14,6 +14,7 @@ export function UILayer() {
       <FolderPickerModal />
       <ConfirmModal />
       <PromptModal />
+      <ShareModal />
     </>
   );
 }
@@ -279,6 +280,120 @@ function ConfirmModal() {
 }
 
 // --- Prompt -----------------------------------------------------------------
+
+// --- Share to Community ----------------------------------------------------
+
+const SHARE_CATEGORIES = ["General", "Showcase", "Help", "Wins", "Feedback"] as const;
+type ShareCategory = (typeof SHARE_CATEGORIES)[number];
+
+function ShareModal() {
+  const { open, mediaType, defaultTitle, defaultBody } = useUIStore((s) => s.share);
+  const close = useUIStore((s) => s.closeShare);
+  const { theme } = useAppStore();
+  const isDark = theme === "dark";
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [category, setCategory] = useState<ShareCategory>("Showcase");
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setTitle(defaultTitle);
+      setBody(defaultBody);
+      setCategory("Showcase");
+      setTimeout(() => titleRef.current?.focus(), 30);
+    }
+  }, [open, defaultTitle, defaultBody]);
+
+  if (!open) return null;
+  const panel = isDark ? "bg-[#0d1117] border-gray-800 text-white" : "bg-white border-gray-200 text-[#0d1117]";
+  const input = isDark
+    ? "border-gray-700 bg-[#161b22] text-white placeholder-gray-500 focus:border-[#f26522]"
+    : "border-gray-200 bg-white text-[#0d1117] placeholder-gray-400 focus:border-[#f26522]";
+
+  const submit = () => {
+    const t = title.trim();
+    if (!t) return;
+    close({ title: t, body: body.trim(), category });
+  };
+  const cancel = () => close(null);
+
+  return (
+    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/50 p-4" onClick={cancel}>
+      <div
+        className={`w-full max-w-lg rounded-2xl border shadow-2xl ${panel}`}
+        onClick={(e) => e.stopPropagation()}
+        style={{ animation: "mb-modal-in 180ms ease-out" }}
+      >
+        <div className={`flex items-center justify-between border-b px-5 py-4 ${isDark ? "border-gray-800" : "border-gray-100"}`}>
+          <h3 className="text-sm font-bold">
+            Share {mediaType === "video" ? "video" : "image"} to community
+          </h3>
+          <button onClick={cancel} className={`rounded-lg p-1.5 ${isDark ? "text-gray-500 hover:bg-white/5" : "text-gray-400 hover:bg-gray-100"}`}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-3 p-5">
+          <input
+            ref={titleRef}
+            type="text"
+            placeholder="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") cancel();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+            }}
+            className={`w-full rounded-lg border px-3 py-2.5 text-[14px] font-semibold outline-none ${input}`}
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {SHARE_CATEGORIES.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
+                  category === c
+                    ? "bg-[#f26522] text-white"
+                    : isDark
+                      ? "bg-white/5 text-gray-300 hover:bg-white/10"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <textarea
+            placeholder="Say something about it (optional)…"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") cancel();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+            }}
+            rows={4}
+            className={`w-full resize-none rounded-lg border px-3 py-2.5 text-[13px] leading-relaxed outline-none ${input}`}
+          />
+        </div>
+        <div className={`flex items-center justify-end gap-2 border-t px-5 py-3 ${isDark ? "border-gray-800" : "border-gray-100"}`}>
+          <button
+            onClick={cancel}
+            className={`rounded-lg px-4 py-2 text-[12px] font-semibold transition-colors ${isDark ? "bg-white/5 text-gray-200 hover:bg-white/10" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!title.trim()}
+            className="rounded-lg bg-[#f26522] px-4 py-2 text-[12px] font-bold text-white hover:bg-[#d9541a] disabled:opacity-50"
+          >
+            Share
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PromptModal() {
   const { open, title, description, placeholder, defaultValue, multiline, confirmLabel } = useUIStore((s) => s.prompt);

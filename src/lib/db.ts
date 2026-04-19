@@ -971,21 +971,44 @@ export async function deleteFolderItem(itemId: string, userId: string): Promise<
 // signed-in user can like a post; users can flag posts for review; admins can
 // hide posts. Media lives in mb_files — posts store a file_id reference.
 
+export const COMMUNITY_CATEGORIES = ["General", "Showcase", "Help", "Wins", "Feedback"] as const;
+export type CommunityCategory = (typeof COMMUNITY_CATEGORIES)[number];
+
 export interface CommunityPost {
   id: string;
   userId: string;
   authorName: string;
-  fileId: string;
-  mediaType: "image" | "video";
-  caption: string;
+  fileId: string | null;
+  mediaType: "image" | "video" | null;
+  title: string;
+  body: string;
+  category: CommunityCategory;
+  pinned: boolean;
   hidden: boolean;
   likeCount: number;
+  commentCount: number;
   createdAt: string;
 }
 
 export interface CommunityPostWithLike extends CommunityPost {
   likedByMe: boolean;
   flaggedByMe: boolean;
+}
+
+export interface CommunityComment {
+  id: string;
+  postId: string;
+  parentId: string | null;
+  userId: string;
+  authorName: string;
+  body: string;
+  hidden: boolean;
+  likeCount: number;
+  createdAt: string;
+}
+
+export interface CommunityCommentWithLike extends CommunityComment {
+  likedByMe: boolean;
 }
 
 let communityTablesInitialized = false;
@@ -997,15 +1020,31 @@ async function ensureCommunityTables(): Promise<void> {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       author_name TEXT NOT NULL DEFAULT '',
-      file_id TEXT NOT NULL,
-      media_type TEXT NOT NULL,
+      file_id TEXT,
+      media_type TEXT,
       caption TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'General',
+      pinned BOOLEAN NOT NULL DEFAULT FALSE,
       hidden BOOLEAN NOT NULL DEFAULT FALSE,
       like_count INTEGER NOT NULL DEFAULT 0,
+      comment_count INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS mb_community_posts_created_idx ON mb_community_posts (hidden, created_at DESC)`;
+  // Older rows predate title/body/category/pinned/comment_count — add them if
+  // missing. ALTER ... IF NOT EXISTS is idempotent and cheap.
+  await sql`ALTER TABLE mb_community_posts ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE mb_community_posts ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE mb_community_posts ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'General'`;
+  await sql`ALTER TABLE mb_community_posts ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE mb_community_posts ADD COLUMN IF NOT EXISTS comment_count INTEGER NOT NULL DEFAULT 0`;
+  // file_id started as NOT NULL; relax it so text-only posts are allowed.
+  await sql`ALTER TABLE mb_community_posts ALTER COLUMN file_id DROP NOT NULL`;
+  await sql`ALTER TABLE mb_community_posts ALTER COLUMN media_type DROP NOT NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS mb_community_posts_feed_idx ON mb_community_posts (hidden, pinned DESC, created_at DESC)`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS mb_community_likes (
       post_id TEXT NOT NULL,
@@ -1024,63 +1063,121 @@ async function ensureCommunityTables(): Promise<void> {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS mb_community_flags_post_idx ON mb_community_flags (post_id)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_community_comments (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      parent_id TEXT,
+      user_id TEXT NOT NULL,
+      author_name TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      hidden BOOLEAN NOT NULL DEFAULT FALSE,
+      like_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_community_comments_post_idx ON mb_community_comments (post_id, created_at ASC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_community_comment_likes (
+      comment_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (comment_id, user_id)
+    )
+  `;
   communityTablesInitialized = true;
 }
 
+function sanitizeCategory(raw: unknown): CommunityCategory {
+  const v = typeof raw === "string" ? raw : "";
+  return (COMMUNITY_CATEGORIES as readonly string[]).includes(v)
+    ? (v as CommunityCategory)
+    : "General";
+}
+
 function rowToCommunityPost(row: Record<string, unknown>): CommunityPost {
+  const title = (row.title as string) || (row.caption as string) || "";
+  const body = (row.body as string) || "";
   return {
     id: row.id as string,
     userId: row.user_id as string,
     authorName: (row.author_name as string) || "",
-    fileId: row.file_id as string,
-    mediaType: row.media_type as "image" | "video",
-    caption: (row.caption as string) || "",
+    fileId: (row.file_id as string | null) ?? null,
+    mediaType: (row.media_type as "image" | "video" | null) ?? null,
+    title,
+    body,
+    category: sanitizeCategory(row.category),
+    pinned: (row.pinned as boolean) ?? false,
     hidden: row.hidden as boolean,
     likeCount: (row.like_count as number) || 0,
+    commentCount: (row.comment_count as number) || 0,
     createdAt: (row.created_at as Date).toISOString(),
   };
 }
 
-export async function createCommunityPost(
-  userId: string,
-  authorName: string,
-  fileId: string,
-  mediaType: "image" | "video",
-  caption: string
-): Promise<CommunityPost> {
+export async function createCommunityPost(params: {
+  userId: string;
+  authorName: string;
+  title: string;
+  body: string;
+  category: CommunityCategory;
+  fileId: string | null;
+  mediaType: "image" | "video" | null;
+}): Promise<CommunityPost> {
   await ensureCommunityTables();
   const id = `cp_${Date.now()}_${randomBytes(4).toString("hex")}`;
   const rows = await sql`
-    INSERT INTO mb_community_posts (id, user_id, author_name, file_id, media_type, caption)
-    VALUES (${id}, ${userId}, ${authorName}, ${fileId}, ${mediaType}, ${caption})
+    INSERT INTO mb_community_posts (id, user_id, author_name, file_id, media_type, title, body, category)
+    VALUES (
+      ${id}, ${params.userId}, ${params.authorName},
+      ${params.fileId}, ${params.mediaType},
+      ${params.title}, ${params.body}, ${params.category}
+    )
     RETURNING *
   `;
   return rowToCommunityPost(rows[0]);
 }
 
-// List posts newest-first. Admins see hidden posts too; everyone else only sees
-// visible posts. When currentUserId is provided, each row is annotated with
-// whether the current user already liked or flagged it so the client can render
-// the correct state without extra round trips.
+// List posts: pinned first, then newest. Filter by category when provided.
+// Admins see hidden posts too; everyone else only sees visible posts.
 export async function listCommunityPosts(
   currentUserId: string | null,
   isAdmin: boolean,
-  limit = 60,
-  offset = 0
+  opts: { category?: CommunityCategory | "All"; limit?: number; offset?: number } = {}
 ): Promise<CommunityPostWithLike[]> {
   await ensureCommunityTables();
+  const limit = opts.limit ?? 60;
+  const offset = opts.offset ?? 0;
+  const catFilter = opts.category && opts.category !== "All" ? opts.category : null;
+
   const rows = isAdmin
-    ? await sql`
-        SELECT * FROM mb_community_posts
-        ORDER BY created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `
-    : await sql`
-        SELECT * FROM mb_community_posts
-        WHERE hidden = FALSE
-        ORDER BY created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+    ? catFilter
+      ? await sql`
+          SELECT * FROM mb_community_posts
+          WHERE category = ${catFilter}
+          ORDER BY pinned DESC, created_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `
+      : await sql`
+          SELECT * FROM mb_community_posts
+          ORDER BY pinned DESC, created_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `
+    : catFilter
+      ? await sql`
+          SELECT * FROM mb_community_posts
+          WHERE hidden = FALSE AND category = ${catFilter}
+          ORDER BY pinned DESC, created_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `
+      : await sql`
+          SELECT * FROM mb_community_posts
+          WHERE hidden = FALSE
+          ORDER BY pinned DESC, created_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `;
+
   if (rows.length === 0) return [];
   const postIds = rows.map((r) => r.id as string);
   let likedSet = new Set<string>();
@@ -1102,6 +1199,14 @@ export async function listCommunityPosts(
     likedByMe: likedSet.has(r.id as string),
     flaggedByMe: flaggedSet.has(r.id as string),
   }));
+}
+
+export async function setCommunityPostPinned(id: string, pinned: boolean): Promise<boolean> {
+  await ensureCommunityTables();
+  const rows = await sql`
+    UPDATE mb_community_posts SET pinned = ${pinned} WHERE id = ${id} RETURNING id
+  `;
+  return rows.length > 0;
 }
 
 export async function getCommunityPost(id: string): Promise<CommunityPost | null> {
@@ -1207,13 +1312,218 @@ export async function listCommunityFlags(limit = 100): Promise<CommunityFlagWith
           id: r.p_id as string,
           userId: r.p_user_id as string,
           authorName: (r.p_author_name as string) || "",
-          fileId: r.p_file_id as string,
-          mediaType: r.p_media_type as "image" | "video",
-          caption: (r.p_caption as string) || "",
+          fileId: (r.p_file_id as string | null) ?? null,
+          mediaType: (r.p_media_type as "image" | "video" | null) ?? null,
+          title: "",
+          body: "",
+          category: "General" as CommunityCategory,
+          pinned: false,
           hidden: r.p_hidden as boolean,
           likeCount: (r.p_like_count as number) || 0,
+          commentCount: 0,
           createdAt: (r.p_created_at as Date).toISOString(),
         }
       : null,
   }));
+}
+
+// --- Community comments -----------------------------------------------------
+
+function rowToCommunityComment(row: Record<string, unknown>): CommunityComment {
+  return {
+    id: row.id as string,
+    postId: row.post_id as string,
+    parentId: (row.parent_id as string | null) ?? null,
+    userId: row.user_id as string,
+    authorName: (row.author_name as string) || "",
+    body: (row.body as string) || "",
+    hidden: row.hidden as boolean,
+    likeCount: (row.like_count as number) || 0,
+    createdAt: (row.created_at as Date).toISOString(),
+  };
+}
+
+export async function listCommunityComments(
+  postId: string,
+  currentUserId: string | null,
+  isAdmin: boolean
+): Promise<CommunityCommentWithLike[]> {
+  await ensureCommunityTables();
+  const rows = isAdmin
+    ? await sql`
+        SELECT * FROM mb_community_comments
+        WHERE post_id = ${postId}
+        ORDER BY created_at ASC
+      `
+    : await sql`
+        SELECT * FROM mb_community_comments
+        WHERE post_id = ${postId} AND hidden = FALSE
+        ORDER BY created_at ASC
+      `;
+  if (rows.length === 0) return [];
+  let likedSet = new Set<string>();
+  if (currentUserId) {
+    const commentIds = rows.map((r) => r.id as string);
+    const likeRows = await sql`
+      SELECT comment_id FROM mb_community_comment_likes
+      WHERE user_id = ${currentUserId} AND comment_id = ANY(${commentIds as unknown as string[]}::text[])
+    `;
+    likedSet = new Set(likeRows.map((r) => r.comment_id as string));
+  }
+  return rows.map((r) => ({
+    ...rowToCommunityComment(r),
+    likedByMe: likedSet.has(r.id as string),
+  }));
+}
+
+export async function createCommunityComment(params: {
+  postId: string;
+  userId: string;
+  authorName: string;
+  body: string;
+  parentId: string | null;
+}): Promise<CommunityComment | null> {
+  await ensureCommunityTables();
+  const post = await getCommunityPost(params.postId);
+  if (!post) return null;
+  const id = `cc_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const trimmed = params.body.trim().slice(0, 4000);
+  if (!trimmed) return null;
+  const rows = await sql`
+    INSERT INTO mb_community_comments (id, post_id, parent_id, user_id, author_name, body)
+    VALUES (${id}, ${params.postId}, ${params.parentId}, ${params.userId}, ${params.authorName}, ${trimmed})
+    RETURNING *
+  `;
+  await sql`
+    UPDATE mb_community_posts SET comment_count = comment_count + 1 WHERE id = ${params.postId}
+  `;
+  return rowToCommunityComment(rows[0]);
+}
+
+export async function deleteCommunityComment(
+  commentId: string,
+  userId: string,
+  isAdmin: boolean
+): Promise<boolean> {
+  await ensureCommunityTables();
+  const rows = isAdmin
+    ? await sql`DELETE FROM mb_community_comments WHERE id = ${commentId} RETURNING post_id`
+    : await sql`DELETE FROM mb_community_comments WHERE id = ${commentId} AND user_id = ${userId} RETURNING post_id`;
+  if (rows.length === 0) return false;
+  const postId = rows[0].post_id as string;
+  await sql`DELETE FROM mb_community_comment_likes WHERE comment_id = ${commentId}`;
+  await sql`
+    UPDATE mb_community_posts SET comment_count = GREATEST(comment_count - 1, 0)
+    WHERE id = ${postId}
+  `;
+  return true;
+}
+
+export async function setCommunityCommentHidden(commentId: string, hidden: boolean): Promise<boolean> {
+  await ensureCommunityTables();
+  const rows = await sql`
+    UPDATE mb_community_comments SET hidden = ${hidden} WHERE id = ${commentId} RETURNING id
+  `;
+  return rows.length > 0;
+}
+
+export async function toggleCommunityCommentLike(
+  commentId: string,
+  userId: string
+): Promise<{ liked: boolean; likeCount: number } | null> {
+  await ensureCommunityTables();
+  const existing = await sql`
+    SELECT 1 FROM mb_community_comment_likes WHERE comment_id = ${commentId} AND user_id = ${userId}
+  `;
+  if (existing.length > 0) {
+    await sql`DELETE FROM mb_community_comment_likes WHERE comment_id = ${commentId} AND user_id = ${userId}`;
+    const rows = await sql`
+      UPDATE mb_community_comments SET like_count = GREATEST(like_count - 1, 0)
+      WHERE id = ${commentId} RETURNING like_count
+    `;
+    if (rows.length === 0) return null;
+    return { liked: false, likeCount: rows[0].like_count as number };
+  }
+  await sql`INSERT INTO mb_community_comment_likes (comment_id, user_id) VALUES (${commentId}, ${userId})`;
+  const rows = await sql`
+    UPDATE mb_community_comments SET like_count = like_count + 1
+    WHERE id = ${commentId} RETURNING like_count
+  `;
+  if (rows.length === 0) return null;
+  return { liked: true, likeCount: rows[0].like_count as number };
+}
+
+// --- Leaderboard ------------------------------------------------------------
+//
+// Points = 5 per post + 1 per comment + 1 per like received (on either posts
+// or comments). Computed live — community volume is small enough that the full
+// scan is cheap, and no caching saves us from stale counts.
+
+export interface LeaderboardEntry {
+  userId: string;
+  authorName: string;
+  points: number;
+  postCount: number;
+  commentCount: number;
+  level: number;
+}
+
+function pointsToLevel(points: number): number {
+  // Level curve: 1 at 0, 2 at 10, 3 at 30, 4 at 70, 5 at 150, 6 at 310 …
+  // Each level takes 2× the prior delta + 10. Cap at 10.
+  let level = 1;
+  let needed = 10;
+  let remaining = points;
+  while (remaining >= needed && level < 10) {
+    remaining -= needed;
+    level += 1;
+    needed = needed * 2;
+  }
+  return level;
+}
+
+export async function getCommunityLeaderboard(limit = 10): Promise<LeaderboardEntry[]> {
+  await ensureCommunityTables();
+  const rows = await sql`
+    WITH post_stats AS (
+      SELECT user_id, MAX(author_name) AS author_name,
+             COUNT(*) AS post_count,
+             COALESCE(SUM(like_count), 0) AS post_likes
+      FROM mb_community_posts
+      WHERE hidden = FALSE
+      GROUP BY user_id
+    ),
+    comment_stats AS (
+      SELECT user_id, MAX(author_name) AS author_name,
+             COUNT(*) AS comment_count,
+             COALESCE(SUM(like_count), 0) AS comment_likes
+      FROM mb_community_comments
+      WHERE hidden = FALSE
+      GROUP BY user_id
+    )
+    SELECT
+      COALESCE(p.user_id, c.user_id) AS user_id,
+      COALESCE(p.author_name, c.author_name, 'Creator') AS author_name,
+      COALESCE(p.post_count, 0)::int AS post_count,
+      COALESCE(c.comment_count, 0)::int AS comment_count,
+      (COALESCE(p.post_count, 0) * 5
+       + COALESCE(c.comment_count, 0) * 1
+       + COALESCE(p.post_likes, 0)
+       + COALESCE(c.comment_likes, 0))::int AS points
+    FROM post_stats p
+    FULL OUTER JOIN comment_stats c ON p.user_id = c.user_id
+    ORDER BY points DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => {
+    const points = (r.points as number) || 0;
+    return {
+      userId: r.user_id as string,
+      authorName: (r.author_name as string) || "Creator",
+      points,
+      postCount: (r.post_count as number) || 0,
+      commentCount: (r.comment_count as number) || 0,
+      level: pointsToLevel(points),
+    };
+  });
 }
