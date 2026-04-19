@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings, createGeneration, updateGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
 import { models } from "@/lib/models";
 
-export const maxDuration = 60; // Segmind calls are synchronous, need more time
+// Synchronous providers (Segmind, Gemini image, Fish TTS, OpenAI TTS) block the
+// route until the upstream returns. Nano Banana 2 at 4K can take 60–120s, so
+// the gateway-level cap needs to clear that with margin. 300s is the Vercel Pro
+// per-request limit; on Hobby this gets clamped down to 60.
+export const maxDuration = 300;
 
 // Persist a generated binary blob to Neon and return an absolute URL.
 async function storeOutput(
