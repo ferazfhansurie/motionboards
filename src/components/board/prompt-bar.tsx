@@ -22,7 +22,8 @@ import { useAppStore, type BoardItem } from "@/lib/store";
 import { importBoardFromFile, ImportCancelled } from "@/lib/board-io";
 import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
-import { askConfirm } from "@/lib/ui-store";
+import { askConfirm, askPrompt } from "@/lib/ui-store";
+import { Pencil } from "lucide-react";
 
 function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>): string {
   if (!model) return "";
@@ -99,6 +100,7 @@ export function PromptBar() {
     addBoard,
     switchBoard,
     deleteBoard,
+    renameBoard,
     theme,
     audioInputId,
     setAudioInput,
@@ -1121,9 +1123,29 @@ export function PromptBar() {
                     <LayoutGrid className="w-3 h-3 shrink-0" />
                     <span className="flex-1 text-[11px] font-medium truncate">{board.name}</span>
                     <span className="text-[9px] text-gray-400">{board.items.length}</span>
+                    <button
+                      className="p-0.5 text-gray-300 hover:text-[#f26522] transition-colors"
+                      title="Rename board"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const name = await askPrompt({
+                          title: "Rename board",
+                          placeholder: "Board name",
+                          defaultValue: board.name,
+                          confirmLabel: "Save",
+                        });
+                        if (name !== null) {
+                          const trimmed = name.trim();
+                          if (trimmed) renameBoard(board.id, trimmed);
+                        }
+                      }}
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
                     {boards.length > 1 && (
                       <button
                         className="p-0.5 text-gray-300 hover:text-red-500 transition-colors"
+                        title="Delete board"
                         onClick={async (e) => {
                           e.stopPropagation();
                           const ok = await askConfirm({
