@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2, Check, Zap, ArrowLeft } from "lucide-react";
-import { Sticker } from "@/components/ui/stickers";
 
 const PLANS = [
   { id: "starter", name: "Starter", price: "RM10", credits: "RM10 balance", gens: "Pay-per-use" },
@@ -46,10 +45,12 @@ export default function SignupPage() {
         body: JSON.stringify({ plan: selectedPlan, name, email, password }),
       });
       const data = await res.json();
+
       if (!res.ok) {
         setError(data.error || "Checkout failed");
         return;
       }
+
       window.location.href = data.url;
     } catch {
       setError("Something went wrong");
@@ -58,274 +59,182 @@ export default function SignupPage() {
     }
   };
 
-  const ink = "#0d1117";
-  const paper = "#fdf6ec";
-  const paperDeep = "#fff8ec";
-  const inputStyle: React.CSSProperties = {
-    background: "#fff",
-    color: ink,
-    borderColor: ink,
-    boxShadow: `3px 3px 0 0 ${ink}`,
-  };
-
   return (
-    <div className="relative min-h-screen flex items-center justify-center px-4 py-10" style={{ background: paper, color: ink }}>
-      <div
-        className="pointer-events-none fixed inset-0"
-        style={{
-          backgroundImage: "radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)",
-          backgroundSize: "4px 4px",
-          opacity: 0.6,
-        }}
-      />
-
-      <div className="relative w-full max-w-lg">
-        {/* Decorative doodles floating around the signup card */}
-        <Sticker.Daisy className="absolute -top-12 -left-16 z-10" rotate={-14} size={62} />
-        <Sticker.Sparkle className="absolute -top-6 left-1/3 z-10" rotate={14} size={28} />
-        <Sticker.Heart className="absolute -top-4 -right-14 z-10" rotate={16} size={42} />
-        <Sticker.Lightning className="absolute top-24 -right-12 z-10" rotate={-18} size={32} />
-        <Sticker.Scribble className="absolute top-52 -left-10 z-10" rotate={22} size={52} color="#f26522" />
-        <Sticker.Arrow className="absolute -bottom-8 -right-10 z-10" rotate={-20} size={70} />
-        <Sticker.Dots className="absolute -bottom-6 left-20 z-10" rotate={0} size={36} color="#f26522" />
-
-        <div
-          className="relative rounded-3xl border-[2.5px] p-6"
-          style={{
-            background: paperDeep,
-            borderColor: ink,
-            boxShadow: `8px 8px 0 0 ${ink}`,
-            transform: "rotate(-0.5deg)",
-          }}
-        >
-          <div
-            className="absolute -top-3 right-8 inline-flex items-center gap-1 rounded-md border-2 px-3 py-1 text-[10.5px] font-black uppercase tracking-wider"
-            style={{
-              background: "#f26522",
-              color: "#fff",
-              borderColor: ink,
-              transform: "rotate(-3deg)",
-              boxShadow: `2px 2px 0 0 ${ink}`,
-            }}
-          >
-            New member
-          </div>
-
-          <div className="flex justify-center mb-5">
-            <img
-              src="/logo.jpg"
-              alt="MotionBoards"
-              className="h-16 rounded-xl border-[2.5px]"
-              style={{ borderColor: ink, boxShadow: `3px 3px 0 0 ${ink}` }}
-            />
-          </div>
-
-          <span className="mb-serif-italic block text-center text-[13px] opacity-70">
-            — {step === "details" ? "chapter one" : "pick a tier"} —
-          </span>
-          <h1 className="mb-serif-display text-center leading-none mt-1" style={{ fontSize: "2rem" }}>
-            {step === "details" ? "Make an account." : "Pick your vibe."}
-          </h1>
-          <p className="text-[13px] text-center mt-2" style={{ opacity: 0.75 }}>
-            {step === "details" ? "Sign up and start generating." : "Top up your balance to begin."}
-          </p>
-
-          {cancelled && (
-            <div
-              className="mt-4 rounded-xl border-[2.5px] px-3 py-2 text-[12px] font-bold text-center"
-              style={{ background: "#fff", color: "#a16207", borderColor: "#f59e0b", boxShadow: `3px 3px 0 0 ${ink}` }}
-            >
-              Payment was cancelled. You can try again.
-            </div>
-          )}
-
-          {error && (
-            <div
-              className="mt-4 rounded-xl border-[2.5px] px-3 py-2 text-[12px] font-bold text-center"
-              style={{ background: "#fff", color: "#dc2626", borderColor: "#dc2626", boxShadow: `3px 3px 0 0 ${ink}` }}
-            >
-              {error}
-            </div>
-          )}
-
-          {step === "details" && (
-            <form onSubmit={handleDetailsNext} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-[10.5px] font-black uppercase tracking-wider mb-1.5">Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full rounded-xl border-[2.5px] px-3 py-2.5 text-sm outline-none"
-                  style={inputStyle}
-                  placeholder="Your name"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10.5px] font-black uppercase tracking-wider mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full rounded-xl border-[2.5px] px-3 py-2.5 text-sm outline-none"
-                  style={inputStyle}
-                  placeholder="you@email.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10.5px] font-black uppercase tracking-wider mb-1.5">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="w-full rounded-xl border-[2.5px] px-3 py-2.5 text-sm outline-none"
-                  style={inputStyle}
-                  placeholder="Min 6 characters"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-full border-[2.5px] px-4 py-3 text-[13px] font-black uppercase tracking-wider text-white transition-transform hover:-translate-y-0.5 active:translate-y-0"
-                style={{ background: "#f26522", borderColor: ink, boxShadow: `4px 4px 0 0 ${ink}`, transform: "rotate(-1deg)" }}
-              >
-                Continue
-              </button>
-
-              <p className="text-[10.5px] text-center" style={{ opacity: 0.6 }}>
-                By continuing, you agree to our{" "}
-                <a href="/terms" className="font-black" style={{ color: "#f26522", textDecoration: "underline" }}>Terms</a>
-                {" & "}
-                <a href="/privacy" className="font-black" style={{ color: "#f26522", textDecoration: "underline" }}>Privacy Policy</a>
-              </p>
-            </form>
-          )}
-
-          {step === "plan" && (
-            <>
-              <button
-                type="button"
-                onClick={() => setStep("details")}
-                className="mt-4 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider"
-                style={{ color: ink, opacity: 0.7 }}
-              >
-                <ArrowLeft className="h-3 w-3" /> Back
-              </button>
-
-              <div
-                className="mt-3 flex items-center gap-3 rounded-2xl border-[2.5px] px-4 py-3"
-                style={{ background: "#fff", borderColor: ink, boxShadow: `3px 3px 0 0 ${ink}` }}
-              >
-                <div
-                  className="h-9 w-9 rounded-full border-2 flex items-center justify-center font-black text-white"
-                  style={{ background: "#f26522", borderColor: ink }}
-                >
-                  {name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-sm font-black">{name}</p>
-                  <p className="text-[10.5px]" style={{ opacity: 0.7 }}>{email}</p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {PLANS.map((plan, i) => {
-                  const selected = selectedPlan === plan.id;
-                  const tilt = i % 2 === 0 ? -1 : 1;
-                  return (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => setSelectedPlan(plan.id)}
-                      className="relative rounded-2xl border-[2.5px] p-4 text-left transition-transform hover:-translate-y-0.5"
-                      style={{
-                        background: selected ? "#f26522" : "#fff",
-                        color: selected ? "#fff" : ink,
-                        borderColor: ink,
-                        boxShadow: selected ? `4px 4px 0 0 ${ink}` : `2px 2px 0 0 ${ink}`,
-                        transform: `rotate(${tilt}deg)`,
-                      }}
-                    >
-                      {plan.popular && (
-                        <span
-                          className="absolute -top-3 right-3 rounded-md border-2 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
-                          style={{ background: "#fff", color: "#f26522", borderColor: ink, transform: "rotate(3deg)", boxShadow: `2px 2px 0 0 ${ink}` }}
-                        >
-                          Popular
-                        </span>
-                      )}
-
-                      {selected && (
-                        <div
-                          className="absolute top-3 right-3 h-6 w-6 rounded-full border-2 flex items-center justify-center"
-                          style={{ background: "#fff", borderColor: ink }}
-                        >
-                          <Check className="h-3.5 w-3.5" style={{ color: "#f26522" }} />
-                        </div>
-                      )}
-
-                      <p className="mb-serif-display text-[1.4rem] leading-none" style={{ color: selected ? "#fff" : ink }}>
-                        {plan.price}
-                      </p>
-                      <p className="text-xs font-black mt-1">{plan.name}</p>
-                      <div className="mt-2 space-y-1">
-                        <p className="text-[10px] font-bold flex items-center gap-1">
-                          <Zap className="h-2.5 w-2.5" /> {plan.credits}
-                        </p>
-                        <p className="text-[10px] font-bold" style={{ opacity: 0.8 }}>{plan.gens}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCheckout}
-                disabled={loading}
-                className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-full border-[2.5px] px-4 py-3 text-[13px] font-black uppercase tracking-wider text-white transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                style={{ background: "#f26522", borderColor: ink, boxShadow: `4px 4px 0 0 ${ink}`, transform: "rotate(-1deg)" }}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Redirecting to payment…
-                  </>
-                ) : (
-                  `Pay ${PLANS.find((p) => p.id === selectedPlan)?.price} & Start`
-                )}
-              </button>
-
-              <p className="mt-3 text-[10.5px] text-center" style={{ opacity: 0.6 }}>
-                Secure payment via Stripe. Your card never touches our servers.
-              </p>
-            </>
-          )}
-
-          <p className="text-[12px] text-center mt-6" style={{ opacity: 0.75 }}>
-            Already have one?{" "}
-            <a href="/login" className="font-black" style={{ color: "#f26522", textDecoration: "underline" }}>Sign in</a>
-          </p>
+    <div className="min-h-screen bg-white flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-lg">
+        <div className="flex justify-center mb-6">
+          <img src="/logo.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
         </div>
 
-        <p className="text-[10px] text-center mt-8 flex items-center justify-center gap-1" style={{ opacity: 0.5 }}>
-          Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm inline-block" />{" "}
-          <span className="font-black">Adletic</span> &copy; 2026
+        <h1 className="text-2xl font-bold text-[#0d1117] text-center mb-1">
+          {step === "details" ? "Create your account" : "Choose your plan"}
+        </h1>
+        <p className="text-sm text-gray-400 text-center mb-6">
+          {step === "details"
+            ? "Sign up to start generating AI videos"
+            : "Select a top-up amount to get started"}
+        </p>
+
+        {cancelled && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs rounded-lg px-3 py-2 mb-4 text-center">
+            Payment was cancelled. You can try again.
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-4 text-center">
+            {error}
+          </div>
+        )}
+
+        {/* Step 1: Account Details */}
+        {step === "details" && (
+          <form onSubmit={handleDetailsNext} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+                placeholder="Your name"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+                placeholder="you@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full px-3 py-2.5 text-sm text-[#0d1117] bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all"
+                placeholder="Min 6 characters"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-[#f26522] text-white text-sm font-semibold rounded-xl hover:bg-[#d9541a] transition-colors flex items-center justify-center gap-2"
+            >
+              Continue
+            </button>
+
+            <p className="text-[10px] text-gray-400 text-center mt-2">
+              By continuing, you agree to our{" "}
+              <a href="/terms" className="text-[#f26522] hover:underline">Terms of Service</a>
+              {" & "}
+              <a href="/privacy" className="text-[#f26522] hover:underline">Privacy Policy</a>
+            </p>
+          </form>
+        )}
+
+        {/* Step 2: Plan Selection */}
+        {step === "plan" && (
+          <>
+            <button
+              type="button"
+              onClick={() => setStep("details")}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#f26522] mb-4 transition-colors"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Back to details
+            </button>
+
+            {/* Account summary */}
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-5">
+              <div className="h-9 w-9 rounded-full bg-[#f26522]/10 flex items-center justify-center text-[#f26522] font-bold text-sm">
+                {name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#0d1117]">{name}</p>
+                <p className="text-[10px] text-gray-400">{email}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {PLANS.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setSelectedPlan(plan.id)}
+                  className={`relative text-left rounded-xl border-2 p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg ${
+                    selectedPlan === plan.id
+                      ? "border-[#f26522] bg-[#f26522]/5 shadow-md"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  {plan.popular && (
+                    <span className="absolute -top-2.5 right-3 bg-[#f26522] text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                      Popular
+                    </span>
+                  )}
+
+                  {selectedPlan === plan.id && (
+                    <div className="absolute top-3 right-3 h-5 w-5 rounded-full bg-[#f26522] flex items-center justify-center">
+                      <Check className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+
+                  <p className="text-lg font-bold text-[#0d1117]">{plan.price}</p>
+                  <p className="text-xs font-semibold text-[#f26522] mt-0.5">{plan.name}</p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                      <Zap className="h-2.5 w-2.5 text-[#f26522]" />
+                      {plan.credits}
+                    </p>
+                    <p className="text-[10px] text-gray-400">{plan.gens}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCheckout}
+              disabled={loading}
+              className="w-full py-3 bg-[#f26522] text-white text-sm font-semibold rounded-xl hover:bg-[#d9541a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Redirecting to payment...
+                </>
+              ) : (
+                `Pay ${PLANS.find((p) => p.id === selectedPlan)?.price} & Create Account`
+              )}
+            </button>
+
+            <p className="text-[10px] text-gray-400 text-center mt-3">
+              Secure payment powered by Stripe. Your card details never touch our servers.
+            </p>
+          </>
+        )}
+
+        <p className="text-xs text-gray-400 text-center mt-6">
+          Already have an account?{" "}
+          <a href="/login" className="text-[#f26522] font-medium hover:underline">Sign in</a>
+        </p>
+
+        <p className="text-[10px] text-gray-300 text-center mt-8 flex items-center justify-center gap-1">
+          Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm inline-block" /> <span className="font-semibold text-gray-400">Adletic</span> &copy; 2026
         </p>
       </div>
-
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,800;1,600;1,700&display=swap');
-        .mb-serif-italic { font-style: italic; font-family: 'Fraunces', 'Georgia', 'Times New Roman', serif; font-weight: 600; letter-spacing: -0.01em; }
-        .mb-serif-display { font-family: 'Fraunces', 'Georgia', serif; font-weight: 800; font-style: italic; letter-spacing: -0.03em; }
-      `}</style>
     </div>
   );
 }

@@ -645,7 +645,7 @@ export function Canvas() {
 
   return (
     <div
-      className={`relative h-screen overflow-hidden transition-[width] duration-200 ${isDark ? "bg-[#14100c]" : "bg-[#fdf6ec]"}`}
+      className={`relative h-screen overflow-hidden transition-[width] duration-200 ${isDark ? "bg-[#0d1117]" : "bg-white"}`}
       style={{ width: isAIPromptOpen ? `calc(100vw - ${aiPanelWidth}px)` : "100vw" }}
     >
       {/* Canvas area */}

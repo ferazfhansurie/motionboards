@@ -1038,16 +1038,8 @@ export function PromptBar() {
             {renderOptionPills()}
           </div>
 
-          {/* The chatbox — zine paper sticker */}
-          <div
-            className="w-full rounded-2xl border-[2.5px] flex flex-col"
-            style={{
-              background: isDark ? "#1c1712" : "#fff8ec",
-              color: isDark ? "#f4ece0" : "#0d1117",
-              borderColor: isDark ? "#f4ece0" : "#0d1117",
-              boxShadow: `4px 4px 0 0 ${isDark ? "#f4ece0" : "#0d1117"}`,
-            }}
-          >
+          {/* The chatbox */}
+          <div className={`w-full rounded-2xl border shadow-lg flex flex-col ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
             {/* Top resize bar — drag left/up to resize */}
             <div
               className={`flex items-center justify-center h-5 cursor-nw-resize select-none shrink-0 rounded-t-2xl transition-colors ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
@@ -1099,15 +1091,8 @@ export function PromptBar() {
         </div>
       </div>
 
-      {/* Bottom toolbar — paper strip with chunky top border */}
-      <div
-        className="pointer-events-auto relative flex h-full w-full items-center px-2.5 py-1 border-t-[2.5px]"
-        style={{
-          background: isDark ? "#14100c" : "#fdf6ec",
-          color: isDark ? "#f4ece0" : "#0d1117",
-          borderColor: isDark ? "#f4ece0" : "#0d1117",
-        }}
-      >
+      {/* Bottom toolbar */}
+      <div className={`pointer-events-auto relative flex h-full w-full items-center backdrop-blur-md px-2.5 py-1 border-t shadow-[0_-2px_10px_rgba(0,0,0,0.04)] ${isDark ? "bg-[#161b22]/95 border-gray-700" : "bg-white/95 border-gray-200"}`}>
         {/* Left: Board selector */}
         <div className="relative">
           <button
