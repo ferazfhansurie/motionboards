@@ -180,7 +180,13 @@ export function Toolbar() {
   return (
     <>
       {/* Top-left: Logo + actions */}
-      <div className={`absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto rounded-xl px-2 py-1.5 backdrop-blur-md ${isDark ? "bg-[#f26522]/15 border border-[#f26522]/30" : "bg-[#f26522]/8 border border-[#f26522]/25 shadow-sm"}`} style={isDark ? undefined : { backgroundColor: "rgba(242,101,34,0.08)" }}>
+      <div
+        className="absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto rounded-xl px-2 py-1.5 backdrop-blur-md border shadow-sm"
+        style={{
+          backgroundColor: isDark ? "rgba(242,101,34,0.55)" : "rgba(242,101,34,0.22)",
+          borderColor: isDark ? "rgba(242,101,34,0.75)" : "rgba(242,101,34,0.4)",
+        }}
+      >
         <div className="flex items-center px-1 py-0.5 rounded-lg">
           <img src="/logo.jpg" alt="MotionBoards" className="h-12 w-auto rounded-lg" />
         </div>
@@ -325,7 +331,13 @@ export function Toolbar() {
 
       {/* Top-right: Zoom controls + theme toggle */}
       <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5 pointer-events-auto">
-        <div className={`flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm ${isDark ? "bg-[#f26522]/15 border-[#f26522]/30" : "border-[#f26522]/25"}`} style={isDark ? undefined : { backgroundColor: "rgba(242,101,34,0.08)" }}>
+        <div
+          className="flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm"
+          style={{
+            backgroundColor: isDark ? "rgba(242,101,34,0.55)" : "rgba(242,101,34,0.22)",
+            borderColor: isDark ? "rgba(242,101,34,0.75)" : "rgba(242,101,34,0.4)",
+          }}
+        >
           <button
             className={`rounded p-1 transition-colors ${btnInactive}`}
             onClick={() => {
