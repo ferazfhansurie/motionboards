@@ -177,14 +177,31 @@ export function Toolbar() {
     : "bg-gray-100 text-[#0d1117]";
   const btnAccent = "bg-[#f26522]/10 text-[#f26522]";
 
+  // Buttons inside the orange capsule. In dark mode the capsule is solid
+  // brand orange, so icons use white with white-tint hover/active; in light
+  // mode we keep the neutral hover set so the peach tint still reads.
+  const capInactive = isDark
+    ? "text-white hover:bg-white/20"
+    : btnInactive;
+  const capActive = isDark
+    ? "bg-white/25 text-white"
+    : btnActive;
+  const capAccent = isDark
+    ? "bg-white/25 text-white"
+    : btnAccent;
+  const capDisabled = isDark
+    ? "text-white/40 cursor-not-allowed"
+    : "text-gray-300 cursor-not-allowed";
+  const capSeparator = isDark ? "bg-white/25" : "bg-gray-200";
+
   return (
     <>
       {/* Top-left: Logo + actions */}
       <div
         className="absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto rounded-xl px-2 py-1.5 backdrop-blur-md border shadow-sm"
         style={{
-          backgroundColor: isDark ? "rgba(242,101,34,0.55)" : "rgba(242,101,34,0.22)",
-          borderColor: isDark ? "rgba(242,101,34,0.75)" : "rgba(242,101,34,0.4)",
+          backgroundColor: isDark ? "#f26522" : "rgba(242,101,34,0.22)",
+          borderColor: isDark ? "#f26522" : "rgba(242,101,34,0.4)",
         }}
       >
         <div className="flex items-center px-1 py-0.5 rounded-lg">
@@ -194,7 +211,7 @@ export function Toolbar() {
         {/* Undo/Redo */}
         <div className="flex items-center gap-0.5 ml-2">
           <button
-            className={`${btnBase} ${undoStack.length > 0 ? (isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-gray-100 hover:text-[#0d1117]") : (isDark ? "text-gray-600 cursor-not-allowed" : "text-gray-300 cursor-not-allowed")}`}
+            className={`${btnBase} ${undoStack.length > 0 ? capInactive : capDisabled}`}
             onClick={undo}
             disabled={undoStack.length === 0}
             title="Undo (Ctrl+Z)"
@@ -202,7 +219,7 @@ export function Toolbar() {
             <Undo className="h-3.5 w-3.5" />
           </button>
           <button
-            className={`${btnBase} ${redoStack.length > 0 ? (isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-gray-100 hover:text-[#0d1117]") : (isDark ? "text-gray-600 cursor-not-allowed" : "text-gray-300 cursor-not-allowed")}`}
+            className={`${btnBase} ${redoStack.length > 0 ? capInactive : capDisabled}`}
             onClick={redo}
             disabled={redoStack.length === 0}
             title="Redo (Ctrl+Y)"
@@ -212,33 +229,33 @@ export function Toolbar() {
         </div>
 
         {/* Separator */}
-        <div className={`h-4 w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+        <div className={`h-4 w-px mx-1 ${capSeparator}`} />
 
         {/* Canvas tools: Select, Text, Draw, Connect */}
         <div className="flex items-center gap-0.5">
           <button
-            className={`${btnBase} ${!activeCanvasTool || activeCanvasTool === "select" ? btnActive : btnInactive}`}
+            className={`${btnBase} ${!activeCanvasTool || activeCanvasTool === "select" ? capActive : capInactive}`}
             onClick={() => setActiveCanvasTool("select")}
             title="Select (V)"
           >
             <MousePointer className="h-3.5 w-3.5" />
           </button>
           <button
-            className={`${btnBase} ${activeCanvasTool === "text" ? btnAccent : btnInactive}`}
+            className={`${btnBase} ${activeCanvasTool === "text" ? capAccent : capInactive}`}
             onClick={() => setActiveCanvasTool(activeCanvasTool === "text" ? "select" : "text")}
             title="Add Text (T)"
           >
             <Type className="h-3.5 w-3.5" />
           </button>
           <button
-            className={`${btnBase} ${activeCanvasTool === "draw" ? btnAccent : btnInactive}`}
+            className={`${btnBase} ${activeCanvasTool === "draw" ? capAccent : capInactive}`}
             onClick={() => setActiveCanvasTool(activeCanvasTool === "draw" ? "select" : "draw")}
             title="Draw (D)"
           >
             <PenTool className="h-3.5 w-3.5" />
           </button>
           <button
-            className={`${btnBase} ${activeCanvasTool === "connect" ? btnAccent : btnInactive}`}
+            className={`${btnBase} ${activeCanvasTool === "connect" ? capAccent : capInactive}`}
             onClick={() => {
               setActiveCanvasTool(activeCanvasTool === "connect" ? "select" : "connect");
               useAppStore.getState().setConnectingFromId(null);
@@ -252,7 +269,7 @@ export function Toolbar() {
         {/* Drawing controls — visible when draw tool active */}
         {activeCanvasTool === "draw" && (
           <>
-            <div className={`h-4 w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+            <div className={`h-4 w-px mx-1 ${capSeparator}`} />
             <div className="flex items-center gap-1.5">
               <input
                 type="color"
@@ -264,7 +281,7 @@ export function Toolbar() {
               <select
                 value={drawingStrokeWidth}
                 onChange={(e) => setDrawingStrokeWidth(Number(e.target.value))}
-                className={`text-[10px] rounded px-1 py-0.5 ${isDark ? "bg-gray-800 text-white border-gray-700" : "bg-white text-gray-700 border-gray-200"} border`}
+                className={`text-[10px] rounded px-1 py-0.5 border ${isDark ? "bg-white/10 text-white border-white/20" : "bg-white text-gray-700 border-gray-200"}`}
                 title="Stroke width"
               >
                 <option value={1}>1px</option>
@@ -279,12 +296,12 @@ export function Toolbar() {
         )}
 
         {/* Separator */}
-        <div className={`h-4 w-px mx-1 ${isDark ? "bg-gray-700" : "bg-gray-200"}`} />
+        <div className={`h-4 w-px mx-1 ${capSeparator}`} />
 
         {/* Upload + PSD Import/Export */}
         <div className="flex items-center gap-0.5">
           <button
-            className={`${btnBase} ${isDark ? "text-gray-400 hover:bg-[#f26522]/10 hover:text-[#f26522]" : "text-gray-400 hover:bg-[#f26522]/10 hover:text-[#f26522]"} transition-colors`}
+            className={`${btnBase} ${capInactive}`}
             onClick={() => uploadInputRef.current?.click()}
             title="Upload files to canvas — files auto-delete after 14 days"
           >
@@ -299,7 +316,7 @@ export function Toolbar() {
             onChange={handleUpload}
           />
           <button
-            className={`${btnBase} ${btnInactive}`}
+            className={`${btnBase} ${capInactive}`}
             onClick={() => psdInputRef.current?.click()}
             title="Import PSD"
           >
@@ -313,14 +330,14 @@ export function Toolbar() {
             onChange={handleImportPsd}
           />
           <button
-            className={`${btnBase} ${btnInactive}`}
+            className={`${btnBase} ${capInactive}`}
             onClick={handleExportPsd}
             title="Export as PSD"
           >
             <Download className="h-3.5 w-3.5" />
           </button>
           <button
-            className={`${btnBase} ${isFoldersOpen ? btnAccent : btnInactive}`}
+            className={`${btnBase} ${isFoldersOpen ? capAccent : capInactive}`}
             onClick={() => setFoldersOpen(!isFoldersOpen)}
             title="Folders"
           >
@@ -334,12 +351,12 @@ export function Toolbar() {
         <div
           className="flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm"
           style={{
-            backgroundColor: isDark ? "rgba(242,101,34,0.55)" : "rgba(242,101,34,0.22)",
-            borderColor: isDark ? "rgba(242,101,34,0.75)" : "rgba(242,101,34,0.4)",
+            backgroundColor: isDark ? "#f26522" : "rgba(242,101,34,0.22)",
+            borderColor: isDark ? "#f26522" : "rgba(242,101,34,0.4)",
           }}
         >
           <button
-            className={`rounded p-1 transition-colors ${btnInactive}`}
+            className={`rounded p-1 transition-colors ${capInactive}`}
             onClick={() => {
               const nz = Math.max(0.1, zoom - 0.1);
               const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
@@ -351,13 +368,13 @@ export function Toolbar() {
             <ZoomOut className="h-3 w-3" />
           </button>
           <button
-            className={`min-w-[2.5rem] px-1 text-center text-[10px] font-medium rounded py-0.5 transition-colors ${isDark ? "text-gray-300 hover:bg-white/10 hover:text-white" : "text-[#374151] hover:bg-gray-100 hover:text-[#0d1117]"}`}
+            className={`min-w-[2.5rem] px-1 text-center text-[10px] font-medium rounded py-0.5 transition-colors ${isDark ? "text-white hover:bg-white/20" : "text-[#374151] hover:bg-gray-100 hover:text-[#0d1117]"}`}
             onClick={() => { setZoom(1); setPan(0, 0); }}
           >
             {Math.round(zoom * 100)}%
           </button>
           <button
-            className={`rounded p-1 transition-colors ${btnInactive}`}
+            className={`rounded p-1 transition-colors ${capInactive}`}
             onClick={() => {
               const nz = Math.min(3, zoom + 0.1);
               const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
