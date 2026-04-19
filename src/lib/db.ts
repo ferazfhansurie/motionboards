@@ -798,3 +798,256 @@ export async function deleteBoardExportJob(id: string, userId: string): Promise<
   `;
   return rows.length > 0;
 }
+
+// --- Community (Instagram-style feed) ---
+//
+// Creators publish a single piece of media (image or video) with a caption. Any
+// signed-in user can like a post; users can flag posts for review; admins can
+// hide posts. Media lives in mb_files — posts store a file_id reference.
+
+export interface CommunityPost {
+  id: string;
+  userId: string;
+  authorName: string;
+  fileId: string;
+  mediaType: "image" | "video";
+  caption: string;
+  hidden: boolean;
+  likeCount: number;
+  createdAt: string;
+}
+
+export interface CommunityPostWithLike extends CommunityPost {
+  likedByMe: boolean;
+  flaggedByMe: boolean;
+}
+
+let communityTablesInitialized = false;
+
+async function ensureCommunityTables(): Promise<void> {
+  if (communityTablesInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_community_posts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      author_name TEXT NOT NULL DEFAULT '',
+      file_id TEXT NOT NULL,
+      media_type TEXT NOT NULL,
+      caption TEXT NOT NULL DEFAULT '',
+      hidden BOOLEAN NOT NULL DEFAULT FALSE,
+      like_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_community_posts_created_idx ON mb_community_posts (hidden, created_at DESC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_community_likes (
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (post_id, user_id)
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_community_flags (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_community_flags_post_idx ON mb_community_flags (post_id)`;
+  communityTablesInitialized = true;
+}
+
+function rowToCommunityPost(row: Record<string, unknown>): CommunityPost {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    authorName: (row.author_name as string) || "",
+    fileId: row.file_id as string,
+    mediaType: row.media_type as "image" | "video",
+    caption: (row.caption as string) || "",
+    hidden: row.hidden as boolean,
+    likeCount: (row.like_count as number) || 0,
+    createdAt: (row.created_at as Date).toISOString(),
+  };
+}
+
+export async function createCommunityPost(
+  userId: string,
+  authorName: string,
+  fileId: string,
+  mediaType: "image" | "video",
+  caption: string
+): Promise<CommunityPost> {
+  await ensureCommunityTables();
+  const id = `cp_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const rows = await sql`
+    INSERT INTO mb_community_posts (id, user_id, author_name, file_id, media_type, caption)
+    VALUES (${id}, ${userId}, ${authorName}, ${fileId}, ${mediaType}, ${caption})
+    RETURNING *
+  `;
+  return rowToCommunityPost(rows[0]);
+}
+
+// List posts newest-first. Admins see hidden posts too; everyone else only sees
+// visible posts. When currentUserId is provided, each row is annotated with
+// whether the current user already liked or flagged it so the client can render
+// the correct state without extra round trips.
+export async function listCommunityPosts(
+  currentUserId: string | null,
+  isAdmin: boolean,
+  limit = 60,
+  offset = 0
+): Promise<CommunityPostWithLike[]> {
+  await ensureCommunityTables();
+  const rows = isAdmin
+    ? await sql`
+        SELECT * FROM mb_community_posts
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `
+    : await sql`
+        SELECT * FROM mb_community_posts
+        WHERE hidden = FALSE
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+  if (rows.length === 0) return [];
+  const postIds = rows.map((r) => r.id as string);
+  let likedSet = new Set<string>();
+  let flaggedSet = new Set<string>();
+  if (currentUserId) {
+    const likeRows = await sql`
+      SELECT post_id FROM mb_community_likes
+      WHERE user_id = ${currentUserId} AND post_id = ANY(${postIds as unknown as string[]}::text[])
+    `;
+    likedSet = new Set(likeRows.map((r) => r.post_id as string));
+    const flagRows = await sql`
+      SELECT DISTINCT post_id FROM mb_community_flags
+      WHERE user_id = ${currentUserId} AND post_id = ANY(${postIds as unknown as string[]}::text[])
+    `;
+    flaggedSet = new Set(flagRows.map((r) => r.post_id as string));
+  }
+  return rows.map((r) => ({
+    ...rowToCommunityPost(r),
+    likedByMe: likedSet.has(r.id as string),
+    flaggedByMe: flaggedSet.has(r.id as string),
+  }));
+}
+
+export async function getCommunityPost(id: string): Promise<CommunityPost | null> {
+  await ensureCommunityTables();
+  const rows = await sql`SELECT * FROM mb_community_posts WHERE id = ${id}`;
+  return rows.length > 0 ? rowToCommunityPost(rows[0]) : null;
+}
+
+export async function deleteCommunityPost(id: string, userId: string): Promise<boolean> {
+  await ensureCommunityTables();
+  const rows = await sql`
+    DELETE FROM mb_community_posts WHERE id = ${id} AND user_id = ${userId} RETURNING id
+  `;
+  if (rows.length > 0) {
+    await sql`DELETE FROM mb_community_likes WHERE post_id = ${id}`;
+    await sql`DELETE FROM mb_community_flags WHERE post_id = ${id}`;
+  }
+  return rows.length > 0;
+}
+
+export async function setCommunityPostHidden(id: string, hidden: boolean): Promise<boolean> {
+  await ensureCommunityTables();
+  const rows = await sql`
+    UPDATE mb_community_posts SET hidden = ${hidden} WHERE id = ${id} RETURNING id
+  `;
+  return rows.length > 0;
+}
+
+// Toggle a like for (post, user). Returns the new liked state and the new count.
+// Uses the likes row as source of truth and denormalizes like_count on the post
+// row so the feed can render counts without a JOIN.
+export async function toggleCommunityLike(
+  postId: string,
+  userId: string
+): Promise<{ liked: boolean; likeCount: number } | null> {
+  await ensureCommunityTables();
+  const existing = await sql`
+    SELECT 1 FROM mb_community_likes WHERE post_id = ${postId} AND user_id = ${userId}
+  `;
+  if (existing.length > 0) {
+    await sql`DELETE FROM mb_community_likes WHERE post_id = ${postId} AND user_id = ${userId}`;
+    const rows = await sql`
+      UPDATE mb_community_posts SET like_count = GREATEST(like_count - 1, 0)
+      WHERE id = ${postId} RETURNING like_count
+    `;
+    if (rows.length === 0) return null;
+    return { liked: false, likeCount: rows[0].like_count as number };
+  }
+  await sql`INSERT INTO mb_community_likes (post_id, user_id) VALUES (${postId}, ${userId})`;
+  const rows = await sql`
+    UPDATE mb_community_posts SET like_count = like_count + 1
+    WHERE id = ${postId} RETURNING like_count
+  `;
+  if (rows.length === 0) return null;
+  return { liked: true, likeCount: rows[0].like_count as number };
+}
+
+export async function flagCommunityPost(
+  postId: string,
+  userId: string,
+  reason: string
+): Promise<boolean> {
+  await ensureCommunityTables();
+  const post = await getCommunityPost(postId);
+  if (!post) return false;
+  const id = `cf_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  await sql`
+    INSERT INTO mb_community_flags (id, post_id, user_id, reason)
+    VALUES (${id}, ${postId}, ${userId}, ${reason})
+  `;
+  return true;
+}
+
+export interface CommunityFlagWithPost {
+  id: string;
+  postId: string;
+  userId: string;
+  reason: string;
+  createdAt: string;
+  post: CommunityPost | null;
+}
+
+export async function listCommunityFlags(limit = 100): Promise<CommunityFlagWithPost[]> {
+  await ensureCommunityTables();
+  const rows = await sql`
+    SELECT f.id AS flag_id, f.post_id, f.user_id, f.reason, f.created_at,
+           p.id AS p_id, p.user_id AS p_user_id, p.author_name AS p_author_name,
+           p.file_id AS p_file_id, p.media_type AS p_media_type, p.caption AS p_caption,
+           p.hidden AS p_hidden, p.like_count AS p_like_count, p.created_at AS p_created_at
+    FROM mb_community_flags f
+    LEFT JOIN mb_community_posts p ON p.id = f.post_id
+    ORDER BY f.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    id: r.flag_id as string,
+    postId: r.post_id as string,
+    userId: r.user_id as string,
+    reason: (r.reason as string) || "",
+    createdAt: (r.created_at as Date).toISOString(),
+    post: r.p_id
+      ? {
+          id: r.p_id as string,
+          userId: r.p_user_id as string,
+          authorName: (r.p_author_name as string) || "",
+          fileId: r.p_file_id as string,
+          mediaType: r.p_media_type as "image" | "video",
+          caption: (r.p_caption as string) || "",
+          hidden: r.p_hidden as boolean,
+          likeCount: (r.p_like_count as number) || 0,
+          createdAt: (r.p_created_at as Date).toISOString(),
+        }
+      : null,
+  }));
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -856,6 +856,38 @@ export function BoardItemCard({
               >
                 <Pencil className="h-3.5 w-3.5 text-gray-400" />
                 Edit
+              </button>
+            )}
+            {isMediaType && (
+              <button
+                type="button"
+                className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+                onClick={async () => {
+                  closeContextMenu();
+                  const mediaUrl = item.outputUrl || item.src;
+                  const mediaType: "image" | "video" =
+                    item.type === "video" || item.outputType === "video" ? "video" : "image";
+                  if (!mediaUrl) return;
+                  const caption = window.prompt("Add a caption (optional):", item.prompt || "") ?? "";
+                  try {
+                    const res = await fetch("/api/community/posts", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ mediaUrl, mediaType, caption }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                      alert(data.error || "Failed to share. Are you signed in?");
+                    } else {
+                      alert("Shared to community.");
+                    }
+                  } catch {
+                    alert("Network error.");
+                  }
+                }}
+              >
+                <Share2 className="h-3.5 w-3.5 text-gray-400" />
+                Share to Community
               </button>
             )}
             {isMediaType && (
