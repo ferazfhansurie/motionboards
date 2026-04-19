@@ -197,8 +197,11 @@ export async function POST(req: NextRequest) {
       const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
       const hasVertexAI = !!(gcpProject && gcpServiceAccount);
       const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
-      // Vertex AI for everything when it's available; otherwise fall back to the API key
-      const useVertexAI = hasVertexAI;
+      // Vertex AI for video (Veo billing flows through GCP) but AI Studio for
+      // image gen — Vertex's image path is consistently slower and 4K Nano
+      // Banana 2 calls would otherwise blow past Vercel Hobby's 60s cap.
+      // Falls back to Vertex for images only if no AI Studio key is set.
+      const useVertexAI = isVideo ? hasVertexAI : (hasVertexAI && !settings.geminiApiKey);
       const gcpLocation = process.env.GOOGLE_LOCATION || "global";
 
       if (!useVertexAI && !settings.geminiApiKey) {
