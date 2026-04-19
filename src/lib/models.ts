@@ -70,7 +70,7 @@ export const models: AIModel[] = [
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
-      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
+      resolution: { values: ["0.5K", "1K", "2K"], default: "1K", label: "Resolution" },
     },
   },
 
