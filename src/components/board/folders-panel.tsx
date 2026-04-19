@@ -14,6 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
+import { askConfirm, askPrompt, showToast, updateToast } from "@/lib/ui-store";
 
 interface Folder {
   id: string;
@@ -78,18 +79,26 @@ export function FoldersPanel() {
   if (!isFoldersOpen) return null;
 
   async function createFolder() {
-    const name = window.prompt("Folder name:");
-    if (!name) return;
+    const name = await askPrompt({
+      title: "New folder",
+      placeholder: "Folder name",
+      confirmLabel: "Create",
+    });
+    if (!name || !name.trim()) return;
     setBusy(true);
+    const toastId = showToast("Creating folder…", { kind: "loading" });
     try {
       const res = await fetch("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: name.trim() }),
       }).then((r) => r.json());
       if (res?.folder) {
         setFolders((prev) => [res.folder, ...prev]);
         setActiveFolderId(res.folder.id);
+        updateToast(toastId, { kind: "success", message: "Folder created." });
+      } else {
+        updateToast(toastId, { kind: "error", message: "Could not create folder." });
       }
     } finally {
       setBusy(false);
@@ -97,13 +106,23 @@ export function FoldersPanel() {
   }
 
   async function deleteFolder(id: string) {
-    if (!confirm("Delete this folder and everything in it?")) return;
+    const ok = await askConfirm({
+      title: "Delete folder?",
+      message: "The folder and every item inside it will be removed. This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
+    const toastId = showToast("Deleting folder…", { kind: "loading" });
     try {
       const res = await fetch(`/api/folders/${id}`, { method: "DELETE" });
       if (res.ok) {
         setFolders((prev) => prev.filter((f) => f.id !== id));
         if (activeFolderId === id) setActiveFolderId(null);
+        updateToast(toastId, { kind: "success", message: "Folder deleted." });
+      } else {
+        updateToast(toastId, { kind: "error", message: "Delete failed." });
       }
     } finally {
       setBusy(false);
@@ -114,6 +133,10 @@ export function FoldersPanel() {
     if (!activeFolderId) return;
     const list = Array.from(files);
     setBusy(true);
+    const toastId = showToast(`Uploading ${list.length} file${list.length === 1 ? "" : "s"}…`, {
+      kind: "loading",
+    });
+    let done = 0;
     try {
       for (const file of list) {
         const form = new FormData();
@@ -124,10 +147,18 @@ export function FoldersPanel() {
         }).then((r) => r.json()).catch(() => null);
         if (res?.item) {
           setItems((prev) => [res.item, ...prev]);
+          done += 1;
         }
       }
-      // Refresh folder count
       loadFolders();
+      if (done === list.length) {
+        updateToast(toastId, { kind: "success", message: `Uploaded ${done} file${done === 1 ? "" : "s"}.` });
+      } else {
+        updateToast(toastId, {
+          kind: done > 0 ? "info" : "error",
+          message: `Uploaded ${done} of ${list.length}.`,
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -135,6 +166,13 @@ export function FoldersPanel() {
 
   async function deleteItem(itemId: string) {
     if (!activeFolderId) return;
+    const ok = await askConfirm({
+      title: "Remove item?",
+      message: "This item will be removed from the folder.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/folders/${activeFolderId}/items/${itemId}`, {

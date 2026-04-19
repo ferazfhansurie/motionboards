@@ -6,6 +6,7 @@ import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
+import { askPrompt, pickFolder, showToast, updateToast } from "@/lib/ui-store";
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
@@ -868,7 +869,16 @@ export function BoardItemCard({
                   const mediaType: "image" | "video" =
                     item.type === "video" || item.outputType === "video" ? "video" : "image";
                   if (!mediaUrl) return;
-                  const caption = window.prompt("Add a caption (optional):", item.prompt || "") ?? "";
+                  const caption = await askPrompt({
+                    title: "Share to community",
+                    description: "Add a caption so other creators know what they're looking at.",
+                    placeholder: "Say something…",
+                    defaultValue: item.prompt || "",
+                    multiline: true,
+                    confirmLabel: "Share",
+                  });
+                  if (caption === null) return;
+                  const toastId = showToast("Sharing to community…", { kind: "loading" });
                   try {
                     const res = await fetch("/api/community/posts", {
                       method: "POST",
@@ -877,12 +887,12 @@ export function BoardItemCard({
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) {
-                      alert(data.error || "Failed to share. Are you signed in?");
+                      updateToast(toastId, { kind: "error", message: data.error || "Failed to share. Are you signed in?" });
                     } else {
-                      alert("Shared to community.");
+                      updateToast(toastId, { kind: "success", message: "Shared to community." });
                     }
                   } catch {
-                    alert("Network error.");
+                    updateToast(toastId, { kind: "error", message: "Network error." });
                   }
                 }}
               >
@@ -900,29 +910,11 @@ export function BoardItemCard({
                   const mediaType: "image" | "video" =
                     item.type === "video" || item.outputType === "video" ? "video" : "image";
                   if (!mediaUrl) return;
+                  const folderId = await pickFolder();
+                  if (!folderId) return;
+                  const toastId = showToast("Saving to folder…", { kind: "loading" });
                   try {
-                    const foldersRes = await fetch("/api/folders").then((r) => r.json());
-                    const folders: { id: string; name: string }[] = foldersRes?.folders || [];
-                    if (folders.length === 0) {
-                      const name = window.prompt("No folders yet. Name the first one:");
-                      if (!name) return;
-                      const created = await fetch("/api/folders", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name }),
-                      }).then((r) => r.json());
-                      if (!created?.folder?.id) return alert("Could not create folder.");
-                      folders.push(created.folder);
-                    }
-                    const pick = window.prompt(
-                      "Save to which folder?\n\n" +
-                        folders.map((f, i) => `${i + 1}. ${f.name}`).join("\n") +
-                        "\n\nEnter a number:"
-                    );
-                    const idx = pick ? parseInt(pick) - 1 : -1;
-                    const target = folders[idx];
-                    if (!target) return;
-                    const res = await fetch(`/api/folders/${target.id}/items`, {
+                    const res = await fetch(`/api/folders/${folderId}/items`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -933,12 +925,13 @@ export function BoardItemCard({
                     });
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({}));
-                      alert(err.error || "Failed to save.");
+                      updateToast(toastId, { kind: "error", message: err.error || "Failed to save." });
                     } else {
+                      updateToast(toastId, { kind: "success", message: "Saved to folder." });
                       useAppStore.getState().setFoldersOpen(true);
                     }
                   } catch {
-                    alert("Network error.");
+                    updateToast(toastId, { kind: "error", message: "Network error." });
                   }
                 }}
               >

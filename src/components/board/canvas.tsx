@@ -13,6 +13,7 @@ import { TemplatesPanel } from "./templates-panel";
 import { ProfilePanel, HistoryPanel } from "./dashboard-modal";
 import { AIPromptPanel } from "./ai-prompt-panel";
 import { FoldersPanel } from "./folders-panel";
+import { UILayer } from "@/components/ui/ui-layer";
 import { parsePsdBuffer } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
@@ -804,6 +805,7 @@ export function Canvas() {
       <HistoryPanel />
       <AIPromptPanel />
       <FoldersPanel />
+      <UILayer />
 
       {/* Marquee selection rectangle (right-click drag) */}
       {marquee && (

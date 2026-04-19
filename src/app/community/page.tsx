@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Heart, Flag, Eye, EyeOff, Trash2, Loader2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store";
+import { askConfirm, showToast, updateToast } from "@/lib/ui-store";
+import { UILayer } from "@/components/ui/ui-layer";
 
 interface Post {
   id: string;
@@ -142,6 +144,8 @@ export default function CommunityPage() {
           }}
         />
       )}
+
+      <UILayer />
     </div>
   );
 }
@@ -175,7 +179,10 @@ function PostModal({
   }, [post.createdAt]);
 
   async function like() {
-    if (!me) return alert("Sign in to like posts");
+    if (!me) {
+      showToast("Sign in to like posts", { kind: "info" });
+      return;
+    }
     setBusy("like");
     try {
       const res = await fetch(`/api/community/posts/${post.id}/like`, { method: "POST" });
@@ -189,17 +196,32 @@ function PostModal({
   }
 
   async function flag() {
-    if (!me) return alert("Sign in to report posts");
+    if (!me) {
+      showToast("Sign in to report posts", { kind: "info" });
+      return;
+    }
     if (post.flaggedByMe) return;
-    if (!confirm("Report this post to moderators?")) return;
+    const ok = await askConfirm({
+      title: "Report this post?",
+      message: "Moderators will review it.",
+      confirmLabel: "Report",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy("flag");
+    const toastId = showToast("Reporting…", { kind: "loading" });
     try {
       const res = await fetch(`/api/community/posts/${post.id}/flag`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: "" }),
       });
-      if (res.ok) onMutate((p) => ({ ...p, flaggedByMe: true }));
+      if (res.ok) {
+        onMutate((p) => ({ ...p, flaggedByMe: true }));
+        updateToast(toastId, { kind: "success", message: "Reported." });
+      } else {
+        updateToast(toastId, { kind: "error", message: "Failed to report." });
+      }
     } finally {
       setBusy(null);
     }
@@ -207,24 +229,42 @@ function PostModal({
 
   async function hide(next: boolean) {
     setBusy("hide");
+    const toastId = showToast(next ? "Hiding…" : "Unhiding…", { kind: "loading" });
     try {
       const res = await fetch(`/api/community/posts/${post.id}/hide`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hidden: next }),
       });
-      if (res.ok) onMutate((p) => ({ ...p, hidden: next }));
+      if (res.ok) {
+        onMutate((p) => ({ ...p, hidden: next }));
+        updateToast(toastId, { kind: "success", message: next ? "Hidden." : "Unhidden." });
+      } else {
+        updateToast(toastId, { kind: "error", message: "Action failed." });
+      }
     } finally {
       setBusy(null);
     }
   }
 
   async function remove() {
-    if (!confirm("Delete this post permanently?")) return;
+    const ok = await askConfirm({
+      title: "Delete this post?",
+      message: "The post will be removed permanently.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy("del");
+    const toastId = showToast("Deleting…", { kind: "loading" });
     try {
       const res = await fetch(`/api/community/posts/${post.id}`, { method: "DELETE" });
-      if (res.ok) onRemove(post.id);
+      if (res.ok) {
+        onRemove(post.id);
+        updateToast(toastId, { kind: "success", message: "Deleted." });
+      } else {
+        updateToast(toastId, { kind: "error", message: "Delete failed." });
+      }
     } finally {
       setBusy(null);
     }

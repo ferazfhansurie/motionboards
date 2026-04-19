@@ -22,6 +22,7 @@ import { useAppStore, type BoardItem } from "@/lib/store";
 import { importBoardFromFile, ImportCancelled } from "@/lib/board-io";
 import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
+import { askConfirm } from "@/lib/ui-store";
 
 function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>): string {
   if (!model) return "";
@@ -1123,11 +1124,15 @@ export function PromptBar() {
                     {boards.length > 1 && (
                       <button
                         className="p-0.5 text-gray-300 hover:text-red-500 transition-colors"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          if (window.confirm(`Delete the board "${board.name}"? This removes every item on it and cannot be undone.`)) {
-                            deleteBoard(board.id);
-                          }
+                          const ok = await askConfirm({
+                            title: `Delete "${board.name}"?`,
+                            message: "Every item on this board will be removed. This cannot be undone.",
+                            confirmLabel: "Delete board",
+                            danger: true,
+                          });
+                          if (ok) deleteBoard(board.id);
                         }}
                       >
                         <Trash2 className="w-2.5 h-2.5" />
