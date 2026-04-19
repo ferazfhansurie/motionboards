@@ -177,31 +177,24 @@ export function Toolbar() {
     : "bg-gray-100 text-[#0d1117]";
   const btnAccent = "bg-[#f26522]/10 text-[#f26522]";
 
-  // Buttons inside the orange capsule. In dark mode the capsule is solid
-  // brand orange, so icons use white with white-tint hover/active; in light
-  // mode we keep the neutral hover set so the peach tint still reads.
-  const capInactive = isDark
-    ? "text-white hover:bg-white/20"
-    : btnInactive;
-  const capActive = isDark
-    ? "bg-white/25 text-white"
-    : btnActive;
-  const capAccent = isDark
-    ? "bg-white/25 text-white"
-    : btnAccent;
-  const capDisabled = isDark
-    ? "text-white/40 cursor-not-allowed"
-    : "text-gray-300 cursor-not-allowed";
-  const capSeparator = isDark ? "bg-white/25" : "bg-gray-200";
+  // The left capsule is a solid orange sticker in both light and dark mode
+  // now, so icons are always white with a white-tint hover/active.
+  const capInactive = "text-white hover:bg-white/20";
+  const capActive = "bg-white/25 text-white";
+  const capAccent = "bg-white/25 text-white";
+  const capDisabled = "text-white/40 cursor-not-allowed";
+  const capSeparator = "bg-white/30";
 
   return (
     <>
-      {/* Top-left: Logo + actions */}
+      {/* Top-left: Logo + actions. Zine sticker: solid orange on a cream page
+          with a chunky black border + hard offset shadow. */}
       <div
-        className="absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto rounded-xl px-2 py-1.5 backdrop-blur-md border shadow-sm"
+        className="absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto rounded-2xl px-2 py-1.5 border-[2.5px]"
         style={{
-          backgroundColor: isDark ? "#f26522" : "rgba(242,101,34,0.22)",
-          borderColor: isDark ? "#f26522" : "rgba(242,101,34,0.4)",
+          backgroundColor: "#f26522",
+          borderColor: "#0d1117",
+          boxShadow: "4px 4px 0 0 #0d1117",
         }}
       >
         <div className="flex items-center px-1 py-0.5 rounded-lg">
@@ -346,17 +339,18 @@ export function Toolbar() {
         </div>
       </div>
 
-      {/* Top-right: Zoom controls + theme toggle */}
-      <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5 pointer-events-auto">
+      {/* Top-right: Zoom controls + theme toggle. Zine stickers. */}
+      <div className="absolute right-3 top-3 z-30 flex items-center gap-2 pointer-events-auto">
         <div
-          className="flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm"
+          className="flex items-center gap-0.5 rounded-2xl p-1 border-[2.5px]"
           style={{
-            backgroundColor: isDark ? "#f26522" : "rgba(242,101,34,0.22)",
-            borderColor: isDark ? "#f26522" : "rgba(242,101,34,0.4)",
+            background: "#f26522",
+            borderColor: "#0d1117",
+            boxShadow: "3px 3px 0 0 #0d1117",
           }}
         >
           <button
-            className={`rounded p-1 transition-colors ${capInactive}`}
+            className="rounded-lg p-1 transition-colors text-white hover:bg-white/20"
             onClick={() => {
               const nz = Math.max(0.1, zoom - 0.1);
               const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
@@ -368,13 +362,13 @@ export function Toolbar() {
             <ZoomOut className="h-3 w-3" />
           </button>
           <button
-            className={`min-w-[2.5rem] px-1 text-center text-[10px] font-medium rounded py-0.5 transition-colors ${isDark ? "text-white hover:bg-white/20" : "text-[#374151] hover:bg-gray-100 hover:text-[#0d1117]"}`}
+            className="min-w-[2.5rem] px-1 text-center text-[10px] font-black rounded-lg py-0.5 transition-colors text-white hover:bg-white/20"
             onClick={() => { setZoom(1); setPan(0, 0); }}
           >
             {Math.round(zoom * 100)}%
           </button>
           <button
-            className={`rounded p-1 transition-colors ${capInactive}`}
+            className="rounded-lg p-1 transition-colors text-white hover:bg-white/20"
             onClick={() => {
               const nz = Math.min(3, zoom + 0.1);
               const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
@@ -387,39 +381,68 @@ export function Toolbar() {
           </button>
         </div>
 
-        {/* Dark/Light mode toggle */}
-        <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          onClick={() => setTheme(isDark ? "light" : "dark")}
-        >
+        {/* Dark/Light mode toggle as its own sticker button. */}
+        <StickerIconBtn isDark={isDark} title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"} onClick={() => setTheme(isDark ? "light" : "dark")}>
           {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-        </button>
+        </StickerIconBtn>
 
-        <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
+        <StickerIconBtn
+          isDark={isDark}
           title="Generation Logs"
           onClick={() => window.open("/logs", "_blank")}
         >
           <ScrollText className="h-3.5 w-3.5" />
-        </button>
+        </StickerIconBtn>
 
-        <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
+        <StickerIconBtn
+          isDark={isDark}
           title="Community"
           onClick={() => window.open("/community", "_blank")}
         >
           <Users className="h-3.5 w-3.5" />
-        </button>
+        </StickerIconBtn>
 
-        <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
+        <StickerIconBtn
+          isDark={isDark}
           title="Tutorials & Help"
           onClick={() => window.open("/tutorials", "_blank")}
         >
           <HelpCircle className="h-3.5 w-3.5" />
-        </button>
+        </StickerIconBtn>
       </div>
     </>
+  );
+}
+
+// A small paper-sticker icon button — cream card, 2.5px black outline, hard
+// offset shadow, orange hover. Used for the top-right cluster (theme, logs,
+// community, tutorials) so they match the zine toolbar language.
+function StickerIconBtn({
+  isDark,
+  title,
+  onClick,
+  children,
+}: {
+  isDark: boolean;
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const ink = isDark ? "#f4ece0" : "#0d1117";
+  const paper = isDark ? "#1c1712" : "#fff8ec";
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className="rounded-xl p-1.5 border-[2.5px] transition-transform hover:-translate-y-0.5 active:translate-y-0"
+      style={{
+        background: paper,
+        color: ink,
+        borderColor: ink,
+        boxShadow: `2px 2px 0 0 ${ink}`,
+      }}
+    >
+      {children}
+    </button>
   );
 }
