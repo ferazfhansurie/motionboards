@@ -196,16 +196,18 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top-left: Logo + actions */}
+      {/* Top-left: Logo + actions.
+          Mobile: tighter gaps, smaller logo, capped width with horizontal
+          scroll so the capsule never collides with the right cluster. */}
       <div
-        className="absolute left-3 top-3 z-30 flex items-center gap-2 pointer-events-auto rounded-xl px-2 py-1.5 backdrop-blur-md border shadow-sm"
+        className="absolute left-2 md:left-3 top-2 md:top-3 z-30 flex items-center gap-1 md:gap-2 pointer-events-auto rounded-xl px-1.5 md:px-2 py-1 md:py-1.5 backdrop-blur-md border shadow-sm overflow-x-auto max-w-[calc(100vw-130px)] md:max-w-none no-scrollbar"
         style={{
           backgroundColor: isDark ? "#f26522" : "rgba(242,101,34,0.22)",
           borderColor: isDark ? "#f26522" : "rgba(242,101,34,0.4)",
         }}
       >
-        <div className="flex items-center px-1 py-0.5 rounded-lg">
-          <img src="/logo.jpg" alt="MotionBoards" className="h-12 w-auto rounded-lg" />
+        <div className="flex items-center px-0.5 md:px-1 py-0.5 rounded-lg shrink-0">
+          <img src="/logo.jpg" alt="MotionBoards" className="h-8 md:h-12 w-auto rounded-lg" />
         </div>
 
         {/* Undo/Redo */}
@@ -346,8 +348,11 @@ export function Toolbar() {
         </div>
       </div>
 
-      {/* Top-right: Zoom controls + theme toggle */}
-      <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5 pointer-events-auto">
+      {/* Top-right: Zoom controls + theme toggle. On mobile we keep only
+          zoom + theme; the external-link buttons (logs, community, WhatsApp,
+          tutorials) are hidden below md since they all exist in the Profile
+          panel / dedicated routes anyway. */}
+      <div className="absolute right-2 md:right-3 top-2 md:top-3 z-30 flex items-center gap-1 md:gap-1.5 pointer-events-auto">
         <div
           className="flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm"
           style={{
@@ -397,7 +402,7 @@ export function Toolbar() {
         </button>
 
         <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
+          className={`hidden md:inline-flex rounded-lg p-1.5 transition-colors ${btnInactive}`}
           title="Generation Logs"
           onClick={() => window.open("/logs", "_blank")}
         >
@@ -405,7 +410,7 @@ export function Toolbar() {
         </button>
 
         <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
+          className={`hidden md:inline-flex rounded-lg p-1.5 transition-colors ${btnInactive}`}
           title="Community"
           onClick={() => window.open("/community", "_blank")}
         >
@@ -413,7 +418,7 @@ export function Toolbar() {
         </button>
 
         <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
+          className={`hidden md:inline-flex rounded-lg p-1.5 transition-colors ${btnInactive}`}
           title="WhatsApp AI"
           onClick={() => window.open("/whatsapp", "_blank")}
         >
@@ -421,13 +426,20 @@ export function Toolbar() {
         </button>
 
         <button
-          className={`rounded-lg p-1.5 transition-colors ${btnInactive}`}
+          className={`hidden md:inline-flex rounded-lg p-1.5 transition-colors ${btnInactive}`}
           title="Tutorials & Help"
           onClick={() => window.open("/tutorials", "_blank")}
         >
           <HelpCircle className="h-3.5 w-3.5" />
         </button>
       </div>
+
+      {/* Hide the native scrollbar on the left capsule so horizontal overflow
+          scroll still works on mobile without an ugly bar. */}
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+      `}</style>
     </>
   );
 }

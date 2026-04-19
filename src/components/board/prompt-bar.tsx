@@ -1092,7 +1092,7 @@ export function PromptBar() {
       </div>
 
       {/* Bottom toolbar */}
-      <div className={`pointer-events-auto relative flex h-full w-full items-center backdrop-blur-md px-2.5 py-1 border-t shadow-[0_-2px_10px_rgba(0,0,0,0.04)] ${isDark ? "bg-[#161b22]/95 border-gray-700" : "bg-white/95 border-gray-200"}`}>
+      <div className={`pointer-events-auto relative flex h-full w-full items-center backdrop-blur-md px-1.5 md:px-2.5 py-1 border-t shadow-[0_-2px_10px_rgba(0,0,0,0.04)] gap-1 md:gap-2 ${isDark ? "bg-[#161b22]/95 border-gray-700" : "bg-white/95 border-gray-200"}`}>
         {/* Left: Board selector */}
         <div className="relative">
           <button
@@ -1285,19 +1285,22 @@ export function PromptBar() {
           )}
         </div>
 
-        {/* Center: Developed by Adletic */}
+        {/* Center: Developed by Adletic — desktop only, bottom bar is too
+            tight on mobile to show credits. */}
         <div className="flex-1 flex justify-center">
-          <span className="text-[9px] text-gray-300 flex items-center gap-1">
+          <span className="hidden md:flex text-[9px] text-gray-300 items-center gap-1">
             Developed by <img src="/adletic-logo.jpg" alt="Adletic" className="h-4 w-4 rounded-sm inline-block" /> <span className="font-semibold text-gray-400">Adletic</span> &copy; 2026
           </span>
         </div>
 
-        {/* Right: Toggle buttons */}
+        {/* Right: Toggle buttons. Below md we collapse labels to icons so the
+            Models / Templates / AI / History / Profile pills fit on a narrow
+            phone viewport without wrapping. */}
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1 rounded-lg p-1.5 border ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-gray-50 border-gray-100"}`}>
+          <div className={`flex items-center gap-1 rounded-lg p-1 md:p-1.5 border ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-gray-50 border-gray-100"}`}>
             {/* Models */}
             <button
-              className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
+              className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-1.5 md:px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isModelPanelOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
                   : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
@@ -1306,14 +1309,14 @@ export function PromptBar() {
               title="Models"
             >
               <FileImage className="w-3.5 h-3.5 shrink-0" />
-              <span className="flex items-center gap-1 truncate max-w-[12rem]">
+              <span className="flex items-center gap-1 truncate max-w-[6rem] md:max-w-[12rem]">
                 <span className="truncate">{selectedModel?.name || "None"}</span>
               </span>
             </button>
 
             {/* Prompt Templates */}
             <button
-              className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
+              className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-1.5 md:px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isTemplatesOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
                   : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
@@ -1322,12 +1325,12 @@ export function PromptBar() {
               title="Prompt Templates"
             >
               <BookOpen className="w-3.5 h-3.5 shrink-0" />
-              <span>Templates</span>
+              <span className="hidden md:inline">Templates</span>
             </button>
 
             {/* AI Prompt Generator */}
             <button
-              className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
+              className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 select-none h-6 px-1.5 md:px-2 text-xs leading-3 whitespace-nowrap gap-1 ${
                 isAIPromptOpen
                   ? "bg-[#f26522] text-white border border-[#f26522]"
                   : isDark ? "bg-[#161b22] text-gray-300 hover:bg-white/10 border border-gray-700" : "bg-white text-[#374151] hover:bg-gray-100 border border-gray-200"
@@ -1336,7 +1339,7 @@ export function PromptBar() {
               onClick={() => setAIPromptOpen(!isAIPromptOpen)}
             >
               <img src="/aios-icon.png" alt="AI" className="w-3.5 h-3.5 rounded-sm" />
-              <span>AI</span>
+              <span className="hidden md:inline">AI</span>
             </button>
 
             {/* Recent Generations */}

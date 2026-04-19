@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle, RotateCcw, Trash2, Save, Lock, Eye, EyeOff } from "lucide-react";
+import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle, RotateCcw, Trash2, Save, Lock, Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
 import { useAppStore, saveBoardSnapshotWithLabel } from "@/lib/store";
 
 interface VersionSummary {
@@ -588,7 +588,35 @@ export function ProfilePanel() {
               </button>
             </>
           ) : (
-            <p className="text-xs text-gray-400 text-center py-4">Not logged in</p>
+            <div className="py-3 flex flex-col gap-2 items-stretch">
+              <div className="flex flex-col items-center gap-1 pb-2">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-full ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
+                  <LogIn className={`h-5 w-5 ${isDark ? "text-gray-400" : "text-gray-500"}`} />
+                </div>
+                <p className={`text-xs font-semibold ${isDark ? "text-white" : "text-[#0d1117]"}`}>You're not signed in</p>
+                <p className={`text-[11px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Sign in to save work, buy credits, and share generations.
+                </p>
+              </div>
+              <a
+                href="/login"
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-[#f26522] hover:bg-[#d9541a] rounded-lg py-2 transition-colors"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                Login
+              </a>
+              <a
+                href="/signup"
+                className={`w-full flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-2 border transition-colors ${
+                  isDark
+                    ? "border-gray-700 text-gray-200 hover:border-[#f26522] hover:text-[#f26522]"
+                    : "border-gray-200 text-[#0d1117] hover:border-[#f26522] hover:text-[#f26522]"
+                }`}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Create account
+              </a>
+            </div>
           )}
         </div>
       </div>
