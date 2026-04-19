@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Check, Zap, ArrowLeft } from "lucide-react";
+import { Sticker } from "@/components/ui/stickers";
 
 const PLANS = [
   { id: "starter", name: "Starter", price: "RM10", credits: "RM10 balance", gens: "Pay-per-use" },
@@ -79,6 +80,15 @@ export default function SignupPage() {
       />
 
       <div className="relative w-full max-w-lg">
+        {/* Decorative doodles floating around the signup card */}
+        <Sticker.Daisy className="absolute -top-12 -left-16 z-10" rotate={-14} size={62} />
+        <Sticker.Sparkle className="absolute -top-6 left-1/3 z-10" rotate={14} size={28} />
+        <Sticker.Heart className="absolute -top-4 -right-14 z-10" rotate={16} size={42} />
+        <Sticker.Lightning className="absolute top-24 -right-12 z-10" rotate={-18} size={32} />
+        <Sticker.Scribble className="absolute top-52 -left-10 z-10" rotate={22} size={52} color="#f26522" />
+        <Sticker.Arrow className="absolute -bottom-8 -right-10 z-10" rotate={-20} size={70} />
+        <Sticker.Dots className="absolute -bottom-6 left-20 z-10" rotate={0} size={36} color="#f26522" />
+
         <div
           className="relative rounded-3xl border-[2.5px] p-6"
           style={{

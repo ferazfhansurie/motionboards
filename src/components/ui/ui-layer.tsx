@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Info, AlertTriangle, Loader2, X, FolderPlus, FolderOpen } from "lucide-react";
 import { useUIStore, type Toast } from "@/lib/ui-store";
 import { useAppStore } from "@/lib/store";
+import { Sticker } from "@/components/ui/stickers";
 
 // Shared theme tokens so every primitive in this file reads from the same palette.
 function useZine() {
@@ -128,26 +129,49 @@ function ZinePanel({
   className = "",
   maxWidth = "max-w-md",
   onClick,
+  sticker = "simple",
 }: {
   children: React.ReactNode;
   className?: string;
   maxWidth?: string;
   onClick?: (e: React.MouseEvent) => void;
+  sticker?: "none" | "simple" | "rich";
 }) {
   const { ink, paper } = useZine();
   return (
-    <div
-      onClick={onClick}
-      className={`relative w-full overflow-hidden rounded-3xl border-[2.5px] ${maxWidth} ${className}`}
-      style={{
-        background: paper,
-        color: ink,
-        borderColor: ink,
-        boxShadow: `8px 8px 0 0 ${ink}`,
-        animation: "mb-modal-in 200ms cubic-bezier(0.2,0.8,0.2,1)",
-      }}
-    >
-      {children}
+    <div className={`relative ${maxWidth} w-full`}>
+      {/* Floating doodles outside the modal body */}
+      {sticker !== "none" && (
+        <>
+          <Sticker.Daisy className="absolute -top-8 -left-10 z-10" rotate={-14} size={42} />
+          <Sticker.Sparkle className="absolute -top-5 right-10 z-10" rotate={18} size={22} />
+          {sticker === "rich" && (
+            <>
+              <Sticker.Heart className="absolute -bottom-6 -right-6 z-10" rotate={14} size={30} />
+              <Sticker.Scribble
+                className="absolute -bottom-8 left-6 z-10"
+                rotate={16}
+                size={38}
+                color="#f26522"
+              />
+              <Sticker.Lightning className="absolute top-24 -right-8 z-10" rotate={-18} size={24} />
+            </>
+          )}
+        </>
+      )}
+      <div
+        onClick={onClick}
+        className={`relative w-full overflow-hidden rounded-3xl border-[2.5px] ${className}`}
+        style={{
+          background: paper,
+          color: ink,
+          borderColor: ink,
+          boxShadow: `8px 8px 0 0 ${ink}`,
+          animation: "mb-modal-in 200ms cubic-bezier(0.2,0.8,0.2,1)",
+        }}
+      >
+        {children}
+      </div>
       <style jsx global>{`
         @keyframes mb-modal-in {
           from { transform: scale(0.96) rotate(-0.5deg); opacity: 0; }
@@ -546,7 +570,7 @@ function ShareModal() {
 
   return (
     <ModalBackdrop onClose={cancel}>
-      <ZinePanel onClick={(e) => e.stopPropagation()} maxWidth="max-w-lg">
+      <ZinePanel onClick={(e) => e.stopPropagation()} maxWidth="max-w-lg" sticker="rich">
         <DialogHeader
           title={`Share ${mediaType === "video" ? "video" : "image"} to community`}
           description="Give it a title + pick a vibe."

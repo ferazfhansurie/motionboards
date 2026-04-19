@@ -23,6 +23,7 @@ import {
 import { useAppStore } from "@/lib/store";
 import { askConfirm, showToast, updateToast } from "@/lib/ui-store";
 import { UILayer } from "@/components/ui/ui-layer";
+import { Sticker, DoodleScatter } from "@/components/ui/stickers";
 
 // Scrapbook / zine look. Every surface is a sticker: solid color, black outline,
 // hard offset shadow, slightly rotated. Category metadata drives the little
@@ -190,7 +191,13 @@ export default function CommunityPage() {
                 The feed.
               </span>
               <ScribbleUnderline color="#f26522" />
-              <StarDoodle className="absolute -top-6 -right-10 text-[#f26522]" rotate={-10} size={34} />
+              {/* Scrapbook doodle cluster around the masthead */}
+              <Sticker.Daisy className="absolute -top-8 -right-14" rotate={-14} size={52} />
+              <Sticker.Sparkle className="absolute -top-4 right-2" rotate={12} size={24} />
+              <Sticker.Heart className="absolute -bottom-4 -right-20" rotate={16} size={38} />
+              <Sticker.Lightning className="absolute top-8 -left-14" rotate={-22} size={30} />
+              <Sticker.Arrow className="absolute -bottom-10 right-20" rotate={-14} size={64} />
+              <Sticker.Scribble className="absolute -top-12 left-24" rotate={22} size={44} color="#f26522" />
             </h1>
             <p className="mt-3 mb-serif-italic text-[15px] opacity-80 max-w-md">
               Wins. Works-in-progress. Weird questions. Drop it all here and watch it loop.
@@ -512,9 +519,13 @@ function EmptyFeed({ ink, paper, onNew }: { ink: string; paper: string; onNew: (
         transform: "rotate(-0.5deg)",
       }}
     >
-      <StarDoodle className="absolute top-4 left-6 text-[#f26522]" rotate={12} size={22} />
-      <StarDoodle className="absolute top-10 right-10 text-[#f26522]" rotate={-20} size={16} />
-      <StarDoodle className="absolute bottom-6 left-12 text-[#f26522]" rotate={8} size={18} />
+      <Sticker.Daisy className="absolute -top-4 -left-4" rotate={-14} size={44} />
+      <Sticker.Sparkle className="absolute top-6 right-6" rotate={18} size={26} />
+      <Sticker.Heart className="absolute bottom-4 -right-5" rotate={14} size={32} />
+      <Sticker.Lightning className="absolute bottom-8 left-6" rotate={-18} size={28} />
+      <Sticker.Dots className="absolute top-20 left-12" rotate={0} size={36} color="#f26522" />
+      <Sticker.Scribble className="absolute -bottom-6 right-24" rotate={10} size={48} color="#f26522" />
+      <Sticker.Arrow className="absolute top-12 -right-10" rotate={20} size={56} />
 
       <span className="mb-serif-italic text-[14px] opacity-75">— chapter one —</span>
       <h3 className="mt-2 mb-serif-display" style={{ fontSize: "clamp(2rem, 5vw, 3rem)", color: ink }}>
@@ -685,7 +696,8 @@ function Leaderboard({ entries, ink, paper }: { entries: LeaderEntry[]; ink: str
         transform: "rotate(1deg)",
       }}
     >
-      <StarDoodle className="absolute -top-3 -right-2 text-[#f26522]" rotate={20} size={20} />
+      <Sticker.Sparkle className="absolute -top-3 -right-3" rotate={22} size={28} />
+      <Sticker.Daisy className="absolute -top-5 -left-5" rotate={-12} size={34} />
       <div className="mb-3">
         <span className="mb-serif-italic text-[12px] opacity-70">— on top —</span>
         <h3 className="mb-serif-display leading-none" style={{ fontSize: "1.6rem", color: ink }}>
@@ -825,8 +837,9 @@ function NewPostModal({
         style={{ background: paper, color: ink, borderColor: ink, boxShadow: `8px 8px 0 0 ${ink}` }}
         onClick={(e) => e.stopPropagation()}
       >
-        <StarDoodle className="absolute top-3 left-5 text-[#f26522]" rotate={8} size={22} />
-        <StarDoodle className="absolute top-4 right-20 text-[#f26522]" rotate={-18} size={16} />
+        <Sticker.Sparkle className="absolute top-4 left-8" rotate={8} size={22} />
+        <Sticker.Heart className="absolute top-6 right-24" rotate={-18} size={24} />
+        <Sticker.Scribble className="absolute -bottom-6 -right-4" rotate={20} size={40} color="#f26522" />
 
         <div className="flex items-center justify-between border-b-2 px-5 py-4" style={{ borderColor: ink }}>
           <div>

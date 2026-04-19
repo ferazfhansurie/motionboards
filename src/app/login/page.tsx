@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { Sticker } from "@/components/ui/stickers";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -55,6 +56,15 @@ export default function LoginPage() {
       />
 
       <div className="relative w-full max-w-sm">
+        {/* Floating doodles around the card */}
+        <Sticker.Daisy className="absolute -top-14 -left-14 z-10" rotate={-14} size={60} />
+        <Sticker.Heart className="absolute -top-6 -right-10 z-10" rotate={18} size={40} />
+        <Sticker.Sparkle className="absolute top-32 -right-14 z-10" rotate={10} size={28} />
+        <Sticker.Lightning className="absolute bottom-20 -left-12 z-10" rotate={-22} size={34} />
+        <Sticker.Scribble className="absolute -bottom-10 -right-6 z-10" rotate={18} size={58} color="#f26522" />
+        <Sticker.Arrow className="absolute -bottom-6 left-10 z-10" rotate={-18} size={70} />
+        <Sticker.Dots className="absolute top-4 -right-16 z-10" rotate={0} size={36} color="#f26522" />
+
         {/* Sticker card */}
         <div
           className="relative rounded-3xl border-[2.5px] p-6"
