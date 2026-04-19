@@ -15,33 +15,34 @@ import {
   Pin,
   PinOff,
   Plus,
-  Sparkles,
   Image as ImageIcon,
   Film,
   Paperclip,
   Send,
-  Crown,
-  Flame,
-  Zap,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { askConfirm, showToast, updateToast } from "@/lib/ui-store";
 import { UILayer } from "@/components/ui/ui-layer";
 
-// Category config — each one has a distinct color, emoji, and vibe. Drives the
-// sidebar, feed card accent bars, and the New Post chip picker so the whole UI
-// reads as one color system instead of "orange on everything".
+// Scrapbook / zine look. Every surface is a sticker: solid color, black outline,
+// hard offset shadow, slightly rotated. Category metadata drives the little
+// "taped label" on each post card and the chip color in the sidebar.
 const CATEGORY_META = {
-  All: { emoji: "✨", color: "#f26522", grad: "linear-gradient(135deg,#f26522,#ff8a3d)" },
-  General: { emoji: "💬", color: "#3b82f6", grad: "linear-gradient(135deg,#3b82f6,#60a5fa)" },
-  Showcase: { emoji: "🎨", color: "#a855f7", grad: "linear-gradient(135deg,#a855f7,#d946ef)" },
-  Help: { emoji: "🆘", color: "#f59e0b", grad: "linear-gradient(135deg,#f59e0b,#fbbf24)" },
-  Wins: { emoji: "🏆", color: "#22c55e", grad: "linear-gradient(135deg,#22c55e,#4ade80)" },
-  Feedback: { emoji: "💡", color: "#ec4899", grad: "linear-gradient(135deg,#ec4899,#f472b6)" },
+  All:       { emoji: "✦", label: "All" },
+  General:   { emoji: "☺", label: "General" },
+  Showcase:  { emoji: "✱", label: "Showcase" },
+  Help:      { emoji: "?",  label: "Help" },
+  Wins:      { emoji: "★",  label: "Wins" },
+  Feedback:  { emoji: "♡",  label: "Feedback" },
 } as const;
 type Category = keyof typeof CATEGORY_META;
 const CATEGORIES = Object.keys(CATEGORY_META) as Category[];
 const POST_CATEGORIES = CATEGORIES.filter((c) => c !== "All");
+
+// Cycled tilt values for the sidebar and feed so each surface feels hand-placed
+// instead of perfectly aligned.
+const TILTS = [-1.5, 1, -0.5, 1.5, -1, 0.5];
+const tiltAt = (i: number) => TILTS[i % TILTS.length];
 
 interface Post {
   id: string;
@@ -104,6 +105,12 @@ export default function CommunityPage() {
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [showComposer, setShowComposer] = useState(false);
 
+  // Theme tokens — scrapbook works best on cream paper; dark mode swaps the
+  // base palette to a warm near-black so the same stickers still read.
+  const ink = isDark ? "#f4ece0" : "#0d1117";
+  const paper = isDark ? "#14100c" : "#fdf6ec";
+  const paperAlt = isDark ? "#1c1712" : "#fff8ec";
+
   async function loadPosts(cat: Category) {
     setLoading(true);
     try {
@@ -143,7 +150,6 @@ export default function CommunityPage() {
   }, [activeCategory]);
 
   const isAdmin = me?.role === "admin";
-
   const openPost = posts.find((p) => p.id === openPostId) || null;
   const updatePost = (id: string, updater: (p: Post) => Post) =>
     setPosts((prev) => prev.map((p) => (p.id === id ? updater(p) : p)));
@@ -151,101 +157,76 @@ export default function CommunityPage() {
     setPosts((prev) => prev.filter((p) => p.id !== id));
 
   return (
-    <div className={`relative min-h-screen ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-      <BackgroundFX isDark={isDark} />
+    <div className="relative min-h-screen" style={{ background: paper, color: ink }}>
+      <PaperTexture isDark={isDark} />
 
-      {/* Top bar */}
-      <header className={`sticky top-0 z-20 border-b backdrop-blur-md ${isDark ? "border-white/5 bg-[#0d1117]/70" : "border-black/5 bg-white/60"}`}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link
-            href="/generate"
-            className={`flex items-center gap-2 text-[13px] font-bold ${isDark ? "text-gray-300 hover:text-white" : "text-gray-700 hover:text-black"}`}
-          >
+      {/* Top strip */}
+      <header className="relative z-20 border-b-2" style={{ borderColor: ink, background: paperAlt }}>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
+          <Link href="/generate" className="mb-link flex items-center gap-2 text-[13px] font-black uppercase tracking-[0.12em]">
             <ArrowLeft className="h-4 w-4" /> Back to canvas
           </Link>
-          <div className="flex items-center gap-2 text-[13px] font-black uppercase tracking-wider">
-            <Sparkles className="h-4 w-4 text-[#f26522]" />
-            <span>Community</span>
-          </div>
+          <div className="font-black uppercase tracking-[0.2em] text-[13px]">Motionboards · Zine</div>
           <div className="flex items-center gap-2">
             {me ? (
               <>
-                <Avatar name={me.name} size="sm" />
-                <span className="text-[12px] font-bold">{me.name}</span>
+                <Avatar name={me.name} size="sm" ink={ink} />
+                <span className="text-[12px] font-black">{me.name}</span>
               </>
             ) : (
-              <span className="text-[12px] font-semibold text-gray-400">Sign in to post</span>
+              <span className="text-[12px] font-bold opacity-60">Sign in to post</span>
             )}
           </div>
         </div>
       </header>
 
-      {/* Hero header */}
-      <section className="mx-auto max-w-6xl px-4 pt-10 pb-6">
-        <div className="flex items-end justify-between gap-6 flex-wrap">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#f26522]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.15em] text-[#f26522]">
-              <Flame className="h-3 w-3" /> Where creators show up
-            </div>
-            <h1 className="mt-3 font-black leading-[0.92] tracking-tighter" style={{ fontSize: "clamp(2.5rem, 7vw, 5rem)" }}>
-              The <span style={{ background: "linear-gradient(135deg,#f26522,#ec4899,#a855f7)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>feed.</span>
+      {/* Masthead */}
+      <section className="relative mx-auto max-w-6xl px-5 pt-10 pb-6">
+        <div className="relative flex items-end justify-between gap-6 flex-wrap">
+          <div className="relative">
+            <span className="mb-serif-italic text-[13px] opacity-70">— where creators show up, loudly —</span>
+            <h1 className="mt-1 relative inline-block">
+              <span className="block font-black uppercase leading-[0.88] tracking-tight" style={{ fontSize: "clamp(3.25rem, 10vw, 7rem)" }}>
+                The feed.
+              </span>
+              <ScribbleUnderline color="#f26522" />
+              <StarDoodle className="absolute -top-6 -right-10 text-[#f26522]" rotate={-10} size={34} />
             </h1>
-            <p className={`mt-1 text-[14px] ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-              Drop your wins, grab feedback, flex what you made.
+            <p className="mt-3 mb-serif-italic text-[15px] opacity-80 max-w-md">
+              Wins. Works-in-progress. Weird questions. Drop it all here and watch it loop.
             </p>
           </div>
-          <button
+
+          <StickerButton
             onClick={() => {
               if (!me) return showToast("Sign in to post", { kind: "info" });
               setShowComposer(true);
             }}
-            className="group relative inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-black text-white shadow-[0_14px_36px_-10px_rgba(242,101,34,0.6)] transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
-            style={{ background: "linear-gradient(135deg,#f26522,#ff8a3d)" }}
+            ink={ink}
+            rotate={2}
           >
             <Plus className="h-4 w-4" /> New Post
-            <span className="absolute -inset-1 -z-10 rounded-full opacity-60 blur-xl" style={{ background: "linear-gradient(135deg,#f26522,#ec4899)" }} />
-          </button>
+          </StickerButton>
         </div>
+
+        <DashDivider ink={ink} className="mt-10" />
       </section>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 pb-16 md:grid-cols-[220px_1fr_280px]">
-        {/* Left: category chips */}
+      <main className="relative mx-auto grid max-w-6xl gap-8 px-5 pb-20 md:grid-cols-[240px_1fr_280px]">
+        {/* Left: categories stack */}
         <aside className="md:sticky md:top-24 md:self-start">
-          <div className="space-y-1.5">
-            {CATEGORIES.map((c) => {
-              const meta = CATEGORY_META[c];
-              const active = activeCategory === c;
-              return (
-                <button
-                  key={c}
-                  onClick={() => setActiveCategory(c)}
-                  className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all ${
-                    active
-                      ? "border-transparent shadow-lg"
-                      : isDark
-                        ? "border-white/5 bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.06]"
-                        : "border-black/5 bg-white hover:border-black/10 hover:shadow-sm"
-                  }`}
-                  style={
-                    active
-                      ? { background: meta.grad, boxShadow: `0 10px 30px -8px ${meta.color}55` }
-                      : undefined
-                  }
-                >
-                  <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[16px]"
-                    style={
-                      active
-                        ? { background: "rgba(255,255,255,0.22)" }
-                        : { background: `${meta.color}15`, color: meta.color }
-                    }
-                  >
-                    {meta.emoji}
-                  </span>
-                  <span className={`text-[13px] font-black tracking-tight ${active ? "text-white" : ""}`}>{c}</span>
-                </button>
-              );
-            })}
+          <div className="space-y-3">
+            {CATEGORIES.map((c, i) => (
+              <CategoryCard
+                key={c}
+                cat={c}
+                active={activeCategory === c}
+                ink={ink}
+                paper={paperAlt}
+                tilt={tiltAt(i)}
+                onClick={() => setActiveCategory(c)}
+              />
+            ))}
           </div>
         </aside>
 
@@ -256,14 +237,16 @@ export default function CommunityPage() {
               <Loader2 className="h-7 w-7 animate-spin text-[#f26522]" />
             </div>
           ) : posts.length === 0 ? (
-            <EmptyFeed isDark={isDark} onNew={() => me ? setShowComposer(true) : showToast("Sign in to post", { kind: "info" })} />
+            <EmptyFeed ink={ink} paper={paperAlt} onNew={() => me ? setShowComposer(true) : showToast("Sign in to post", { kind: "info" })} />
           ) : (
-            <div className="space-y-4">
-              {posts.map((p) => (
+            <div className="space-y-6">
+              {posts.map((p, i) => (
                 <FeedCard
                   key={p.id}
                   post={p}
-                  isDark={isDark}
+                  ink={ink}
+                  paper={paperAlt}
+                  tilt={tiltAt(i + 2)}
                   onOpen={() => setOpenPostId(p.id)}
                   onToggleLike={async () => {
                     if (!me) return showToast("Sign in to like", { kind: "info" });
@@ -279,7 +262,7 @@ export default function CommunityPage() {
 
         {/* Right: leaderboard */}
         <aside className="md:sticky md:top-24 md:self-start">
-          <Leaderboard entries={leaderboard} isDark={isDark} />
+          <Leaderboard entries={leaderboard} ink={ink} paper={paperAlt} />
         </aside>
       </main>
 
@@ -288,7 +271,9 @@ export default function CommunityPage() {
           post={openPost}
           me={me}
           isAdmin={!!isAdmin}
-          isDark={isDark}
+          ink={ink}
+          paper={paper}
+          paperAlt={paperAlt}
           onClose={() => setOpenPostId(null)}
           onMutate={(updater) => updatePost(openPost.id, updater)}
           onRemove={(id) => {
@@ -300,7 +285,9 @@ export default function CommunityPage() {
 
       {showComposer && (
         <NewPostModal
-          isDark={isDark}
+          ink={ink}
+          paper={paper}
+          paperAlt={paperAlt}
           onClose={() => setShowComposer(false)}
           onCreated={(post) => {
             setPosts((prev) => [post, ...prev]);
@@ -312,74 +299,234 @@ export default function CommunityPage() {
 
       <UILayer />
 
+      {/* Font + keyframes. Inline so the page is self-contained. If Caveat/
+          Fraunces aren't on the system we fall back through native cursive/
+          serif stacks so it still reads artistic. */}
       <style jsx global>{`
-        @keyframes mb-float {
-          0%,100% { transform: translateY(0) rotate(var(--r,0deg)); }
-          50% { transform: translateY(-8px) rotate(var(--r,0deg)); }
-        }
-        @keyframes mb-pulse-glow {
-          0%,100% { opacity: 0.5; transform: scale(1); }
-          50% { opacity: 0.85; transform: scale(1.06); }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Fraunces:ital,wght@0,800;1,600;1,700&display=swap');
+        .mb-script { font-family: 'Caveat', 'Kalam', 'Bradley Hand', 'Segoe Script', cursive; }
+        .mb-serif-italic { font-style: italic; font-family: 'Fraunces', 'Georgia', 'Times New Roman', serif; font-weight: 600; letter-spacing: -0.01em; }
+        .mb-serif-display { font-family: 'Fraunces', 'Georgia', serif; font-weight: 800; font-style: italic; letter-spacing: -0.03em; }
         @keyframes mb-card-in {
-          from { transform: translateY(8px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+          from { transform: translateY(10px) rotate(var(--tilt, 0deg)); opacity: 0; }
+          to { transform: translateY(0) rotate(var(--tilt, 0deg)); opacity: 1; }
         }
-        .mb-card-enter { animation: mb-card-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .mb-card-enter { animation: mb-card-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .mb-link { transition: color 120ms; }
+        .mb-link:hover { color: #f26522; }
       `}</style>
     </div>
   );
 }
 
-// --- Background FX ---------------------------------------------------------
+// --- Paper texture overlay --------------------------------------------------
 
-function BackgroundFX({ isDark }: { isDark: boolean }) {
+function PaperTexture({ isDark }: { isDark: boolean }) {
   return (
-    <>
-      <div
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{
-          background: isDark
-            ? "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(242,101,34,0.10), transparent 60%), radial-gradient(ellipse 60% 50% at 15% 40%, rgba(168,85,247,0.08), transparent 60%), radial-gradient(ellipse 60% 50% at 85% 70%, rgba(236,72,153,0.08), transparent 60%), #0a0e14"
-            : "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(242,101,34,0.14), transparent 60%), radial-gradient(ellipse 60% 50% at 15% 40%, rgba(168,85,247,0.08), transparent 60%), radial-gradient(ellipse 60% 50% at 85% 70%, rgba(236,72,153,0.08), transparent 60%), #fafaf7",
-        }}
-      />
-      <div
-        className="pointer-events-none fixed inset-0 -z-10 opacity-[0.35]"
-        style={{
-          backgroundImage: isDark
-            ? "radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)"
-            : "radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-    </>
+    <div
+      className="pointer-events-none fixed inset-0 -z-10"
+      style={{
+        backgroundImage: isDark
+          ? "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)"
+          : "radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)",
+        backgroundSize: "4px 4px",
+        opacity: 0.6,
+      }}
+    />
   );
 }
 
-// --- Empty state -----------------------------------------------------------
+// --- Sticker primitives -----------------------------------------------------
 
-function EmptyFeed({ isDark, onNew }: { isDark: boolean; onNew: () => void }) {
+function StickerButton({
+  children,
+  ink,
+  rotate = 0,
+  onClick,
+  fill = "#f26522",
+  color = "#fff",
+  size = "md",
+  disabled = false,
+}: {
+  children: React.ReactNode;
+  ink: string;
+  rotate?: number;
+  onClick?: () => void;
+  fill?: string;
+  color?: string;
+  size?: "sm" | "md" | "lg";
+  disabled?: boolean;
+}) {
+  const pad = size === "lg" ? "px-6 py-3 text-[14px]" : size === "sm" ? "px-3 py-1.5 text-[11px]" : "px-5 py-2.5 text-[13px]";
   return (
-    <div className={`relative overflow-hidden rounded-3xl border p-10 text-center ${isDark ? "border-white/5 bg-white/[0.02]" : "border-black/5 bg-white/70"}`}>
-      <div
-        className="absolute -top-16 left-1/2 -translate-x-1/2 h-56 w-56 rounded-full blur-3xl"
-        style={{ background: "linear-gradient(135deg,#f26522,#ec4899)", opacity: 0.25, animation: "mb-pulse-glow 3s ease-in-out infinite" }}
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center gap-2 rounded-full border-[2.5px] font-black uppercase tracking-wider transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 ${pad}`}
+      style={{
+        background: fill,
+        color,
+        borderColor: ink,
+        boxShadow: `4px 4px 0 0 ${ink}`,
+        transform: `rotate(${rotate}deg)`,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StickerChip({
+  children,
+  ink,
+  fill,
+  color = "#0d1117",
+  rotate = 0,
+}: {
+  children: React.ReactNode;
+  ink: string;
+  fill: string;
+  color?: string;
+  rotate?: number;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border-2 px-2 py-[2px] text-[10px] font-black uppercase tracking-wider"
+      style={{ background: fill, color, borderColor: ink, transform: `rotate(${rotate}deg)` }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DashDivider({ ink, className = "" }: { ink: string; className?: string }) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span className="flex-1 border-t-[2px] border-dashed" style={{ borderColor: ink, opacity: 0.35 }} />
+      <span className="h-2 w-2 rounded-full" style={{ background: "#f26522" }} />
+      <span className="flex-1 border-t-[2px] border-dashed" style={{ borderColor: ink, opacity: 0.35 }} />
+    </div>
+  );
+}
+
+function ScribbleUnderline({ color }: { color: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 220 18"
+      className="absolute left-0 right-0 -bottom-2 w-[60%] max-w-[320px]"
+      preserveAspectRatio="none"
+    >
+      <path
+        d="M3 12 C 40 2, 80 16, 120 8 S 200 4, 218 12"
+        fill="none"
+        stroke={color}
+        strokeWidth="4"
+        strokeLinecap="round"
       />
-      <div className="relative">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg" style={{ background: "linear-gradient(135deg,#f26522,#ff8a3d)" }}>
-          <Sparkles className="h-7 w-7 text-white" />
-        </div>
-        <h3 className="text-2xl font-black tracking-tight">Nothing here… yet.</h3>
-        <p className={`mx-auto mt-1 max-w-sm text-[13px] ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-          Be the one to start it. Drop a win, a WIP, or a weird question — this feed loves it all.
-        </p>
-        <button
-          onClick={onNew}
-          className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#f26522] px-5 py-2.5 text-[13px] font-black text-white shadow-md hover:bg-[#d9541a]"
-        >
+    </svg>
+  );
+}
+
+function StarDoodle({
+  className = "",
+  rotate = 0,
+  size = 24,
+}: {
+  className?: string;
+  rotate?: number;
+  size?: number;
+}) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      style={{ transform: `rotate(${rotate}deg)` }}
+    >
+      <path
+        d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+// --- Category card ---------------------------------------------------------
+
+function CategoryCard({
+  cat,
+  active,
+  ink,
+  paper,
+  tilt,
+  onClick,
+}: {
+  cat: Category;
+  active: boolean;
+  ink: string;
+  paper: string;
+  tilt: number;
+  onClick: () => void;
+}) {
+  const meta = CATEGORY_META[cat];
+  return (
+    <button
+      onClick={onClick}
+      className="group flex w-full items-center gap-3 rounded-2xl border-[2.5px] px-3 py-3 text-left transition-transform hover:-translate-y-0.5 hover:translate-x-0.5"
+      style={{
+        background: active ? "#f26522" : paper,
+        color: active ? "#fff" : ink,
+        borderColor: ink,
+        boxShadow: `${active ? 5 : 3}px ${active ? 5 : 3}px 0 0 ${ink}`,
+        transform: `rotate(${tilt}deg)`,
+      }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-[16px] font-black"
+        style={{
+          background: active ? "#fff" : "#f26522",
+          color: active ? "#f26522" : "#fff",
+          borderColor: ink,
+        }}
+      >
+        {meta.emoji}
+      </span>
+      <span className="text-[14px] font-black tracking-tight">{meta.label}</span>
+    </button>
+  );
+}
+
+// --- Empty feed ------------------------------------------------------------
+
+function EmptyFeed({ ink, paper, onNew }: { ink: string; paper: string; onNew: () => void }) {
+  return (
+    <div
+      className="relative rounded-3xl border-[2.5px] p-10 text-center"
+      style={{
+        background: paper,
+        borderColor: ink,
+        boxShadow: `6px 6px 0 0 ${ink}`,
+        transform: "rotate(-0.5deg)",
+      }}
+    >
+      <StarDoodle className="absolute top-4 left-6 text-[#f26522]" rotate={12} size={22} />
+      <StarDoodle className="absolute top-10 right-10 text-[#f26522]" rotate={-20} size={16} />
+      <StarDoodle className="absolute bottom-6 left-12 text-[#f26522]" rotate={8} size={18} />
+
+      <span className="mb-serif-italic text-[14px] opacity-75">— chapter one —</span>
+      <h3 className="mt-2 mb-serif-display" style={{ fontSize: "clamp(2rem, 5vw, 3rem)", color: ink }}>
+        Nothing here… <span style={{ color: "#f26522" }}>yet.</span>
+      </h3>
+      <p className="mx-auto mt-2 max-w-sm text-[13px]" style={{ color: ink, opacity: 0.7 }}>
+        Be the one to start it. Drop a win, a WIP, or a weird question — this feed loves it all.
+      </p>
+      <div className="mt-5 flex justify-center">
+        <StickerButton ink={ink} onClick={onNew} rotate={-1} size="lg">
           <Plus className="h-4 w-4" /> Make the first post
-        </button>
+        </StickerButton>
       </div>
     </div>
   );
@@ -389,59 +536,95 @@ function EmptyFeed({ isDark, onNew }: { isDark: boolean; onNew: () => void }) {
 
 function FeedCard({
   post,
-  isDark,
+  ink,
+  paper,
+  tilt,
   onOpen,
   onToggleLike,
 }: {
   post: Post;
-  isDark: boolean;
+  ink: string;
+  paper: string;
+  tilt: number;
   onOpen: () => void;
   onToggleLike: () => void;
 }) {
   const cat = getCat(post.category);
   const meta = CATEGORY_META[cat];
-  const text = isDark ? "text-white" : "text-[#0d1117]";
-  const sub = isDark ? "text-gray-400" : "text-gray-500";
 
   return (
     <article
-      className={`mb-card-enter relative overflow-hidden rounded-3xl border p-5 transition-all duration-200 hover:-translate-y-0.5 ${
-        isDark ? "border-white/5 bg-white/[0.03] hover:bg-white/[0.05]" : "border-black/5 bg-white hover:shadow-xl"
-      } ${post.hidden ? "opacity-50" : ""}`}
-      style={{
-        boxShadow: !isDark ? `0 1px 0 rgba(0,0,0,0.02), 0 20px 40px -24px ${meta.color}33` : undefined,
-      }}
+      className="mb-card-enter relative rounded-3xl border-[2.5px] p-5 transition-transform hover:-translate-y-1"
+      style={
+        {
+          background: paper,
+          color: ink,
+          borderColor: ink,
+          boxShadow: `6px 6px 0 0 ${ink}`,
+          transform: `rotate(${tilt}deg)`,
+          // expose to the keyframe so the card lands at its real tilt:
+          ["--tilt" as string]: `${tilt}deg`,
+          opacity: post.hidden ? 0.5 : 1,
+        } as React.CSSProperties
+      }
     >
-      {/* Left accent bar */}
-      <span className="absolute left-0 top-4 bottom-4 w-1 rounded-r-full" style={{ background: meta.grad }} />
+      {/* Taped category label */}
+      <div
+        className="absolute -top-3 right-6 inline-flex items-center gap-1 rounded-md border-2 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider"
+        style={{
+          background: "#f26522",
+          color: "#fff",
+          borderColor: ink,
+          transform: "rotate(-3deg)",
+          boxShadow: `2px 2px 0 0 ${ink}`,
+        }}
+      >
+        <span className="text-[13px] leading-none">{meta.emoji}</span>
+        {meta.label}
+      </div>
 
-      <div className="flex items-center gap-3">
-        <Avatar name={post.authorName} ring />
-        <div className="flex-1 min-w-0">
-          <p className={`text-[14px] font-black truncate ${text}`}>{post.authorName}</p>
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className={sub}>{relativeTime(post.createdAt)}</span>
-            <CategoryChip cat={cat} />
-          </div>
+      {post.pinned && (
+        <div
+          className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-md border-2 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider"
+          style={{
+            color: ink,
+            borderColor: ink,
+            transform: "rotate(3deg)",
+            boxShadow: `2px 2px 0 0 ${ink}`,
+          }}
+        >
+          <Pin className="h-3 w-3" /> Pinned
         </div>
-        {post.pinned && (
-          <span className="flex items-center gap-1 rounded-full bg-[#f26522] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow">
-            <Pin className="h-3 w-3" /> Pinned
-          </span>
-        )}
+      )}
+
+      <div className="flex items-center gap-3 pt-1">
+        <Avatar name={post.authorName} ink={ink} size="md" stickerRing />
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-black truncate">{post.authorName}</p>
+          <p className="mb-serif-italic text-[11.5px] opacity-70">{relativeTime(post.createdAt)}</p>
+        </div>
       </div>
 
       <button onClick={onOpen} className="mt-3 block w-full text-left">
-        <h3 className={`text-[18px] font-black leading-tight tracking-tight ${text}`}>{post.title || "(untitled)"}</h3>
+        <h3
+          className="mb-serif-display leading-[1.05]"
+          style={{ fontSize: "clamp(1.25rem, 2vw, 1.6rem)" }}
+        >
+          {post.title || "(untitled)"}
+        </h3>
         {post.body && (
-          <p className={`mt-1.5 text-[13.5px] leading-relaxed line-clamp-3 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+          <p className="mt-1.5 text-[13.5px] leading-relaxed line-clamp-3" style={{ color: ink, opacity: 0.8 }}>
             {post.body}
           </p>
         )}
       </button>
 
       {post.fileId && (
-        <button onClick={onOpen} className={`mt-3 block w-full overflow-hidden rounded-2xl border ${isDark ? "border-white/5" : "border-black/5"}`}>
+        <button
+          onClick={onOpen}
+          className="mt-3 block w-full overflow-hidden rounded-2xl border-[2.5px]"
+          style={{ borderColor: ink }}
+        >
           {post.mediaType === "video" ? (
             <video
               src={`/api/files/${post.fileId}`}
@@ -462,27 +645,26 @@ function FeedCard({
         </button>
       )}
 
-      <div className={`mt-4 flex items-center gap-2 pt-3 border-t ${isDark ? "border-white/5" : "border-black/5"}`}>
+      <div className="mt-4 flex items-center gap-2 border-t-[2px] border-dashed pt-3" style={{ borderColor: ink, opacity: 1 }}>
         <button
           onClick={onToggleLike}
-          className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-black transition-all ${
-            post.likedByMe
-              ? "bg-[#f26522] text-white shadow-md"
-              : isDark
-                ? "text-gray-300 hover:bg-white/5"
-                : "text-gray-600 hover:bg-gray-100"
-          }`}
+          className="group inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-[12px] font-black uppercase tracking-wider transition-transform hover:-translate-y-0.5"
+          style={{
+            background: post.likedByMe ? "#f26522" : "transparent",
+            color: post.likedByMe ? "#fff" : ink,
+            borderColor: ink,
+            boxShadow: post.likedByMe ? `2px 2px 0 0 ${ink}` : "none",
+          }}
         >
-          <Heart className={`h-4 w-4 transition-transform ${post.likedByMe ? "fill-current scale-110" : "group-hover:scale-110"}`} />
+          <Heart className={`h-3.5 w-3.5 ${post.likedByMe ? "fill-current" : ""}`} />
           {post.likeCount}
         </button>
         <button
           onClick={onOpen}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-black transition-colors ${
-            isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-600 hover:bg-gray-100"
-          }`}
+          className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-[12px] font-black uppercase tracking-wider transition-transform hover:-translate-y-0.5"
+          style={{ borderColor: ink, color: ink }}
         >
-          <MessageCircle className="h-4 w-4" />
+          <MessageCircle className="h-3.5 w-3.5" />
           {post.commentCount}
         </button>
       </div>
@@ -490,67 +672,62 @@ function FeedCard({
   );
 }
 
-function CategoryChip({ cat }: { cat: Category }) {
-  const meta = CATEGORY_META[cat];
+// --- Leaderboard -----------------------------------------------------------
+
+function Leaderboard({ entries, ink, paper }: { entries: LeaderEntry[]; ink: string; paper: string }) {
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider"
-      style={{ background: `${meta.color}18`, color: meta.color }}
+    <div
+      className="relative rounded-3xl border-[2.5px] p-5"
+      style={{
+        background: paper,
+        borderColor: ink,
+        boxShadow: `5px 5px 0 0 ${ink}`,
+        transform: "rotate(1deg)",
+      }}
     >
-      <span className="text-[11px] leading-none">{meta.emoji}</span>
-      {cat}
-    </span>
-  );
-}
-
-// --- Leaderboard ------------------------------------------------------------
-
-function Leaderboard({ entries, isDark }: { entries: LeaderEntry[]; isDark: boolean }) {
-  const card = isDark ? "border-white/5 bg-white/[0.03]" : "border-black/5 bg-white/80";
-  const sub = isDark ? "text-gray-400" : "text-gray-500";
-  return (
-    <div className={`rounded-3xl border p-4 ${card}`}>
-      <div className="mb-3 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-xl" style={{ background: "linear-gradient(135deg,#f26522,#f59e0b)" }}>
-          <Crown className="h-4 w-4 text-white" />
-        </div>
-        <h3 className="text-[13px] font-black uppercase tracking-wider">Top creators</h3>
+      <StarDoodle className="absolute -top-3 -right-2 text-[#f26522]" rotate={20} size={20} />
+      <div className="mb-3">
+        <span className="mb-serif-italic text-[12px] opacity-70">— on top —</span>
+        <h3 className="mb-serif-display leading-none" style={{ fontSize: "1.6rem", color: ink }}>
+          Top creators
+        </h3>
       </div>
       {entries.length === 0 ? (
-        <p className={`text-[11px] ${sub}`}>No activity yet. Post something and claim #1 ✨</p>
+        <p className="text-[12px]" style={{ color: ink, opacity: 0.7 }}>
+          No activity yet. Post something and claim #1.
+        </p>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {entries.map((e, i) => {
-            const top = i === 0;
+            const isOne = i === 0;
             return (
               <div
                 key={e.userId}
-                className={`flex items-center gap-2.5 rounded-2xl px-2.5 py-2 transition-colors ${
-                  top ? "" : isDark ? "hover:bg-white/[0.04]" : "hover:bg-black/[0.02]"
-                }`}
-                style={top ? { background: "linear-gradient(135deg,rgba(242,101,34,0.15),rgba(245,158,11,0.10))" } : undefined}
+                className="flex items-center gap-2.5 rounded-2xl border-2 px-2.5 py-2"
+                style={{
+                  background: isOne ? "#f26522" : "transparent",
+                  color: isOne ? "#fff" : ink,
+                  borderColor: ink,
+                  boxShadow: isOne ? `3px 3px 0 0 ${ink}` : "none",
+                  transform: `rotate(${isOne ? -1 : 0}deg)`,
+                }}
               >
                 <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-black ${
-                    top ? "text-white" : isDark ? "bg-white/5 text-gray-300" : "bg-black/5 text-gray-600"
-                  }`}
-                  style={top ? { background: "linear-gradient(135deg,#f26522,#f59e0b)" } : undefined}
+                  className="mb-serif-display flex h-7 w-7 shrink-0 items-center justify-center leading-none"
+                  style={{
+                    color: isOne ? "#fff" : "#f26522",
+                    fontSize: "1.35rem",
+                    fontStyle: "italic",
+                  }}
                 >
                   {i + 1}
                 </span>
-                <Avatar name={e.authorName} size="sm" ring={top} />
+                <Avatar name={e.authorName} ink={ink} size="sm" stickerRing={isOne} />
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-[12.5px] font-black">{e.authorName}</p>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-[1px] text-[9px] font-black text-white"
-                      style={{ background: "linear-gradient(135deg,#f26522,#ec4899)" }}
-                    >
-                      <Zap className="h-2.5 w-2.5" />
-                      {e.points}
-                    </span>
-                    <span className={`text-[9.5px] font-bold ${sub}`}>Lv {e.level}</span>
-                  </div>
+                  <p className="text-[10px] font-bold" style={{ opacity: 0.85 }}>
+                    Lv {e.level} · {e.points} pts
+                  </p>
                 </div>
               </div>
             );
@@ -561,14 +738,18 @@ function Leaderboard({ entries, isDark }: { entries: LeaderEntry[]; isDark: bool
   );
 }
 
-// --- New post modal ---------------------------------------------------------
+// --- New post modal --------------------------------------------------------
 
 function NewPostModal({
-  isDark,
+  ink,
+  paper,
+  paperAlt,
   onClose,
   onCreated,
 }: {
-  isDark: boolean;
+  ink: string;
+  paper: string;
+  paperAlt: string;
   onClose: () => void;
   onCreated: (post: Post) => void;
 }) {
@@ -578,11 +759,6 @@ function NewPostModal({
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const panel = isDark ? "bg-[#0f1520] border-white/10 text-white" : "bg-white border-black/5 text-[#0d1117]";
-  const input = isDark
-    ? "border-white/10 bg-white/[0.03] text-white placeholder-gray-500 focus:border-[#f26522]"
-    : "border-black/5 bg-gray-50 text-[#0d1117] placeholder-gray-400 focus:border-[#f26522] focus:bg-white";
 
   async function submit() {
     if (!title.trim()) {
@@ -618,7 +794,7 @@ function NewPostModal({
         setBusy(false);
         return;
       }
-      updateToast(toastId, { kind: "success", message: "Posted! ✨" });
+      updateToast(toastId, { kind: "success", message: "Posted." });
       const created: Post = {
         ...data.post,
         likedByMe: false,
@@ -631,32 +807,47 @@ function NewPostModal({
     }
   }
 
+  const inputStyle: React.CSSProperties = {
+    background: paperAlt,
+    color: ink,
+    borderColor: ink,
+    boxShadow: `3px 3px 0 0 ${ink}`,
+  };
+
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[150] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.5)" }}
+      onClick={onClose}
+    >
       <div
-        className={`relative w-full max-w-lg overflow-hidden rounded-3xl border shadow-2xl ${panel}`}
+        className="relative w-full max-w-lg rounded-3xl border-[2.5px] overflow-hidden"
+        style={{ background: paper, color: ink, borderColor: ink, boxShadow: `8px 8px 0 0 ${ink}` }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="absolute -top-16 -left-16 h-48 w-48 rounded-full blur-3xl"
-          style={{ background: "linear-gradient(135deg,#f26522,#ec4899)", opacity: 0.35 }}
-        />
-        <div className={`relative flex items-center justify-between border-b px-6 py-4 ${isDark ? "border-white/10" : "border-black/5"}`}>
+        <StarDoodle className="absolute top-3 left-5 text-[#f26522]" rotate={8} size={22} />
+        <StarDoodle className="absolute top-4 right-20 text-[#f26522]" rotate={-18} size={16} />
+
+        <div className="flex items-center justify-between border-b-2 px-5 py-4" style={{ borderColor: ink }}>
           <div>
-            <h3 className="text-[15px] font-black tracking-tight">Write a post</h3>
-            <p className={`text-[11px] ${isDark ? "text-gray-400" : "text-gray-500"}`}>Share a win, a WIP, a question. Whatever.</p>
+            <span className="mb-serif-italic text-[12px] opacity-70">— write a post —</span>
+            <h3 className="mb-serif-display leading-none mt-1" style={{ fontSize: "1.6rem", color: ink }}>
+              Say it loud.
+            </h3>
           </div>
-          <button onClick={onClose} className={`rounded-lg p-1.5 ${isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-400 hover:bg-gray-100"}`}>
+          <button onClick={onClose} className="rounded-full border-2 p-1.5" style={{ borderColor: ink }}>
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="relative flex flex-col gap-4 px-6 py-5">
+
+        <div className="flex flex-col gap-3 px-5 py-5">
           <input
             type="text"
-            placeholder="Title. Make it catchy."
+            placeholder="Title. Keep it punchy."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className={`w-full rounded-xl border px-4 py-3 text-[16px] font-bold outline-none transition-colors ${input}`}
+            className="w-full rounded-2xl border-[2.5px] px-4 py-3 text-[16px] font-black outline-none"
+            style={inputStyle}
           />
           <div className="flex flex-wrap gap-1.5">
             {POST_CATEGORIES.map((c) => {
@@ -666,19 +857,17 @@ function NewPostModal({
                 <button
                   key={c}
                   onClick={() => setCategory(c)}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-black uppercase tracking-wider transition-all hover:-translate-y-0.5"
-                  style={
-                    active
-                      ? { background: meta.grad, color: "#fff", borderColor: "transparent", boxShadow: `0 8px 20px -6px ${meta.color}66` }
-                      : {
-                          background: isDark ? "rgba(255,255,255,0.03)" : `${meta.color}10`,
-                          color: meta.color,
-                          borderColor: isDark ? "rgba(255,255,255,0.08)" : `${meta.color}30`,
-                        }
-                  }
+                  className="inline-flex items-center gap-1.5 rounded-full border-[2.5px] px-3 py-1 text-[11px] font-black uppercase tracking-wider transition-transform hover:-translate-y-0.5"
+                  style={{
+                    background: active ? "#f26522" : paperAlt,
+                    color: active ? "#fff" : ink,
+                    borderColor: ink,
+                    boxShadow: active ? `3px 3px 0 0 ${ink}` : "none",
+                    transform: active ? "rotate(-1.5deg)" : "rotate(0deg)",
+                  }}
                 >
-                  <span className="text-[12px] leading-none">{meta.emoji}</span>
-                  {c}
+                  <span className="text-[13px] leading-none">{meta.emoji}</span>
+                  {meta.label}
                 </button>
               );
             })}
@@ -688,23 +877,23 @@ function NewPostModal({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={5}
-            className={`w-full resize-none rounded-xl border px-4 py-3 text-[13.5px] leading-relaxed outline-none transition-colors ${input}`}
+            className="w-full resize-none rounded-2xl border-[2.5px] px-4 py-3 text-[13.5px] leading-relaxed outline-none"
+            style={inputStyle}
           />
           <div className="flex items-center gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-black transition-all hover:-translate-y-0.5 ${
-                isDark ? "border-white/10 text-gray-300 hover:border-[#f26522] hover:text-[#f26522]" : "border-black/10 text-gray-600 hover:border-[#f26522] hover:text-[#f26522]"
-              }`}
+              className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider hover:-translate-y-0.5 transition-transform"
+              style={{ borderColor: ink, color: ink, background: "transparent" }}
             >
               <Paperclip className="h-3.5 w-3.5" />
-              {file ? "Change attachment" : "Attach image / video"}
+              {file ? "Swap attachment" : "Attach image / video"}
             </button>
             {file && (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-[#f26522]">
+              <span className="mb-serif-italic inline-flex items-center gap-1 text-[11px]" style={{ color: "#f26522" }}>
                 {file.type.startsWith("video/") ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
                 <span className="truncate max-w-[180px]">{file.name}</span>
-                <button onClick={() => setFile(null)} className="ml-1 text-gray-400 hover:text-red-500">
+                <button onClick={() => setFile(null)} className="ml-1 opacity-60 hover:opacity-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -718,35 +907,34 @@ function NewPostModal({
             />
           </div>
         </div>
-        <div className={`relative flex items-center justify-end gap-2 border-t px-6 py-4 ${isDark ? "border-white/10" : "border-black/5"}`}>
+
+        <div className="flex items-center justify-end gap-3 border-t-2 px-5 py-3" style={{ borderColor: ink, background: paperAlt }}>
           <button
             onClick={onClose}
             disabled={busy}
-            className={`rounded-full px-5 py-2 text-[12px] font-black transition-colors ${isDark ? "bg-white/5 text-gray-200 hover:bg-white/10" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+            className="rounded-full border-2 px-4 py-2 text-[11.5px] font-black uppercase tracking-wider"
+            style={{ borderColor: ink, color: ink, background: "transparent" }}
           >
             Cancel
           </button>
-          <button
-            onClick={submit}
-            disabled={busy || !title.trim()}
-            className="rounded-full px-6 py-2 text-[12px] font-black text-white transition-all hover:-translate-y-0.5 disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#f26522,#ff8a3d)", boxShadow: "0 10px 24px -10px rgba(242,101,34,0.6)" }}
-          >
-            {busy ? "Publishing…" : "Publish ✨"}
-          </button>
+          <StickerButton ink={ink} onClick={submit} disabled={busy || !title.trim()} rotate={-1}>
+            {busy ? "Publishing…" : "Publish"}
+          </StickerButton>
         </div>
       </div>
     </div>
   );
 }
 
-// --- Post detail modal ------------------------------------------------------
+// --- Post detail modal -----------------------------------------------------
 
 function PostDetailModal({
   post,
   me,
   isAdmin,
-  isDark,
+  ink,
+  paper,
+  paperAlt,
   onClose,
   onMutate,
   onRemove,
@@ -754,14 +942,13 @@ function PostDetailModal({
   post: Post;
   me: Me | null;
   isAdmin: boolean;
-  isDark: boolean;
+  ink: string;
+  paper: string;
+  paperAlt: string;
   onClose: () => void;
   onMutate: (updater: (p: Post) => Post) => void;
   onRemove: (id: string) => void;
 }) {
-  const panel = isDark ? "bg-[#0f1520] border-white/10 text-white" : "bg-white border-black/5 text-[#0d1117]";
-  const text = isDark ? "text-white" : "text-[#0d1117]";
-  const sub = isDark ? "text-gray-400" : "text-gray-500";
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(true);
   const [newComment, setNewComment] = useState("");
@@ -904,48 +1091,57 @@ function PostDetailModal({
   const canDeletePost = !!me && (me.id === post.userId || isAdmin);
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm md:items-center">
+    <div
+      className="fixed inset-0 z-[150] flex items-start justify-center overflow-y-auto p-4 md:items-center"
+      style={{ background: "rgba(0,0,0,0.55)" }}
+    >
       <div
-        className={`relative w-full max-w-2xl overflow-hidden rounded-3xl border shadow-2xl ${panel}`}
+        className="relative w-full max-w-2xl rounded-3xl border-[2.5px] overflow-hidden"
+        style={{ background: paper, color: ink, borderColor: ink, boxShadow: `8px 8px 0 0 ${ink}` }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="absolute -top-20 right-0 h-48 w-48 rounded-full blur-3xl"
-          style={{ background: meta.grad, opacity: 0.2 }}
-        />
+          className="absolute -top-3 right-8 inline-flex items-center gap-1 rounded-md border-2 px-3 py-1 text-[10.5px] font-black uppercase tracking-wider"
+          style={{
+            background: "#f26522",
+            color: "#fff",
+            borderColor: ink,
+            transform: "rotate(-3deg)",
+            boxShadow: `2px 2px 0 0 ${ink}`,
+          }}
+        >
+          <span className="text-[13px] leading-none">{meta.emoji}</span>
+          {meta.label}
+        </div>
+
         <button
           onClick={onClose}
-          className={`absolute right-3 top-3 z-10 rounded-lg p-1.5 ${isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-400 hover:bg-gray-100"}`}
+          className="absolute right-4 top-4 z-10 rounded-full border-2 p-1.5"
+          style={{ borderColor: ink, background: paperAlt }}
         >
           <X className="h-4 w-4" />
         </button>
 
         <div className="relative p-6">
           <div className="flex items-center gap-3">
-            <Avatar name={post.authorName} ring />
+            <Avatar name={post.authorName} ink={ink} size="md" stickerRing />
             <div className="flex-1 min-w-0">
-              <p className={`font-black truncate ${text}`}>{post.authorName}</p>
-              <div className="flex items-center gap-2 text-[11px]">
-                <span className={sub}>{relativeTime(post.createdAt)}</span>
-                <CategoryChip cat={cat} />
-                {post.pinned && (
-                  <span className="rounded-full bg-[#f26522] px-2 py-[1px] text-[9px] font-black uppercase tracking-wider text-white">
-                    Pinned
-                  </span>
-                )}
-              </div>
+              <p className="font-black truncate">{post.authorName}</p>
+              <p className="mb-serif-italic text-[11.5px] opacity-70">{relativeTime(post.createdAt)}</p>
             </div>
           </div>
 
-          <h2 className={`mt-4 text-2xl font-black leading-tight tracking-tight ${text}`}>{post.title}</h2>
+          <h2 className="mb-serif-display mt-4 leading-[1.02]" style={{ fontSize: "clamp(1.8rem, 3.2vw, 2.4rem)" }}>
+            {post.title}
+          </h2>
           {post.body && (
-            <p className={`mt-2 whitespace-pre-wrap text-[14px] leading-relaxed ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed" style={{ opacity: 0.85 }}>
               {post.body}
             </p>
           )}
 
           {post.fileId && (
-            <div className={`mt-4 overflow-hidden rounded-2xl border ${isDark ? "border-white/5" : "border-black/5"}`}>
+            <div className="mt-4 overflow-hidden rounded-2xl border-[2.5px]" style={{ borderColor: ink }}>
               {post.mediaType === "video" ? (
                 <video src={`/api/files/${post.fileId}`} controls className="max-h-[60vh] w-full" />
               ) : (
@@ -954,31 +1150,31 @@ function PostDetailModal({
             </div>
           )}
 
-          <div className={`mt-4 flex items-center gap-2 border-y py-3 ${isDark ? "border-white/5" : "border-black/5"}`}>
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t-2 border-dashed pt-3" style={{ borderColor: ink }}>
             <button
               onClick={togglePostLike}
-              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-black transition-all ${
-                post.likedByMe
-                  ? "text-white shadow-md"
-                  : isDark
-                    ? "bg-white/5 text-gray-300 hover:bg-white/10"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-              style={post.likedByMe ? { background: "linear-gradient(135deg,#f26522,#ec4899)" } : undefined}
+              className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-[12px] font-black uppercase tracking-wider"
+              style={{
+                background: post.likedByMe ? "#f26522" : "transparent",
+                color: post.likedByMe ? "#fff" : ink,
+                borderColor: ink,
+                boxShadow: post.likedByMe ? `2px 2px 0 0 ${ink}` : "none",
+              }}
             >
-              <Heart className={`h-4 w-4 ${post.likedByMe ? "fill-current" : ""}`} />
+              <Heart className={`h-3.5 w-3.5 ${post.likedByMe ? "fill-current" : ""}`} />
               {post.likeCount}
             </button>
-            <span className={`flex items-center gap-1.5 text-[12px] font-black ${sub}`}>
-              <MessageCircle className="h-4 w-4" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-[12px] font-black uppercase tracking-wider" style={{ borderColor: ink, opacity: 0.7 }}>
+              <MessageCircle className="h-3.5 w-3.5" />
               {post.commentCount}
             </span>
             <div className="flex-1" />
             <button
               onClick={flagPost}
               disabled={post.flaggedByMe}
-              title={post.flaggedByMe ? "Already reported" : "Report to moderators"}
-              className={`rounded-lg p-1.5 ${post.flaggedByMe ? "text-yellow-500" : isDark ? "text-gray-400 hover:bg-white/5 hover:text-yellow-400" : "text-gray-400 hover:bg-gray-100 hover:text-yellow-600"}`}
+              title={post.flaggedByMe ? "Already reported" : "Report"}
+              className="rounded-full border-2 p-1.5"
+              style={{ borderColor: ink, color: post.flaggedByMe ? "#d97706" : ink, background: "transparent" }}
             >
               <Flag className="h-4 w-4" />
             </button>
@@ -987,45 +1183,50 @@ function PostDetailModal({
                 <button
                   onClick={togglePin}
                   title={post.pinned ? "Unpin" : "Pin"}
-                  className={`rounded-lg p-1.5 ${post.pinned ? "text-[#f26522]" : isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-400 hover:bg-gray-100"}`}
+                  className="rounded-full border-2 p-1.5"
+                  style={{ borderColor: ink, color: post.pinned ? "#f26522" : ink, background: "transparent" }}
                 >
                   {post.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
                 </button>
                 <button
                   onClick={toggleHide}
                   title={post.hidden ? "Unhide" : "Hide"}
-                  className={`rounded-lg p-1.5 ${post.hidden ? "text-red-500" : isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-400 hover:bg-gray-100"}`}
+                  className="rounded-full border-2 p-1.5"
+                  style={{ borderColor: ink, color: post.hidden ? "#dc2626" : ink, background: "transparent" }}
                 >
                   {post.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </>
             )}
             {canDeletePost && (
-              <button onClick={remove} className="rounded-lg bg-red-500/10 p-1.5 text-red-500 hover:bg-red-500/20">
+              <button onClick={remove} className="rounded-full border-2 p-1.5" style={{ borderColor: ink, color: "#dc2626", background: "transparent" }}>
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
           </div>
 
-          <div className="mt-4">
-            <h4 className={`text-[11px] font-black uppercase tracking-[0.15em] ${sub}`}>
+          <div className="mt-5">
+            <span className="mb-serif-italic text-[12px] opacity-70">— chatter —</span>
+            <h4 className="mb-serif-display leading-none mt-0.5" style={{ fontSize: "1.3rem" }}>
               {post.commentCount} Comment{post.commentCount === 1 ? "" : "s"}
             </h4>
             <div className="mt-2 space-y-2">
               {loadingComments ? (
                 <div className="flex justify-center py-6">
-                  <Loader2 className={`h-4 w-4 animate-spin ${sub}`} />
+                  <Loader2 className="h-4 w-4 animate-spin opacity-70" />
                 </div>
               ) : comments.length === 0 ? (
-                <p className={`text-[12px] ${sub}`}>No replies yet. Be the one with something to say.</p>
+                <p className="text-[12px] opacity-70">No replies yet. Be the one with something to say.</p>
               ) : (
-                comments.map((c) => (
+                comments.map((c, i) => (
                   <CommentRow
                     key={c.id}
                     comment={c}
                     me={me}
                     isAdmin={isAdmin}
-                    isDark={isDark}
+                    ink={ink}
+                    paper={paperAlt}
+                    tilt={tiltAt(i + 4)}
                     onLike={() => toggleCommentLike(c)}
                     onDelete={() => deleteComment(c)}
                   />
@@ -1034,7 +1235,7 @@ function PostDetailModal({
             </div>
 
             <div className="mt-3 flex items-start gap-2">
-              <Avatar name={me?.name || "?"} size="sm" />
+              <Avatar name={me?.name || "?"} ink={ink} size="sm" />
               <div className="flex-1">
                 <textarea
                   placeholder={me ? "Drop a comment…" : "Sign in to comment"}
@@ -1045,22 +1246,14 @@ function PostDetailModal({
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitComment();
                   }}
                   rows={2}
-                  className={`w-full resize-none rounded-xl border px-3 py-2 text-[13px] outline-none ${
-                    isDark
-                      ? "border-white/10 bg-white/[0.03] text-white placeholder-gray-500 focus:border-[#f26522]"
-                      : "border-black/5 bg-gray-50 text-[#0d1117] placeholder-gray-400 focus:border-[#f26522] focus:bg-white"
-                  }`}
+                  className="w-full resize-none rounded-2xl border-[2.5px] px-3 py-2 text-[13px] outline-none"
+                  style={{ background: paperAlt, color: ink, borderColor: ink, boxShadow: `3px 3px 0 0 ${ink}` }}
                 />
                 <div className="mt-1.5 flex justify-end">
-                  <button
-                    onClick={submitComment}
-                    disabled={!me || !newComment.trim() || posting}
-                    className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[11px] font-black text-white disabled:opacity-50"
-                    style={{ background: "linear-gradient(135deg,#f26522,#ff8a3d)" }}
-                  >
+                  <StickerButton ink={ink} onClick={submitComment} disabled={!me || !newComment.trim() || posting} rotate={-1} size="sm">
                     <Send className="h-3 w-3" />
                     {posting ? "Posting…" : "Comment"}
-                  </button>
+                  </StickerButton>
                 </div>
               </div>
             </div>
@@ -1075,44 +1268,53 @@ function CommentRow({
   comment,
   me,
   isAdmin,
-  isDark,
+  ink,
+  paper,
+  tilt,
   onLike,
   onDelete,
 }: {
   comment: Comment;
   me: Me | null;
   isAdmin: boolean;
-  isDark: boolean;
+  ink: string;
+  paper: string;
+  tilt: number;
   onLike: () => void;
   onDelete: () => void;
 }) {
-  const text = isDark ? "text-white" : "text-[#0d1117]";
-  const sub = isDark ? "text-gray-500" : "text-gray-500";
   const canDelete = !!me && (me.id === comment.userId || isAdmin);
-
   return (
-    <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 ${isDark ? "bg-white/[0.03]" : "bg-gray-50"} ${comment.hidden ? "opacity-50" : ""}`}>
-      <Avatar name={comment.authorName} size="sm" />
+    <div
+      className="flex items-start gap-2 rounded-2xl border-2 px-3 py-2.5"
+      style={{
+        background: paper,
+        borderColor: ink,
+        boxShadow: `3px 3px 0 0 ${ink}`,
+        transform: `rotate(${tilt}deg)`,
+        opacity: comment.hidden ? 0.5 : 1,
+      }}
+    >
+      <Avatar name={comment.authorName} ink={ink} size="sm" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className={`text-[12px] font-black ${text}`}>{comment.authorName}</p>
-          <span className={`text-[10px] ${sub}`}>{relativeTime(comment.createdAt)}</span>
+          <p className="text-[12px] font-black">{comment.authorName}</p>
+          <span className="mb-serif-italic text-[10px] opacity-70">{relativeTime(comment.createdAt)}</span>
         </div>
-        <p className={`mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+        <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed" style={{ opacity: 0.9 }}>
           {comment.body}
         </p>
         <div className="mt-1.5 flex items-center gap-3">
           <button
             onClick={onLike}
-            className={`flex items-center gap-1 text-[11px] font-black transition-colors ${
-              comment.likedByMe ? "text-[#f26522]" : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-[#0d1117]"
-            }`}
+            className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider"
+            style={{ color: comment.likedByMe ? "#f26522" : ink }}
           >
             <Heart className={`h-3 w-3 ${comment.likedByMe ? "fill-current" : ""}`} />
             {comment.likeCount}
           </button>
           {canDelete && (
-            <button onClick={onDelete} className="text-[11px] font-black text-red-500 hover:underline">
+            <button onClick={onDelete} className="text-[11px] font-black uppercase tracking-wider" style={{ color: "#dc2626" }}>
               Delete
             </button>
           )}
@@ -1122,27 +1324,39 @@ function CommentRow({
   );
 }
 
-// --- Avatar with optional gradient ring ------------------------------------
+// --- Avatar ----------------------------------------------------------------
 
-function Avatar({ name, size = "md", ring = false }: { name: string; size?: "sm" | "md"; ring?: boolean }) {
+function Avatar({
+  name,
+  ink,
+  size = "md",
+  stickerRing = false,
+}: {
+  name: string;
+  ink: string;
+  size?: "sm" | "md";
+  stickerRing?: boolean;
+}) {
   const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
-  const dim = size === "sm" ? "h-7 w-7 text-[11px]" : "h-9 w-9 text-[13px]";
+  const dim = size === "sm" ? "h-7 w-7 text-[11px]" : "h-10 w-10 text-[14px]";
   const hash = Array.from(name).reduce((a, c) => a + c.charCodeAt(0), 0);
-  const hues = [12, 28, 160, 200, 260, 340];
+  const hues = [18, 30, 160, 200, 280, 340];
   const hue = hues[hash % hues.length];
-  const inner = (
+  const circle = (
     <div
-      className={`flex items-center justify-center rounded-full font-black text-white shrink-0 ${dim}`}
-      style={{ background: `hsl(${hue}, 70%, 48%)` }}
+      className={`flex items-center justify-center rounded-full border-2 font-black text-white shrink-0 ${dim}`}
+      style={{ background: `hsl(${hue}, 65%, 48%)`, borderColor: ink }}
     >
       {initial}
     </div>
   );
-  if (!ring) return inner;
-  const pad = size === "sm" ? "p-[1.5px]" : "p-[2px]";
+  if (!stickerRing) return circle;
+  const pad = size === "sm" ? "p-[2px]" : "p-[3px]";
   return (
-    <div className={`rounded-full shrink-0 ${pad}`} style={{ background: "linear-gradient(135deg,#f26522,#ec4899,#a855f7)" }}>
-      {inner}
+    <div className={`rounded-full shrink-0 ${pad}`} style={{ background: "#f26522" }}>
+      <div className={`rounded-full ${pad}`} style={{ background: "#fff" }}>
+        {circle}
+      </div>
     </div>
   );
 }
