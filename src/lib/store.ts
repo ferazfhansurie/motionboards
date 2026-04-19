@@ -252,6 +252,9 @@ export interface AppState {
 
   // Canvas tool mode
   activeCanvasTool: "select" | "text" | "draw" | "connect" | null;
+  // When set, the matching item enters edit mode immediately on render.
+  // Cleared by the consumer after it activates editing.
+  autoEditItemId: string | null;
   drawingColor: string;
   drawingStrokeWidth: number;
   connections: Connection[];
@@ -308,6 +311,7 @@ export interface AppState {
   deleteBoard: (boardId: string) => void;
   renameBoard: (boardId: string, name: string) => void;
   setActiveCanvasTool: (tool: "select" | "text" | "draw" | "connect" | null) => void;
+  setAutoEditItemId: (id: string | null) => void;
   setDrawingColor: (color: string) => void;
   setDrawingStrokeWidth: (width: number) => void;
   addConnection: (fromId: string, toId: string) => void;
@@ -367,6 +371,7 @@ export const useAppStore = create<AppState>((set) => {
   isEditMode: false,
   isCropMode: false,
   activeCanvasTool: null,
+  autoEditItemId: null,
   drawingColor: "#000000",
   drawingStrokeWidth: 3,
   connections: startBoard.connections || [],
@@ -400,6 +405,7 @@ export const useAppStore = create<AppState>((set) => {
     };
   }),
   setActiveCanvasTool: (activeCanvasTool) => set({ activeCanvasTool }),
+  setAutoEditItemId: (autoEditItemId) => set({ autoEditItemId }),
   setDrawingColor: (drawingColor) => set({ drawingColor }),
   setDrawingStrokeWidth: (drawingStrokeWidth) => set({ drawingStrokeWidth }),
   addConnection: (fromId, toId) => set((s) => ({

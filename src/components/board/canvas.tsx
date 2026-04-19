@@ -182,20 +182,22 @@ export function Canvas() {
         }
       }
 
-      // Text tool: click on canvas to add text
+      // Text tool: click on canvas to add text and immediately enter edit mode
       if (e.button === 0 && isCanvas && activeCanvasTool === "text" && !spaceHeld && !e.altKey) {
         e.preventDefault();
         const canvasX = (e.clientX - panX) / zoom;
         const canvasY = (e.clientY - panY) / zoom;
-        useAppStore.getState().addItem({
-          id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        const newId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const store = useAppStore.getState();
+        store.addItem({
+          id: newId,
           type: "text",
           x: canvasX,
           y: canvasY,
-          width: 200,
-          height: 40,
+          width: 240,
+          height: 48,
           src: "",
-          text: "Double-click to edit",
+          text: "",
           fontSize: 16,
           fontFamily: "Inter, sans-serif",
           fontColor: isDark ? "#ffffff" : "#000000",
@@ -204,6 +206,9 @@ export function Canvas() {
           backgroundColor: "transparent",
           createdAt: new Date().toISOString(),
         });
+        store.selectItem(newId);
+        store.setAutoEditItemId(newId);
+        store.setActiveCanvasTool("select");
         return;
       }
 

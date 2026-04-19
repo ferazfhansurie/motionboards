@@ -296,7 +296,7 @@ export function BoardItemCard({
   onDoubleClick,
   onResizeStart,
 }: BoardItemCardProps) {
-  const { startFrameId, endFrameId, inputRefs, audioInputId, isEditMode, setEditMode, selectItem, theme } = useAppStore();
+  const { startFrameId, endFrameId, inputRefs, audioInputId, isEditMode, setEditMode, selectItem, theme, autoEditItemId, setAutoEditItemId } = useAppStore();
   const isDark = theme === "dark";
 
   const isStartFrame = startFrameId === item.id;
@@ -308,6 +308,31 @@ export function BoardItemCard({
   // Text editing state
   const [isEditingText, setIsEditingText] = useState(false);
   const [editTextValue, setEditTextValue] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-enter edit mode for freshly placed text items (flagged via store).
+  useEffect(() => {
+    if (item.type !== "text") return;
+    if (autoEditItemId !== item.id) return;
+    setEditTextValue(item.text || "");
+    setIsEditingText(true);
+    setAutoEditItemId(null);
+  }, [autoEditItemId, item.id, item.type, item.text, setAutoEditItemId]);
+
+  // While editing, grow the textarea + the box height to fit the content
+  // so the user always sees what they're typing instead of a clipped scrollbar.
+  useEffect(() => {
+    if (!isEditingText) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const contentH = ta.scrollHeight;
+    ta.style.height = `${contentH}px`;
+    const targetH = Math.max(48, contentH + 16); // p-2 padding (8px top + 8px bottom)
+    if (Math.abs((item.height || 0) - targetH) > 1) {
+      useAppStore.getState().updateItem(item.id, { height: targetH });
+    }
+  }, [editTextValue, isEditingText, item.id, item.height, item.fontSize, item.fontFamily, item.width]);
 
   // Build CSS filter string from editState
   const filterStyle = item.editState
@@ -694,7 +719,8 @@ export function BoardItemCard({
           >
             {isEditingText ? (
               <textarea
-                className="outline-none cursor-text w-full bg-transparent resize-none border-none p-0 m-0"
+                ref={textareaRef}
+                className="outline-none cursor-text w-full bg-transparent resize-none border-none p-0 m-0 overflow-hidden placeholder:opacity-40"
                 style={{
                   fontSize: "inherit",
                   fontFamily: "inherit",
@@ -703,18 +729,28 @@ export function BoardItemCard({
                   fontStyle: "inherit",
                   textAlign: item.textAlign || "left",
                   lineHeight: "inherit",
-                  minHeight: Math.max(30, item.height - 16),
-                  height: Math.max(30, item.height - 16),
+                  minHeight: 30,
                 }}
+                placeholder="Type something…"
                 value={editTextValue}
                 onChange={(e) => setEditTextValue(e.target.value)}
                 onBlur={() => {
-                  useAppStore.getState().updateItem(item.id, { text: editTextValue });
+                  const trimmed = editTextValue.trim();
+                  if (!trimmed) {
+                    useAppStore.getState().removeItem(item.id);
+                  } else {
+                    useAppStore.getState().updateItem(item.id, { text: editTextValue });
+                  }
                   setIsEditingText(false);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
-                    useAppStore.getState().updateItem(item.id, { text: editTextValue });
+                    const trimmed = editTextValue.trim();
+                    if (!trimmed) {
+                      useAppStore.getState().removeItem(item.id);
+                    } else {
+                      useAppStore.getState().updateItem(item.id, { text: editTextValue });
+                    }
                     setIsEditingText(false);
                   }
                   e.stopPropagation();
@@ -724,7 +760,7 @@ export function BoardItemCard({
                 autoFocus
               />
             ) : (
-              <span className="whitespace-pre-wrap" style={{ minHeight: Math.max(20, item.height - 16), display: "block" }}>{item.text || "Double-click to edit"}</span>
+              <span className="whitespace-pre-wrap" style={{ minHeight: Math.max(20, item.height - 16), display: "block" }}>{item.text || ""}</span>
             )}
           </div>
         )}
