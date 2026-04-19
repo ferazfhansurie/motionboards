@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip, Settings as SettingsIcon, Wand2 } from "lucide-react";
+import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip, Settings as SettingsIcon, Wand2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -122,6 +122,8 @@ export function AIPromptPanel() {
   // Resizable width — persisted to localStorage
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
+  // Collapse the chat-list column for a focused conversation view.
+  const [chatListCollapsed, setChatListCollapsed] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(WIDTH_STORAGE_KEY);
@@ -129,6 +131,15 @@ export function AIPromptPanel() {
       const n = parseInt(saved, 10);
       if (!isNaN(n) && n >= MIN_WIDTH && n <= MAX_WIDTH) setPanelWidth(n);
     }
+    setChatListCollapsed(localStorage.getItem("motionboards_ai_chatlist_collapsed") === "true");
+  }, []);
+
+  const toggleChatList = useCallback(() => {
+    setChatListCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("motionboards_ai_chatlist_collapsed", String(next)); } catch {}
+      return next;
+    });
   }, []);
 
   // Persist width so the canvas knows how much space to reserve
@@ -615,6 +626,14 @@ export function AIPromptPanel() {
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
+            className={`rounded-lg p-1.5 transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
+            onClick={toggleChatList}
+            title={chatListCollapsed ? "Show chats" : "Hide chats (focus mode)"}
+          >
+            {chatListCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
             className={`rounded-lg p-1.5 transition-colors ${showSettings ? "bg-[#f26522]/15 text-[#f26522]" : isDark ? "text-gray-400 hover:bg-white/10 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#0d1117]"}`}
             onClick={() => setShowSettings(!showSettings)}
             title="Instruction / template"
@@ -634,7 +653,8 @@ export function AIPromptPanel() {
 
       {/* Body: chat list | conversation */}
       <div className="flex-1 flex min-h-0">
-        {/* Chat list — always visible on the left */}
+        {/* Chat list — collapsible for focused conversation mode */}
+        {!chatListCollapsed && (
         <div
           className={`shrink-0 flex flex-col border-r ${isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-100 bg-gray-50"}`}
           style={{ width: CHAT_LIST_WIDTH }}
@@ -688,6 +708,7 @@ export function AIPromptPanel() {
             )}
           </div>
         </div>
+        )}
 
         {/* Conversation column — hidden when settings panel is showing */}
         <div className="flex-1 flex flex-col min-w-0">
