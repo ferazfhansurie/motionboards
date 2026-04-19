@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Sparkles, Upload, Type, PenTool, Link2, Film, Wand2, Layers, Video, CreditCard, HelpCircle, Play, Mic } from "lucide-react";
+import { ArrowLeft, ChevronRight, Sparkles, Upload, Type, PenTool, Link2, FolderOpen, Wand2, Layers, Video, CreditCard, HelpCircle, Play, Mic } from "lucide-react";
 
 interface Step {
   title: string;
@@ -35,7 +35,7 @@ const tutorials: Tutorial[] = [
     steps: [
       { title: "Welcome to the Canvas", description: "When you open MotionBoards you'll see an infinite canvas with a prompt box in the center. This is your workspace. Click and drag on empty space to pan around, scroll to zoom in and out.", tip: "Top-right corner has zoom controls. Click the percentage to reset to 100%.", image: "/tutorials/01-canvas.png" },
       { title: "Generate Your First Image", description: "Type what you want in the prompt box, like 'A donkey riding a dragon, hyper realistic'. Then hit Generate or Ctrl+Enter. The AI generates it and places it right on your canvas. That's it, you're creating.", tip: "Default model is Nano Banana 2. Fast, affordable, great quality.", image: "/tutorials/17-options.png" },
-      { title: "The Toolbar", description: "Top-left is where all your tools live. Select (V), Text (T), Draw (D), Connect (L), Upload, PSD Import/Export, and the Timeline editor. Everything one click away.", image: "/tutorials/02-toolbar.png" },
+      { title: "The Toolbar", description: "Top-left is where all your tools live. Select (V), Text (T), Draw (D), Connect (L), Upload, PSD Import/Export, and Folders. Everything one click away.", image: "/tutorials/02-toolbar.png" },
       { title: "Bottom Bar", description: "Bottom of the screen is your control center. Switch models, browse templates, open AI prompt helper, check generation history, and manage credits. Click the model name to explore 30+ AI models.", image: "/tutorials/03-bottombar.png" },
       { title: "Light/Dark Mode", description: "Prefer dark mode? Click the moon icon top-right. It saves automatically so you dont have to set it every time.", image: "/tutorials/16-darkfull.png" },
     ],
@@ -68,7 +68,7 @@ const tutorials: Tutorial[] = [
     duration: "3 min",
     coverImage: "/tutorials/06-texttool.png",
     steps: [
-      { title: "Select Tool (V)", description: "Default tool. Click to select, drag to move, corners to resize. Right-click anything for Download, Edit, Add to Timeline, or Delete." },
+      { title: "Select Tool (V)", description: "Default tool. Click to select, drag to move, corners to resize. Right-click anything for Download, Edit, Save to Folder, or Delete." },
       { title: "Text Tool (T)", description: "Press T then click anywhere to place a text box. Double-click to edit. When selected, you get a full formatting bar with H1/H2/H3/Body/Small presets, font picker, size, bold, italic, alignment, and colors.", tip: "Use H1 for big titles, Body for descriptions. You can even add background colors.", image: "/tutorials/06-texttool.png" },
       { title: "Draw Tool (D)", description: "Press D and draw freehand on the canvas. Pick your color and stroke width from the toolbar. Release to finish, your drawing becomes a movable item you can resize.", tip: "Perfect for quick annotations, arrows, or sketching ideas over your generations.", image: "/tutorials/07-drawtool.png" },
       { title: "Connect Tool (L)", description: "Press L, click one item, then click another. Creates a dashed line connecting them. Click the line to remove it. Use this to map out your storyboard or show which image feeds into which video.", tip: "Great for organizing your workflow. Connect your input image to the generated video to keep track.", image: "/tutorials/14-connect.png" },
@@ -87,7 +87,7 @@ const tutorials: Tutorial[] = [
       { title: "Toolbar Upload", description: "Click the image+ icon in the toolbar to open a file picker. You can select multiple files at once and they'll all land on your canvas." },
       { title: "Paste from Clipboard", description: "Screenshot something? Ctrl+V to paste it directly onto the canvas. Works with any image you've copied from anywhere." },
       { title: "PSD Import/Export", description: "Working with Photoshop? Import PSD files and each layer becomes its own item on the canvas. Export your canvas back as a layered PSD. Seamless workflow." },
-      { title: "Right-Click Menu", description: "Right-click any item for the good stuff: Download it, Edit (crop/filters for images), Add to Timeline, or Delete. All one click away." },
+      { title: "Right-Click Menu", description: "Right-click any item for the good stuff: Download it, Edit (crop/filters for images), Save to Folder, Share to Community, or Delete. All one click away." },
     ],
   },
   {
@@ -140,21 +140,21 @@ const tutorials: Tutorial[] = [
     ],
   },
   {
-    id: "timeline-editor",
-    title: "The Timeline: Edit & Export Videos",
-    description: "Got multiple clips? Combine them into one video. Trim, reorder, export. All in the browser, no extra software needed.",
-    icon: <Film className="h-5 w-5" />,
-    category: "Editing",
-    difficulty: "Intermediate",
-    duration: "4 min",
-    coverImage: "/tutorials/13-timeline.png",
+    id: "folders",
+    title: "Folders: Save & Organize Your Work",
+    description: "Stash references, generations, and uploads into folders. They live outside the canvas so the board stays clean, and stick around for 14 days.",
+    icon: <FolderOpen className="h-5 w-5" />,
+    category: "Organization",
+    difficulty: "Beginner",
+    duration: "2 min",
+    coverImage: "/tutorials/02-toolbar.png",
     steps: [
-      { title: "Open the Timeline", description: "Click the film icon in the toolbar. The timeline editor opens at the bottom of your canvas, dark UI, professional look.", image: "/tutorials/13-timeline.png" },
-      { title: "Add Your Clips", description: "Right-click any image or video on the canvas > 'Add to Timeline'. It appears in the track. Images default to 3 seconds, videos use their full length." },
-      { title: "Drag to Reorder", description: "Just drag clips left and right to change the order. First clip plays first, second plays second. Simple." },
-      { title: "Trim Your Clips", description: "Hover on the left or right edge of any clip, you'll see a trim handle. Drag it to cut the start or end. For images, adjust how long they show on screen." },
-      { title: "Preview Clips", description: "Click any clip to see its preview in the left panel. Click on the timecode ruler to move your playhead to any position." },
-      { title: "Export Your Video", description: "When you're happy, click 'Export'. It renders everything into a single 1920x1080 video file. All done in your browser, no FFmpeg, no downloads, no hassle.", tip: "Best results when all clips have the same aspect ratio. Different ratios get letterboxed automatically." },
+      { title: "Open Folders", description: "Click the folder icon in the toolbar. A side panel slides in listing every folder you've created." },
+      { title: "Create a Folder", description: "Hit 'New Folder', give it a name ('Brand Assets', 'Hero Shots', whatever). It shows up in the list immediately." },
+      { title: "Save from the Canvas", description: "Right-click any image or video on the canvas > 'Save to Folder'. Pick where it goes. The item stays on the canvas too — this is a copy, not a move." },
+      { title: "Upload Directly", description: "Inside any folder, drop files to upload them straight in. Handy for references you don't want cluttering the canvas." },
+      { title: "Back to the Canvas", description: "Click an item in a folder to preview it, or use 'Add to Canvas' to drop a copy onto your active board." },
+      { title: "Auto-expiry", description: "Folder contents share the 14-day storage window. Anything important, download it or keep it on the canvas.", tip: "Folders are per-account — not shared. Good for organizing your own workspace." },
     ],
   },
   {

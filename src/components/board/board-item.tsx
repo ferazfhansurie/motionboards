@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Film, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2 } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -894,24 +894,56 @@ export function BoardItemCard({
               <button
                 type="button"
                 className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
-                onClick={() => {
+                onClick={async () => {
                   closeContextMenu();
-                  const store = useAppStore.getState();
-                  const alreadyAdded = store.timelineClips.some((c) => c.itemId === item.id);
-                  if (!alreadyAdded) {
-                    store.addTimelineClip({
-                      id: `clip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                      itemId: item.id,
-                      trimStart: 0,
-                      trimEnd: 0,
-                      duration: item.type === "image" || item.type === "psd-layer" ? 3 : 10,
+                  const mediaUrl = item.outputUrl || item.src;
+                  const mediaType: "image" | "video" =
+                    item.type === "video" || item.outputType === "video" ? "video" : "image";
+                  if (!mediaUrl) return;
+                  try {
+                    const foldersRes = await fetch("/api/folders").then((r) => r.json());
+                    const folders: { id: string; name: string }[] = foldersRes?.folders || [];
+                    if (folders.length === 0) {
+                      const name = window.prompt("No folders yet. Name the first one:");
+                      if (!name) return;
+                      const created = await fetch("/api/folders", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name }),
+                      }).then((r) => r.json());
+                      if (!created?.folder?.id) return alert("Could not create folder.");
+                      folders.push(created.folder);
+                    }
+                    const pick = window.prompt(
+                      "Save to which folder?\n\n" +
+                        folders.map((f, i) => `${i + 1}. ${f.name}`).join("\n") +
+                        "\n\nEnter a number:"
+                    );
+                    const idx = pick ? parseInt(pick) - 1 : -1;
+                    const target = folders[idx];
+                    if (!target) return;
+                    const res = await fetch(`/api/folders/${target.id}/items`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        mediaUrl,
+                        mediaType,
+                        fileName: item.fileName || item.prompt || "Untitled",
+                      }),
                     });
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({}));
+                      alert(err.error || "Failed to save.");
+                    } else {
+                      useAppStore.getState().setFoldersOpen(true);
+                    }
+                  } catch {
+                    alert("Network error.");
                   }
-                  store.setTimelineOpen(true);
                 }}
               >
-                <Film className="h-3.5 w-3.5 text-gray-400" />
-                Add to Timeline
+                <FolderPlus className="h-3.5 w-3.5 text-gray-400" />
+                Save to Folder
               </button>
             )}
 

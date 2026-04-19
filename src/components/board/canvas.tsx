@@ -12,7 +12,7 @@ import { EditPanel } from "./edit-panel";
 import { TemplatesPanel } from "./templates-panel";
 import { ProfilePanel, HistoryPanel } from "./dashboard-modal";
 import { AIPromptPanel } from "./ai-prompt-panel";
-import { TimelineWidget } from "./timeline-widget";
+import { FoldersPanel } from "./folders-panel";
 import { parsePsdBuffer } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
@@ -803,7 +803,7 @@ export function Canvas() {
       <ProfilePanel />
       <HistoryPanel />
       <AIPromptPanel />
-      <TimelineWidget />
+      <FoldersPanel />
 
       {/* Marquee selection rectangle (right-click drag) */}
       {marquee && (

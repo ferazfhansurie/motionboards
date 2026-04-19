@@ -799,6 +799,172 @@ export async function deleteBoardExportJob(id: string, userId: string): Promise<
   return rows.length > 0;
 }
 
+// --- Folders (per-user asset stash) ---
+//
+// Each user has a list of folders. Each folder has items — a reference to a
+// file_id in mb_files plus some display metadata. Items are 14-day TTL because
+// their backing file rows are swept; we also prune orphan item rows when a
+// file disappears. Folders themselves don't expire.
+
+export interface Folder {
+  id: string;
+  userId: string;
+  name: string;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface FolderItem {
+  id: string;
+  folderId: string;
+  fileId: string;
+  mediaType: "image" | "video" | "audio";
+  fileName: string;
+  createdAt: string;
+}
+
+let foldersTablesInitialized = false;
+
+async function ensureFoldersTables(): Promise<void> {
+  if (foldersTablesInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_folders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT 'Untitled',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_folders_user_idx ON mb_folders (user_id, created_at DESC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_folder_items (
+      id TEXT PRIMARY KEY,
+      folder_id TEXT NOT NULL,
+      file_id TEXT NOT NULL,
+      media_type TEXT NOT NULL,
+      file_name TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_folder_items_folder_idx ON mb_folder_items (folder_id, created_at DESC)`;
+  foldersTablesInitialized = true;
+}
+
+function rowToFolder(row: Record<string, unknown>, itemCount: number): Folder {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    name: row.name as string,
+    itemCount,
+    createdAt: (row.created_at as Date).toISOString(),
+  };
+}
+
+function rowToFolderItem(row: Record<string, unknown>): FolderItem {
+  return {
+    id: row.id as string,
+    folderId: row.folder_id as string,
+    fileId: row.file_id as string,
+    mediaType: row.media_type as "image" | "video" | "audio",
+    fileName: (row.file_name as string) || "",
+    createdAt: (row.created_at as Date).toISOString(),
+  };
+}
+
+export async function listFolders(userId: string): Promise<Folder[]> {
+  await ensureFoldersTables();
+  const rows = await sql`
+    SELECT f.*, COUNT(fi.id) AS item_count
+    FROM mb_folders f
+    LEFT JOIN mb_folder_items fi ON fi.folder_id = f.id
+    WHERE f.user_id = ${userId}
+    GROUP BY f.id
+    ORDER BY f.created_at DESC
+  `;
+  return rows.map((r) => rowToFolder(r, Number(r.item_count || 0)));
+}
+
+export async function createFolder(userId: string, name: string): Promise<Folder> {
+  await ensureFoldersTables();
+  const id = `fd_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const safeName = (name || "Untitled").toString().slice(0, 80);
+  const rows = await sql`
+    INSERT INTO mb_folders (id, user_id, name)
+    VALUES (${id}, ${userId}, ${safeName})
+    RETURNING *
+  `;
+  return rowToFolder(rows[0], 0);
+}
+
+export async function renameFolder(id: string, userId: string, name: string): Promise<boolean> {
+  await ensureFoldersTables();
+  const safeName = (name || "Untitled").toString().slice(0, 80);
+  const rows = await sql`
+    UPDATE mb_folders SET name = ${safeName}
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING id
+  `;
+  return rows.length > 0;
+}
+
+export async function deleteFolder(id: string, userId: string): Promise<boolean> {
+  await ensureFoldersTables();
+  const rows = await sql`
+    DELETE FROM mb_folders WHERE id = ${id} AND user_id = ${userId} RETURNING id
+  `;
+  if (rows.length > 0) {
+    await sql`DELETE FROM mb_folder_items WHERE folder_id = ${id}`;
+  }
+  return rows.length > 0;
+}
+
+// List items whose backing file still exists in mb_files. Filters out rows whose
+// file was swept by the TTL so we don't render broken thumbnails.
+export async function listFolderItems(folderId: string, userId: string): Promise<FolderItem[]> {
+  await ensureFoldersTables();
+  const owner = await sql`SELECT 1 FROM mb_folders WHERE id = ${folderId} AND user_id = ${userId}`;
+  if (owner.length === 0) return [];
+  const rows = await sql`
+    SELECT fi.*
+    FROM mb_folder_items fi
+    JOIN mb_files f ON f.id = fi.file_id
+    WHERE fi.folder_id = ${folderId}
+    ORDER BY fi.created_at DESC
+  `;
+  return rows.map(rowToFolderItem);
+}
+
+export async function addFolderItem(
+  folderId: string,
+  userId: string,
+  fileId: string,
+  mediaType: "image" | "video" | "audio",
+  fileName: string
+): Promise<FolderItem | null> {
+  await ensureFoldersTables();
+  const owner = await sql`SELECT 1 FROM mb_folders WHERE id = ${folderId} AND user_id = ${userId}`;
+  if (owner.length === 0) return null;
+  const id = `fi_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const safeName = (fileName || "Untitled").toString().slice(0, 120);
+  const rows = await sql`
+    INSERT INTO mb_folder_items (id, folder_id, file_id, media_type, file_name)
+    VALUES (${id}, ${folderId}, ${fileId}, ${mediaType}, ${safeName})
+    RETURNING *
+  `;
+  return rowToFolderItem(rows[0]);
+}
+
+export async function deleteFolderItem(itemId: string, userId: string): Promise<boolean> {
+  await ensureFoldersTables();
+  const rows = await sql`
+    DELETE FROM mb_folder_items
+    WHERE id = ${itemId}
+      AND folder_id IN (SELECT id FROM mb_folders WHERE user_id = ${userId})
+    RETURNING id
+  `;
+  return rows.length > 0;
+}
+
 // --- Community (Instagram-style feed) ---
 //
 // Creators publish a single piece of media (image or video) with a caption. Any

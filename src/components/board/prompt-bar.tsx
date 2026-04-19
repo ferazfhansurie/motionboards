@@ -1123,7 +1123,12 @@ export function PromptBar() {
                     {boards.length > 1 && (
                       <button
                         className="p-0.5 text-gray-300 hover:text-red-500 transition-colors"
-                        onClick={(e) => { e.stopPropagation(); deleteBoard(board.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete the board "${board.name}"? This removes every item on it and cannot be undone.`)) {
+                            deleteBoard(board.id);
+                          }
+                        }}
                       >
                         <Trash2 className="w-2.5 h-2.5" />
                       </button>

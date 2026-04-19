@@ -207,14 +207,6 @@ export interface Connection {
   toId: string;
 }
 
-export interface TimelineClip {
-  id: string;
-  itemId: string; // references BoardItem.id
-  trimStart: number; // seconds
-  trimEnd: number; // seconds (0 = full duration)
-  duration: number; // total duration of source
-}
-
 export interface AppState {
   // Boards
   boards: Board[];
@@ -269,9 +261,8 @@ export interface AppState {
   // its input refs (start frame, end frame, input refs, audio) to the generation
   autoConnectGenerations: boolean;
 
-  // Timeline
-  isTimelineOpen: boolean;
-  timelineClips: TimelineClip[];
+  // Folders panel
+  isFoldersOpen: boolean;
 
   // Undo/Redo
   undoStack: BoardItem[][];
@@ -325,11 +316,7 @@ export interface AppState {
   setAutoConnectGenerations: (v: boolean) => void;
   restoreBoardsSnapshot: (snapshot: unknown) => void;
   setConnectingFromId: (id: string | null) => void;
-  setTimelineOpen: (open: boolean) => void;
-  addTimelineClip: (clip: TimelineClip) => void;
-  removeTimelineClip: (id: string) => void;
-  reorderTimelineClips: (clips: TimelineClip[]) => void;
-  updateTimelineClip: (id: string, updates: Partial<TimelineClip>) => void;
+  setFoldersOpen: (open: boolean) => void;
   pushUndo: () => void;
   undo: () => void;
   redo: () => void;
@@ -386,8 +373,7 @@ export const useAppStore = create<AppState>((set) => {
   theme: (typeof window !== "undefined" && localStorage.getItem("motionboards_theme") as "light" | "dark") || "light",
   autoConnectGenerations: typeof window !== "undefined" ? localStorage.getItem("motionboards_autoconnect") !== "false" : true,
   connectingFromId: null,
-  isTimelineOpen: false,
-  timelineClips: [],
+  isFoldersOpen: false,
   undoStack: [],
   redoStack: [],
 
@@ -461,17 +447,7 @@ export const useAppStore = create<AppState>((set) => {
       };
     }),
   setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
-  setTimelineOpen: (isTimelineOpen) => set({ isTimelineOpen }),
-  addTimelineClip: (clip) => set((s) => ({
-    timelineClips: [...s.timelineClips, clip],
-  })),
-  removeTimelineClip: (id) => set((s) => ({
-    timelineClips: s.timelineClips.filter((c) => c.id !== id),
-  })),
-  reorderTimelineClips: (timelineClips) => set({ timelineClips }),
-  updateTimelineClip: (id, updates) => set((s) => ({
-    timelineClips: s.timelineClips.map((c) => c.id === id ? { ...c, ...updates } : c),
-  })),
+  setFoldersOpen: (isFoldersOpen) => set({ isFoldersOpen }),
 
   addItem: (item) => set((s) => ({
     undoStack: [...s.undoStack.slice(-49), s.items],
