@@ -180,6 +180,41 @@ export const models: AIModel[] = [
   },
 
   {
+    id: "bytedance/seedance-2.0",
+    name: "Seedance 2.0",
+    provider: "replicate", type: "t2v", category: "Video",
+    description: "ByteDance Seedance 2.0 — multimodal cinematic video with native audio, realistic physics, and director-level camera control.",
+    cost: "~RM0.65/s (720p)", creditCost: 325, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+    },
+    perSecond: { noAudio720p: 0.65, withAudio720p: 0.65, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "bytedance/seedance-2.0/i2v",
+    name: "Seedance 2.0 I2V",
+    provider: "replicate", type: "i2v", category: "Video",
+    description: "Seedance 2.0 image-to-video — animate a character or product shot into a cinematic clip with native audio.",
+    cost: "~RM0.65/s (720p)", creditCost: 325, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How the image should animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+    },
+    perSecond: { noAudio720p: 0.65, withAudio720p: 0.65, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
     id: "wan-video/wan-2.2-animate-replace",
     name: "Wan 2.2 Animate — Camera Movement",
     provider: "replicate", type: "v2v", category: "Video",

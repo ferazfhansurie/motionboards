@@ -97,15 +97,31 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
           }
 
-          // Extract rejection reason if available
-          const failedVideo = operation.response.generatedVideos?.[0];
-          const filterReason = (failedVideo as Record<string, unknown>)?.filteredReason
-            || (failedVideo as Record<string, unknown>)?.finishReason
-            || (operation.response as Record<string, unknown>)?.blockReason;
-          const errDetail = filterReason
-            ? `Video blocked: ${filterReason}. Try rephrasing your prompt.`
-            : "No video generated — the prompt may have been flagged by content policy.";
-          console.error("[Veo] No video output:", JSON.stringify(operation.response).slice(0, 1000));
+          // No video came back, but there may not be a real filter reason —
+          // Veo occasionally completes with an empty generatedVideos array for
+          // transient reasons (internal retries, bad reference frames, quota
+          // hiccups). Only claim "content policy" when we actually see a
+          // safety / prohibited / RAI signal; otherwise give a neutral retry
+          // message so users don't chase a policy rewrite for nothing.
+          const failedVideo = operation.response.generatedVideos?.[0] as Record<string, unknown> | undefined;
+          const rawReason =
+            (failedVideo?.filteredReason as string | undefined) ||
+            (failedVideo?.finishReason as string | undefined) ||
+            ((operation.response as Record<string, unknown>)?.blockReason as string | undefined) ||
+            ((operation.response as Record<string, unknown>)?.raiMediaFilteredReasons as string | undefined);
+
+          const looksLikePolicy = !!rawReason && /SAFE|PROHIBIT|POLICY|RAI|CHILD|HARM|HATE|HARASS|SEXUAL|VIOLEN|COPYRIG|RECITAT/i.test(String(rawReason));
+
+          let errDetail: string;
+          if (looksLikePolicy) {
+            errDetail = `Blocked by content policy (${rawReason}). Try rephrasing the prompt or swapping reference frames.`;
+          } else if (rawReason) {
+            errDetail = `Video failed: ${rawReason}. Try again.`;
+          } else {
+            errDetail =
+              "Veo returned no video. Transient errors on Veo are common — try Generate again. If it keeps failing, tweak the prompt or swap the start/end frames.";
+          }
+          console.error("[Veo] No video output:", JSON.stringify(operation.response).slice(0, 1500));
           await updateGeneration(generationId, { status: "failed", error: errDetail, duration: 0 });
           return NextResponse.json({ status: "failed", error: errDetail });
         }

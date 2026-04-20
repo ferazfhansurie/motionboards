@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { ZoomIn, ZoomOut, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus, Type, PenTool, MousePointer, Link2, Sun, Moon, FolderOpen, Users, MessageSquare } from "lucide-react";
+import { ZoomIn, ZoomOut, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus, Type, PenTool, MousePointer, Link2, Sun, Moon, FolderOpen, Users, MessageSquare, Library } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { parsePsdBuffer, buildPsdFromItems, downloadPsd } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
@@ -399,6 +399,14 @@ export function Toolbar() {
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >
           {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+        </button>
+
+        <button
+          className={`hidden md:inline-flex rounded-lg p-1.5 transition-colors ${btnInactive}`}
+          title="Media Library"
+          onClick={() => window.open("/media", "_blank")}
+        >
+          <Library className="h-3.5 w-3.5" />
         </button>
 
         <button

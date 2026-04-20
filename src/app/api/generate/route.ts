@@ -532,13 +532,22 @@ export async function POST(req: NextRequest) {
           if (input.image_url) repInput.image = input.image_url;
           if (input.video_url) repInput.video = input.video_url;
         } else {
-          // Video pipeline (Seedance)
+          // Video pipeline (Seedance 1.x and 2.0, and similar Replicate video
+          // models). The field names are identical across the line.
+          const isSeedance2 = replicateModel.startsWith("bytedance/seedance-2");
+
           repInput.aspect_ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "16:9";
           repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "720p";
-          repInput.generate_audio = input.generate_audio !== undefined ? !!input.generate_audio : (modelInfo.options?.generate_audio?.default ?? true);
           const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "5s";
           const dur = parseInt(durStr.replace("s", ""));
           if (dur > 0) repInput.duration = dur;
+
+          // Seedance 2 has native audio baked in — it doesn't accept a
+          // generate_audio field, and sending one rejects the request. Only
+          // pass it for the older Seedance models that still expose the flag.
+          if (!isSeedance2 && modelInfo.options?.generate_audio) {
+            repInput.generate_audio = input.generate_audio !== undefined ? !!input.generate_audio : (modelInfo.options.generate_audio.default ?? true);
+          }
 
           const imageUrl = input.image_url as string | undefined;
           if (imageUrl) repInput.image = imageUrl;

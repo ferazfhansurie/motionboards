@@ -371,6 +371,119 @@ export async function deleteFile(id: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+// Metadata row for the user-facing media library. Excludes the `data` blob
+// (we only need it when streaming the file through /api/files/:id).
+export interface UserFileMeta {
+  id: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+// Page a user's files by creation time. `before` is a cursor — pass the
+// createdAt of the oldest row from the previous page to keep paging stable
+// even when new uploads arrive at the top. `from` / `to` clamp to a date
+// window (inclusive).
+export async function listUserFiles(
+  userId: string,
+  opts: { limit?: number; before?: string | null; from?: string | null; to?: string | null } = {}
+): Promise<{ files: UserFileMeta[]; nextCursor: string | null }> {
+  await ensureFilesTable();
+  const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100);
+  const before = opts.before ?? null;
+  const from = opts.from ?? null;
+  const to = opts.to ?? null;
+
+  // Neon's tagged-template driver doesn't love conditional WHERE clauses so
+  // we switch per branch — keeps the query simple and predicate indexable.
+  const rows =
+    before && from && to
+      ? await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+            AND created_at < ${before}
+            AND created_at >= ${from}
+            AND created_at <= ${to}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : before && from
+      ? await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+            AND created_at < ${before}
+            AND created_at >= ${from}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : before && to
+      ? await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+            AND created_at < ${before}
+            AND created_at <= ${to}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : before
+      ? await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+            AND created_at < ${before}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : from && to
+      ? await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+            AND created_at >= ${from}
+            AND created_at <= ${to}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : from
+      ? await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+            AND created_at >= ${from}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : to
+      ? await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+            AND created_at <= ${to}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : await sql`
+          SELECT id, mime_type, size_bytes, created_at FROM mb_files
+          WHERE user_id = ${userId}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
+
+  const files: UserFileMeta[] = rows.map((r) => ({
+    id: r.id as string,
+    mimeType: r.mime_type as string,
+    sizeBytes: r.size_bytes as number,
+    createdAt: (r.created_at as Date).toISOString(),
+  }));
+  const nextCursor = files.length === limit ? files[files.length - 1].createdAt : null;
+  return { files, nextCursor };
+}
+
+// Let a user delete one of their own files from the library.
+export async function deleteUserFile(id: string, userId: string): Promise<boolean> {
+  await ensureFilesTable();
+  const rows = await sql`
+    DELETE FROM mb_files WHERE id = ${id} AND user_id = ${userId} RETURNING id
+  `;
+  return rows.length > 0;
+}
+
 // --- AI Prompt Generator chats ---
 //
 // Conversation history for the AI Prompt Generator side panel. Each chat is a
