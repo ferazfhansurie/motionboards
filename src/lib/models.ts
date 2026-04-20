@@ -184,16 +184,18 @@ export const models: AIModel[] = [
     name: "Seedance 2.0",
     provider: "replicate", type: "t2v", category: "Video",
     description: "ByteDance Seedance 2.0 — multimodal cinematic video with native audio, realistic physics, and director-level camera control.",
-    cost: "~RM0.65/s (720p)", creditCost: 325, speed: "~3m", stable: true,
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
       resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
-      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
     },
-    perSecond: { noAudio720p: 0.65, withAudio720p: 0.65, noAudio4k: 0, withAudio4k: 0 },
+    // 720p non-video-in = $0.18/s on Replicate ≈ RM0.67 after margin.
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
   },
 
   {
@@ -201,7 +203,7 @@ export const models: AIModel[] = [
     name: "Seedance 2.0 I2V",
     provider: "replicate", type: "i2v", category: "Video",
     description: "Seedance 2.0 image-to-video — animate a character or product shot into a cinematic clip with native audio.",
-    cost: "~RM0.65/s (720p)", creditCost: 325, speed: "~3m", stable: true,
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -209,9 +211,10 @@ export const models: AIModel[] = [
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
       resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
-      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
     },
-    perSecond: { noAudio720p: 0.65, withAudio720p: 0.65, noAudio4k: 0, withAudio4k: 0 },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
   },
 
   {
@@ -219,7 +222,7 @@ export const models: AIModel[] = [
     name: "Seedance 2.0 S2E",
     provider: "replicate", type: "s2e", category: "Video",
     description: "Seedance 2.0 start-to-end: give it a start frame + end frame and it animates the transition between them with native audio.",
-    cost: "~RM0.65/s (720p)", creditCost: 325, speed: "~3m", stable: true,
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
@@ -228,9 +231,10 @@ export const models: AIModel[] = [
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
       resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
-      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
     },
-    perSecond: { noAudio720p: 0.65, withAudio720p: 0.65, noAudio4k: 0, withAudio4k: 0 },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
   },
 
   {
