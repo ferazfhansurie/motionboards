@@ -1044,6 +1044,22 @@ export function PromptBar() {
             </div>
           )}
 
+          {/* Always-visible requirements row — one pill per required input
+              on the current model, colored green when satisfied and orange
+              when still missing. This makes it obvious what the user needs
+              to drag in before hitting Generate. */}
+          {selectedModel && (
+            <RequirementsRow
+              model={selectedModel}
+              isDark={isDark}
+              hasStartFrame={!!startFrameId}
+              hasEndFrame={!!endFrameId}
+              hasImageRef={refItems.some((r) => r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image")) || !!startFrameId}
+              hasVideoRef={refItems.some((r) => r.type === "video" || (r.type === "generation" && r.outputType === "video"))}
+              hasAudio={!!audioItem}
+            />
+          )}
+
           {/* Option pills — outside the chatbox */}
           <div className="flex justify-end mb-1">
             {renderOptionPills()}
@@ -1381,6 +1397,95 @@ export function PromptBar() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Always-visible model requirements row. Shows one pill per required input
+// (image / video / audio / start-frame / end-frame) plus a note about what
+// the user needs to do. Pills are green with a check when satisfied, orange
+// with a spark when still missing. For models with no inputs beyond the
+// prompt, the row renders nothing.
+function RequirementsRow({
+  model,
+  isDark,
+  hasStartFrame,
+  hasEndFrame,
+  hasImageRef,
+  hasVideoRef,
+  hasAudio,
+}: {
+  model: AIModel;
+  isDark: boolean;
+  hasStartFrame: boolean;
+  hasEndFrame: boolean;
+  hasImageRef: boolean;
+  hasVideoRef: boolean;
+  hasAudio: boolean;
+}) {
+  type Req = { label: string; hint: string; ok: boolean; required: boolean };
+  const reqs: Req[] = [];
+
+  // Start + end frames are a special case — only applies to start-to-end
+  // models. We key on model.type === "s2e" and synthesize two required slots
+  // instead of reading from model.inputs (which has `first_frame_url` /
+  // `last_frame_url` we'd have to map manually).
+  if (model.type === "s2e") {
+    reqs.push({ label: "Start frame", hint: "Right-click an image → Set as Start Frame", ok: hasStartFrame, required: true });
+    reqs.push({ label: "End frame",   hint: "Right-click an image → Set as End Frame",   ok: hasEndFrame,   required: true });
+  } else {
+    for (const inp of model.inputs) {
+      if (inp.type === "image") {
+        reqs.push({
+          label: inp.required ? "Image" : "Image (optional)",
+          hint: "Right-click an image → Set as Input",
+          ok: hasImageRef,
+          required: !!inp.required,
+        });
+      } else if (inp.type === "video") {
+        reqs.push({
+          label: inp.required ? "Video" : "Video (optional)",
+          hint: "Right-click a video → Set as Input",
+          ok: hasVideoRef,
+          required: !!inp.required,
+        });
+      } else if (inp.type === "audio") {
+        reqs.push({
+          label: inp.required ? "Audio" : "Audio (optional)",
+          hint: "Right-click an audio clip → Set as Input",
+          ok: hasAudio,
+          required: !!inp.required,
+        });
+      }
+    }
+  }
+
+  if (reqs.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mb-1.5 self-start max-w-full">
+      <span className={`text-[9.5px] font-black uppercase tracking-[0.15em] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+        Needs
+      </span>
+      {reqs.map((r, i) => {
+        const tone = r.ok
+          ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/40"
+          : r.required
+            ? "bg-[#f26522]/15 text-[#f26522] border-[#f26522]/40"
+            : (isDark ? "bg-white/[0.04] text-gray-400 border-gray-700" : "bg-gray-100 text-gray-500 border-gray-200");
+        return (
+          <span
+            key={i}
+            title={r.ok ? `${r.label} set` : r.hint}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-[2px] text-[10px] font-bold ${tone}`}
+          >
+            <span aria-hidden className="text-[11px] leading-none">
+              {r.ok ? "✓" : r.required ? "!" : "○"}
+            </span>
+            {r.label}
+          </span>
+        );
+      })}
     </div>
   );
 }
