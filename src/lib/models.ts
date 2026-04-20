@@ -179,6 +179,23 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.42, withAudio720p: 0.42, noAudio4k: 1.16, withAudio4k: 1.16 },
   },
 
+  {
+    id: "wan-video/wan-2.2-animate-replace",
+    name: "Wan 2.2 Animate — Camera Movement",
+    provider: "replicate", type: "v2v", category: "Video",
+    description: "Swap the performer in a reference video for your character image while keeping the camera movement, lighting, and motion 1:1. Tag a video + an image as inputs.",
+    cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: false, description: "Optional caption" },
+      { name: "image_url", type: "image", required: true, description: "Character image (the person to inject)" },
+      { name: "video_url", type: "video", required: true, description: "Reference video (camera, scene, and motion are preserved)" },
+    ],
+    options: {
+      resolution: { values: ["480p", "580p", "720p"], default: "480p", label: "Resolution" },
+    },
+    perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
+  },
+
   // ═══════════════ SOUND EFFECTS ═══════════════
 
   {

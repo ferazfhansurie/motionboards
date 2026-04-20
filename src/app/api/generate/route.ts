@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Session expired. Please login again." }, { status: 401 });
 
     const body = await req.json();
-    const { prompt, model: modelId, inputImage, inputImages, startFrame, endFrame, inputAudio, generationOptions } = body;
+    const { prompt, model: modelId, inputImage, inputImages, inputVideo, startFrame, endFrame, inputAudio, generationOptions } = body;
 
     const modelInfo = models.find((m) => m.id === modelId);
     if (!modelInfo) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
@@ -88,7 +88,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    for (const inp of videoInputs) { if (inputImage) input[inp.name] = inputImage; }
+    // Video inputs — pull from the dedicated inputVideo slot; fall back to
+    // inputImage only for legacy SFX/mmaudio flows that sometimes pass the
+    // same item through both channels.
+    for (const inp of videoInputs) {
+      if (inputVideo) input[inp.name] = inputVideo;
+      else if (inputImage && modelInfo.type === "sfx") input[inp.name] = inputImage;
+    }
     for (const inp of audioInputs) { if (inputAudio) input[inp.name] = inputAudio; }
 
     // Create generation record
@@ -499,6 +505,7 @@ export async function POST(req: NextRequest) {
         const replicateModel = modelId.replace(/\/(i2v|s2e)$/, "");
         const isSfx = modelInfo.type === "sfx";
         const isImage = ["t2i", "i2i"].includes(modelInfo.type);
+        const isV2V = modelInfo.type === "v2v";
 
         const repInput: Record<string, unknown> = {
           prompt: prompt?.trim() || (isSfx ? "Generate audio" : isImage ? "Generate an image" : "Generate a video"),
@@ -516,6 +523,14 @@ export async function POST(req: NextRequest) {
           if (replicateModel === "zsxkib/mmaudio" && input.video_url) {
             repInput.video = input.video_url;
           }
+        } else if (isV2V) {
+          // Wan Animate and friends: character image + reference video, with
+          // the camera, scene, and motion coming from the video. The prompt
+          // is optional — strip it if empty so we don't bias the model.
+          if (!prompt?.trim()) delete repInput.prompt;
+          repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "480p";
+          if (input.image_url) repInput.image = input.image_url;
+          if (input.video_url) repInput.video = input.video_url;
         } else {
           // Video pipeline (Seedance)
           repInput.aspect_ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "16:9";

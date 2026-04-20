@@ -496,7 +496,13 @@ export function PromptBar() {
         }
       };
 
-      const inputImage = (await resolveUrl(refItems[0])) || (await resolveUrl(startItem));
+      // For v2v models like Wan Animate we need BOTH a character image and a
+      // reference video. Pick the first image-ish ref for `inputImage` and the
+      // first video ref for `inputVideo`.
+      const firstImageRef = refItems.find((r) => r && (r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image"))) || refItems[0];
+      const firstVideoRef = refItems.find((r) => r && (r.type === "video" || (r.type === "generation" && r.outputType === "video")));
+      const inputImage = (await resolveUrl(firstImageRef)) || (await resolveUrl(startItem));
+      const inputVideo = await resolveUrl(firstVideoRef);
       const inputImagesList = (await Promise.all(refItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
       const startFrameUrl = await resolveUrl(startItem);
       const endFrameUrl = await resolveUrl(endItem);
@@ -511,6 +517,7 @@ export function PromptBar() {
           mode: selectedModel.type,
           inputImage,
           inputImages: inputImagesList,
+          inputVideo,
           startFrame: startFrameUrl,
           endFrame: endFrameUrl,
           inputAudio: inputAudioUrl,
