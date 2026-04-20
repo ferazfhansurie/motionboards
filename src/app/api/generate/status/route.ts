@@ -227,15 +227,30 @@ export async function GET(req: NextRequest) {
         }
 
         if (pred.status === "failed" || pred.status === "canceled") {
-          const errMsg = (pred.error as string) || "Generation failed on Replicate";
+          const raw = (pred.error as string) || "Generation failed on Replicate";
           // Log the full prediction so we can see what Replicate actually complained about
           console.error("[Replicate] Prediction failed", JSON.stringify({
             status: pred.status,
             error: pred.error,
             logs: (pred.logs as string)?.slice(-500),
           }));
-          await updateGeneration(generationId, { status: "failed", error: errMsg, duration: 0 });
-          return NextResponse.json({ status: "failed", error: errMsg });
+
+          // Translate common Replicate errors into plain-English toasts so the
+          // user knows whether to tweak the prompt, swap inputs, or retry.
+          let friendly = raw;
+          if (/flagged as sensitive|E005|NSFW|safety|content policy|sensitive content/i.test(raw)) {
+            friendly =
+              "Blocked by the model's safety filter. The prompt or one of your reference images tripped it — try rephrasing or swapping a different reference.";
+          } else if (/RESOURCE_EXHAUSTED|rate ?limit|429|quota/i.test(raw)) {
+            friendly = "Model is rate-limited right now. Try again in a minute.";
+          } else if (/timeout|timed out/i.test(raw)) {
+            friendly = "The generation timed out. Try a shorter duration or lower resolution.";
+          } else if (/input .*invalid|validation|unexpected keyword|unknown field/i.test(raw)) {
+            friendly = "The model rejected the input config. Double-check your aspect ratio / resolution / duration.";
+          }
+
+          await updateGeneration(generationId, { status: "failed", error: friendly, duration: 0 });
+          return NextResponse.json({ status: "failed", error: friendly });
         }
 
         // Still starting or processing
