@@ -330,8 +330,24 @@ export async function POST(req: NextRequest) {
         }
 
         if (!imageBase64) {
-          await updateGeneration(generation.id, { status: "failed", error: "No image generated", duration: 0 });
-          return NextResponse.json({ error: "Gemini returned no image" }, { status: 400 });
+          // Gemini accepted the call but returned no image. Usually this means
+          // the content filter silently rejected the prompt or the reference
+          // image. Pull the finishReason / promptFeedback so we can give the
+          // user an actionable message instead of "returned no image".
+          const cand = response.candidates?.[0] as Record<string, unknown> | undefined;
+          const finishReason = (cand?.finishReason as string | undefined) || "";
+          const feedback = (response as unknown as { promptFeedback?: { blockReason?: string } }).promptFeedback;
+          const blockReason = feedback?.blockReason || "";
+          let userMsg = "No image came back. Try again.";
+          if (finishReason === "SAFETY" || blockReason || finishReason === "PROHIBITED_CONTENT") {
+            userMsg = "Blocked by content policy. Rephrase the prompt or change the reference images.";
+          } else if (finishReason === "RECITATION") {
+            userMsg = "Blocked by content policy (too close to copyrighted material). Try a more original prompt.";
+          } else if (finishReason) {
+            userMsg = "Blocked by content policy. Rephrase the prompt.";
+          }
+          await updateGeneration(generation.id, { status: "failed", error: userMsg, duration: 0 });
+          return NextResponse.json({ error: userMsg }, { status: 400 });
         }
 
         // Store the result in Neon and return a /api/files/:id URL
@@ -346,9 +362,22 @@ export async function POST(req: NextRequest) {
           outputUrl,
         });
       } catch (gemErr) {
-        const msg = gemErr instanceof Error ? gemErr.message : "Gemini API error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
-        return NextResponse.json({ error: msg }, { status: 500 });
+        const raw = gemErr instanceof Error ? gemErr.message : "Gemini API error";
+        // Translate common Google API errors into actionable copy.
+        let userMsg = raw;
+        let status = 500;
+        if (/RESOURCE_EXHAUSTED|429|quota/i.test(raw)) {
+          userMsg = "Image model is rate-limited right now. Wait a minute and try again.";
+          status = 429;
+        } else if (/SAFETY|blocked|PROHIBITED/i.test(raw)) {
+          userMsg = "Blocked by content policy. Rephrase the prompt.";
+          status = 400;
+        } else if (/PERMISSION_DENIED|API key|credential/i.test(raw)) {
+          userMsg = "Image credentials are missing or invalid. Contact the admin.";
+          status = 500;
+        }
+        await updateGeneration(generation.id, { status: "failed", error: userMsg, duration: 0 });
+        return NextResponse.json({ error: userMsg }, { status });
       }
     }
 

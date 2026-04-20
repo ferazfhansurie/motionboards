@@ -22,7 +22,7 @@ import { useAppStore, type BoardItem } from "@/lib/store";
 import { importBoardFromFile, ImportCancelled } from "@/lib/board-io";
 import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
-import { askConfirm, askPrompt } from "@/lib/ui-store";
+import { askConfirm, askPrompt, showToast } from "@/lib/ui-store";
 import { Pencil } from "lucide-react";
 
 function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>): string {
@@ -310,7 +310,7 @@ export function PromptBar() {
       // Keep the menu open so the user can watch progress
     } catch (err) {
       setBoardIoBusy(null);
-      alert(err instanceof Error ? err.message : "Export failed");
+      showToast(err instanceof Error ? err.message : "Export failed", { kind: "error" });
     }
   };
 
@@ -330,11 +330,11 @@ export function PromptBar() {
       useAppStore.getState().insertImportedBoard(board);
       setBoardIoBusy(null);
       setBoardMenuOpen(false);
-      if (skipped > 0) alert(`Imported with ${skipped} media items that couldn't be uploaded (kept as data URIs).`);
+      if (skipped > 0) showToast(`Imported with ${skipped} media items that stayed as data URIs.`, { kind: "info" });
     } catch (err) {
       setBoardIoBusy(null);
       if (err instanceof ImportCancelled) return; // silent cancel
-      alert(err instanceof Error ? err.message : "Import failed");
+      showToast(err instanceof Error ? err.message : "Import failed", { kind: "error" });
     } finally {
       importAbortRef.current = null;
     }
@@ -360,12 +360,12 @@ export function PromptBar() {
     const audioItem = currentAudioId ? items.find((i) => i.id === currentAudioId) : null;
 
     if (selectedModel.type === "s2e") {
-      if (!startFrameId) { alert(`${selectedModel.name} requires a Start Frame.`); return; }
-      if (!endFrameId) { alert(`${selectedModel.name} requires an End Frame.`); return; }
+      if (!startFrameId) { showToast(`${selectedModel.name} needs a Start Frame`, { kind: "info" }); return; }
+      if (!endFrameId) { showToast(`${selectedModel.name} needs an End Frame`, { kind: "info" }); return; }
     }
-    if (needsImage && !hasImageInput) { alert(`${selectedModel.name} requires an image input.`); return; }
-    if (needsVideo && !hasVideoInput && !inputRefs.length) { alert(`${selectedModel.name} requires a video input.`); return; }
-    if (needsAudio && !audioItem) { alert(`${selectedModel.name} requires an audio input.`); return; }
+    if (needsImage && !hasImageInput) { showToast(`${selectedModel.name} needs an image input`, { kind: "info" }); return; }
+    if (needsVideo && !hasVideoInput && !inputRefs.length) { showToast(`${selectedModel.name} needs a video input`, { kind: "info" }); return; }
+    if (needsAudio && !audioItem) { showToast(`${selectedModel.name} needs an audio input`, { kind: "info" }); return; }
 
     // Create item IMMEDIATELY at center of screen — zero latency
 
@@ -535,7 +535,11 @@ export function PromptBar() {
       if (!res.ok) {
         useAppStore.getState().removeItem(genItem.id);
         if (res.status === 401) { window.location.href = "/signup"; return; }
-        alert(data.error || "Generation failed");
+        const msg = data.error || "Generation failed";
+        // 429s and safety blocks get a longer toast so the actionable hint
+        // stays on screen long enough to read.
+        const durationMs = res.status === 429 ? 8000 : 6000;
+        showToast(msg, { kind: "error", durationMs });
         return;
       }
 
