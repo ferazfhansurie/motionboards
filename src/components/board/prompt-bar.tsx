@@ -1401,11 +1401,12 @@ export function PromptBar() {
   );
 }
 
-// Always-visible model requirements row. Shows one pill per required input
-// (image / video / audio / start-frame / end-frame) plus a note about what
-// the user needs to do. Pills are green with a check when satisfied, orange
-// with a spark when still missing. For models with no inputs beyond the
-// prompt, the row renders nothing.
+// Always-visible model requirements row. Pulls the label from each input's
+// description so users see what the input actually is ("Character image",
+// "Reference video", "Voice reference audio to clone") instead of a generic
+// "Image"/"Video"/"Audio". Each pill is green when that input is satisfied
+// by something on the canvas, orange when required-but-missing, neutral when
+// optional-and-unset. Hover shows the full description + how-to hint.
 function RequirementsRow({
   model,
   isDark,
@@ -1423,35 +1424,69 @@ function RequirementsRow({
   hasVideoRef: boolean;
   hasAudio: boolean;
 }) {
-  type Req = { label: string; hint: string; ok: boolean; required: boolean };
+  type Req = {
+    label: string;
+    fullDesc: string;
+    hint: string;
+    ok: boolean;
+    required: boolean;
+  };
   const reqs: Req[] = [];
 
-  // Start + end frames are a special case — only applies to start-to-end
-  // models. We key on model.type === "s2e" and synthesize two required slots
-  // instead of reading from model.inputs (which has `first_frame_url` /
-  // `last_frame_url` we'd have to map manually).
+  // Pull a short label out of the input description, e.g.
+  //   "Character image (the person to inject)" → "Character image"
+  //   "Reference video (camera, scene, and motion are preserved)" → "Reference video"
+  //   "Voice reference audio to clone" → "Voice reference audio to clone"
+  //   "Optional video to synchronize audio with" → "Video to synchronize audio with"
+  // Strips a leading "Optional " so we don't say "optional" twice (once in
+  // the label, once in the badge).
+  function shortLabel(desc: string | undefined, fallback: string): string {
+    if (!desc) return fallback;
+    let s = desc.trim();
+    const paren = s.indexOf("(");
+    if (paren > 0) s = s.slice(0, paren).trim();
+    s = s.replace(/^optional\s+/i, "");
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+    return s || fallback;
+  }
+
   if (model.type === "s2e") {
-    reqs.push({ label: "Start frame", hint: "Right-click an image → Set as Start Frame", ok: hasStartFrame, required: true });
-    reqs.push({ label: "End frame",   hint: "Right-click an image → Set as End Frame",   ok: hasEndFrame,   required: true });
+    reqs.push({
+      label: "Start frame",
+      fullDesc: "First frame the video should begin on",
+      hint: "Right-click an image → Set as Start Frame",
+      ok: hasStartFrame,
+      required: true,
+    });
+    reqs.push({
+      label: "End frame",
+      fullDesc: "Last frame the video should end on",
+      hint: "Right-click an image → Set as End Frame",
+      ok: hasEndFrame,
+      required: true,
+    });
   } else {
     for (const inp of model.inputs) {
       if (inp.type === "image") {
         reqs.push({
-          label: inp.required ? "Image" : "Image (optional)",
+          label: shortLabel(inp.description, "Image"),
+          fullDesc: inp.description || "Image reference",
           hint: "Right-click an image → Set as Input",
           ok: hasImageRef,
           required: !!inp.required,
         });
       } else if (inp.type === "video") {
         reqs.push({
-          label: inp.required ? "Video" : "Video (optional)",
+          label: shortLabel(inp.description, "Video"),
+          fullDesc: inp.description || "Video reference",
           hint: "Right-click a video → Set as Input",
           ok: hasVideoRef,
           required: !!inp.required,
         });
       } else if (inp.type === "audio") {
         reqs.push({
-          label: inp.required ? "Audio" : "Audio (optional)",
+          label: shortLabel(inp.description, "Audio"),
+          fullDesc: inp.description || "Audio reference",
           hint: "Right-click an audio clip → Set as Input",
           ok: hasAudio,
           required: !!inp.required,
@@ -1473,16 +1508,25 @@ function RequirementsRow({
           : r.required
             ? "bg-[#f26522]/15 text-[#f26522] border-[#f26522]/40"
             : (isDark ? "bg-white/[0.04] text-gray-400 border-gray-700" : "bg-gray-100 text-gray-500 border-gray-200");
+        const status = r.ok ? "set" : r.required ? "required" : "optional";
+        const statusTone = r.ok
+          ? "bg-emerald-600/20 text-emerald-600"
+          : r.required
+            ? "bg-[#f26522]/25 text-[#f26522]"
+            : (isDark ? "bg-white/10 text-gray-400" : "bg-black/10 text-gray-500");
         return (
           <span
             key={i}
-            title={r.ok ? `${r.label} set` : r.hint}
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-[2px] text-[10px] font-bold ${tone}`}
+            title={r.ok ? `${r.label} — set` : `${r.fullDesc}\n\n${r.hint}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-[2px] text-[10.5px] font-bold ${tone}`}
           >
             <span aria-hidden className="text-[11px] leading-none">
               {r.ok ? "✓" : r.required ? "!" : "○"}
             </span>
-            {r.label}
+            <span>{r.label}</span>
+            <span className={`rounded-full px-1.5 py-[1px] text-[8.5px] font-black uppercase tracking-wider ${statusTone}`}>
+              {status}
+            </span>
           </span>
         );
       })}
