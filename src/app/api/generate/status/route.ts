@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
     const geminiVideo = req.nextUrl.searchParams.get("geminiVideo");
     const openaiVideo = req.nextUrl.searchParams.get("openaiVideo");
     const replicateVideo = req.nextUrl.searchParams.get("replicateVideo");
+    const byteplusVideo = req.nextUrl.searchParams.get("byteplusVideo");
 
     if (!requestId || !modelId || !generationId) {
       return NextResponse.json({ error: "Missing params" }, { status: 400 });
@@ -178,6 +179,79 @@ export async function GET(req: NextRequest) {
         });
       } catch (oaiErr) {
         const msg = oaiErr instanceof Error ? oaiErr.message : "OpenAI status check failed";
+        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ status: "failed", error: msg });
+      }
+    }
+
+    // --- ByteDance Ark (Seedance 2.0) task polling ---
+    if (byteplusVideo === "true") {
+      if (!settings.arkApiKey) {
+        return NextResponse.json({ error: "ByteDance Ark API key not configured" }, { status: 500 });
+      }
+      try {
+        const taskRes = await fetch(
+          `https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks/${encodeURIComponent(requestId)}`,
+          { headers: { Authorization: `Bearer ${settings.arkApiKey}` } }
+        );
+        const task = (await taskRes.json()) as Record<string, unknown>;
+
+        const status = (task.status as string) || "";
+        if (status === "succeeded") {
+          const contentObj = task.content as Record<string, unknown> | undefined;
+          const videoUrl = contentObj?.video_url as string | undefined;
+          if (!videoUrl) {
+            await updateGeneration(generationId, { status: "failed", error: "No video URL returned", duration: 0 });
+            return NextResponse.json({ status: "failed", error: "No video URL returned" });
+          }
+
+          // Re-host in Neon so the URL survives Ark's storage TTL and shares
+          // our 14-day sweep with every other generation.
+          let outputUrl = videoUrl;
+          try {
+            const vidRes = await fetch(videoUrl);
+            if (vidRes.ok) {
+              const buffer = Buffer.from(await vidRes.arrayBuffer());
+              const mimeType = vidRes.headers.get("content-type") || "video/mp4";
+              const { id } = await putFile(buffer, mimeType, user.id);
+              outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
+            }
+          } catch (dlErr) {
+            console.error("Failed to re-host Ark video:", dlErr);
+          }
+
+          const modelInfo = models.find((m) => m.id === modelId);
+          const actualCreditCost = modelInfo?.creditCost || 0;
+          const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
+          await deductCredits(user.id, actualCreditCost);
+          await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+          return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
+        }
+
+        if (status === "failed" || status === "expired") {
+          // Ark returns error detail either as a string or an object with
+          // { code, message }. Translate common filter and quota errors.
+          const rawErr = task.error as Record<string, unknown> | string | undefined;
+          const raw = typeof rawErr === "string"
+            ? rawErr
+            : (rawErr?.message as string) || (rawErr?.code as string) || `Seedance ${status}`;
+          let friendly = raw;
+          if (/sensitive|safety|content|policy|violat|NSFW|prohibit/i.test(raw)) {
+            friendly = "Blocked by the model's safety filter. The prompt or one of your reference images tripped it — try rephrasing or swapping a different reference.";
+          } else if (/quota|limit|rate|429/i.test(raw)) {
+            friendly = "Seedance is rate-limited right now. Try again in a minute.";
+          } else if (/timeout|timed out|expire/i.test(raw)) {
+            friendly = "The generation took too long and expired. Try a shorter duration or lower resolution.";
+          }
+          console.error("[ByteplusArk] Task failed", JSON.stringify(task).slice(0, 800));
+          await updateGeneration(generationId, { status: "failed", error: friendly, duration: 0 });
+          return NextResponse.json({ status: "failed", error: friendly });
+        }
+
+        // queued / running — keep polling
+        return NextResponse.json({ status: "processing", log: `Seedance: ${status || "queued"}...` });
+      } catch (arkErr) {
+        const msg = arkErr instanceof Error ? arkErr.message : "ByteDance Ark status check failed";
         await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
         return NextResponse.json({ status: "failed", error: msg });
       }

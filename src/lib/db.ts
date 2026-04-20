@@ -22,13 +22,17 @@ export interface Settings {
   segmindApiKey: string;
   geminiApiKey: string;
   fishApiKey: string;
+  // ByteDance ModelArk (ARK) — direct-API Seedance 2.0 access. Token lives in
+  // ARK_API_KEY on Vercel; no settings.json fallback needed for this one but
+  // we keep the shape consistent with the others.
+  arkApiKey: string;
 }
 
 export function getSettings(): Settings {
-  let settings: Settings = { openaiApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "" };
+  let settings: Settings = { openaiApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "", arkApiKey: "" };
   if (existsSync(SETTINGS_FILE)) {
     try {
-      settings = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
+      settings = { ...settings, ...JSON.parse(readFileSync(SETTINGS_FILE, "utf-8")) };
     } catch {}
   }
   // Fall back to environment variables (works on Vercel)
@@ -37,6 +41,7 @@ export function getSettings(): Settings {
   if (!settings.segmindApiKey) settings.segmindApiKey = process.env.SEGMIND_API_KEY || "";
   if (!settings.geminiApiKey) settings.geminiApiKey = process.env.GEMINI_API_KEY || "";
   if (!settings.fishApiKey) settings.fishApiKey = process.env.FISH_API_KEY || "";
+  if (!settings.arkApiKey) settings.arkApiKey = process.env.ARK_API_KEY || "";
   return settings;
 }
 

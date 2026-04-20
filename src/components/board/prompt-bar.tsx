@@ -578,6 +578,7 @@ export function PromptBar() {
       const isGeminiVideo = data.geminiVideo || false;
       const isOpenaiVideo = data.openaiVideo || false;
       const isReplicateVideo = data.replicateVideo || false;
+      const isByteplusVideo = data.byteplusVideo || false;
       useAppStore.getState().updateItem(genItem.id, { progressText: ttsStep ? "Cloning voice..." : "Queued..." });
 
       const poll = async () => {
@@ -586,6 +587,7 @@ export function PromptBar() {
           if (isGeminiVideo) url += `&geminiVideo=true`;
           if (isOpenaiVideo) url += `&openaiVideo=true`;
           if (isReplicateVideo) url += `&replicateVideo=true`;
+          if (isByteplusVideo) url += `&byteplusVideo=true`;
           if (ttsStep && currentModelId.includes("clone-voice")) {
             url += `&ttsInput=${encodeURIComponent(JSON.stringify(ttsStep.input))}&ttsModelId=${encodeURIComponent(ttsStep.modelId)}`;
           }

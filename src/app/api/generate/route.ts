@@ -495,6 +495,101 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ByteDance ModelArk (Seedance 2.0). Async task — POST to create, poll in
+    // the status route. The model id already contains any /i2v or /s2e suffix
+    // we added for UI routing, so strip it before sending to Ark.
+    if (modelInfo.provider === "byteplus") {
+      if (!settings.arkApiKey) {
+        return NextResponse.json({ error: "ByteDance Ark API key not configured." }, { status: 500 });
+      }
+      try {
+        const arkModel = modelId.replace(/\/(i2v|s2e)$/, "");
+
+        // ModelArk's /contents/generations/tasks takes a `content` array of
+        // role-tagged parts: a text prompt, plus image_url entries where the
+        // role decides whether it's a first frame, last frame, or reference.
+        type ContentPart =
+          | { type: "text"; text: string }
+          | { type: "image_url"; image_url: { url: string }; role?: string };
+        const content: ContentPart[] = [];
+
+        const text = prompt?.trim();
+        if (text) content.push({ type: "text", text });
+
+        if (modelInfo.type === "s2e") {
+          if (input.first_frame_url) {
+            content.push({ type: "image_url", image_url: { url: input.first_frame_url as string }, role: "first_frame" });
+          }
+          if (input.last_frame_url) {
+            content.push({ type: "image_url", image_url: { url: input.last_frame_url as string }, role: "last_frame" });
+          }
+        } else if (modelInfo.type === "i2v") {
+          const imgUrl = (input.image_url as string | undefined);
+          if (imgUrl) {
+            content.push({ type: "image_url", image_url: { url: imgUrl } });
+          }
+        }
+
+        // Map option fields to the names Ark expects — they use `ratio` not
+        // aspect_ratio, and accept duration as an integer (seconds).
+        const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "5s";
+        const durSeconds = Math.max(4, Math.min(15, parseInt(durStr.replace("s", "")) || 5));
+        const resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "720p";
+        const ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "16:9";
+        const genAudio = input.generate_audio !== undefined
+          ? !!input.generate_audio
+          : (modelInfo.options?.generate_audio?.default ?? true);
+
+        const arkBody: Record<string, unknown> = {
+          model: arkModel,
+          content,
+          ratio,
+          resolution,
+          duration: durSeconds,
+          watermark: false,
+        };
+        // Audio gen is only valid on i2v / s2e / t2v for Seedance 2 — we pass
+        // the boolean through always since the model accepts it everywhere.
+        arkBody.generate_audio = genAudio;
+
+        console.log("[ByteplusArk] Submitting", arkModel, JSON.stringify(arkBody).slice(0, 500));
+
+        const createRes = await fetch(
+          "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${settings.arkApiKey}`,
+            },
+            body: JSON.stringify(arkBody),
+          }
+        );
+        const createData = await createRes.json() as Record<string, unknown>;
+        if (!createRes.ok) {
+          // Ark surfaces errors either as { error: { message } } or a plain
+          // { message } depending on tier. Normalize.
+          const errObj = (createData.error as Record<string, unknown>) || createData;
+          const errMsg = (errObj.message as string) || (errObj.code as string) || "ByteDance Ark submission failed";
+          console.error("[ByteplusArk] Submission rejected", createRes.status, JSON.stringify(createData).slice(0, 500));
+          await updateGeneration(generation.id, { status: "failed", error: errMsg, duration: 0 });
+          return NextResponse.json({ error: errMsg }, { status: 400 });
+        }
+
+        return NextResponse.json({
+          generationId: generation.id,
+          requestId: createData.id as string,
+          modelId,
+          status: "processing",
+          byteplusVideo: true,
+        });
+      } catch (arkErr) {
+        const msg = arkErr instanceof Error ? arkErr.message : "ByteDance Ark error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
     // Replicate: async prediction — POST to create, poll in status route
     if (modelInfo.provider === "replicate") {
       if (!settings.replicateApiKey) {

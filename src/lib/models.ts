@@ -39,7 +39,7 @@ export interface PerSecondRate {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "openai" | "replicate" | "segmind" | "gemini" | "fish";
+  provider: "openai" | "replicate" | "segmind" | "gemini" | "fish" | "byteplus";
   type: ModelType;
   category: ModelCategory;
   description: string;
@@ -179,12 +179,77 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.42, withAudio720p: 0.42, noAudio4k: 1.16, withAudio4k: 1.16 },
   },
 
+  // Seedance 2.0 talks to ByteDance ModelArk directly — not Replicate — so
+  // we get access to 1080p, the Fast variant, and official billing.
+  //
+  //   base URL: https://ark.ap-southeast.bytepluses.com/api/v3
+  //   POST /contents/generations/tasks → task ID
+  //   GET  /contents/generations/tasks/{id} → status + content.video_url
+  //
+  // The id we store here IS the ARK model id so the route can send it as-is.
   {
-    id: "bytedance/seedance-2.0",
+    id: "dreamina-seedance-2-0-260128",
     name: "Seedance 2.0",
-    provider: "replicate", type: "t2v", category: "Video",
-    description: "ByteDance Seedance 2.0 — multimodal cinematic video with native audio, realistic physics, and director-level camera control.",
+    provider: "byteplus", type: "t2v", category: "Video",
+    description: "ByteDance Seedance 2.0 (direct API). Multimodal cinematic video with native audio, realistic physics, 1080p available.",
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "dreamina-seedance-2-0-260128/i2v",
+    name: "Seedance 2.0 I2V",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Seedance 2.0 image-to-video (direct API). Animate a character or product shot into a cinematic clip with native audio.",
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How the image should animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "dreamina-seedance-2-0-260128/s2e",
+    name: "Seedance 2.0 S2E",
+    provider: "byteplus", type: "s2e", category: "Video",
+    description: "Seedance 2.0 start-to-end (direct API). Give it a start frame + end frame and it animates the transition with native audio.",
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "dreamina-seedance-2-0-fast-260128",
+    name: "Seedance 2.0 Fast",
+    provider: "byteplus", type: "t2v", category: "Video",
+    description: "Seedance 2.0 Fast — cheaper + quicker variant. Up to 720p. Same multimodal prompt + image refs, same native audio.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
     ],
@@ -194,16 +259,15 @@ export const models: AIModel[] = [
       duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
       generate_audio: { default: true, label: "Native audio" },
     },
-    // 720p non-video-in = $0.18/s on Replicate ≈ RM0.67 after margin.
-    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+    perSecond: { noAudio720p: 0.46, withAudio720p: 0.46, noAudio4k: 0, withAudio4k: 0 },
   },
 
   {
-    id: "bytedance/seedance-2.0/i2v",
-    name: "Seedance 2.0 I2V",
-    provider: "replicate", type: "i2v", category: "Video",
-    description: "Seedance 2.0 image-to-video — animate a character or product shot into a cinematic clip with native audio.",
-    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    id: "dreamina-seedance-2-0-fast-260128/i2v",
+    name: "Seedance 2.0 Fast I2V",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Seedance 2.0 Fast image-to-video. Cheaper + quicker animate-an-image route, up to 720p.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate" },
@@ -214,15 +278,15 @@ export const models: AIModel[] = [
       duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
       generate_audio: { default: true, label: "Native audio" },
     },
-    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+    perSecond: { noAudio720p: 0.46, withAudio720p: 0.46, noAudio4k: 0, withAudio4k: 0 },
   },
 
   {
-    id: "bytedance/seedance-2.0/s2e",
-    name: "Seedance 2.0 S2E",
-    provider: "replicate", type: "s2e", category: "Video",
-    description: "Seedance 2.0 start-to-end: give it a start frame + end frame and it animates the transition between them with native audio.",
-    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    id: "dreamina-seedance-2-0-fast-260128/s2e",
+    name: "Seedance 2.0 Fast S2E",
+    provider: "byteplus", type: "s2e", category: "Video",
+    description: "Seedance 2.0 Fast start-to-end. Start + end frame transition at the cheaper Fast tier.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
@@ -234,7 +298,7 @@ export const models: AIModel[] = [
       duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
       generate_audio: { default: true, label: "Native audio" },
     },
-    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+    perSecond: { noAudio720p: 0.46, withAudio720p: 0.46, noAudio4k: 0, withAudio4k: 0 },
   },
 
   {
