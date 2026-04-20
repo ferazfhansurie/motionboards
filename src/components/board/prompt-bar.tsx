@@ -912,95 +912,10 @@ export function PromptBar() {
 
   return (
     <div className="absolute bottom-0 left-0 right-0 flex flex-col pointer-events-none">
-      {/* Reference controls — anchored to the right above the chatbox */}
-      {canSetAsRef && showAnyRef && (
-        <div className="pointer-events-auto ml-auto mb-2 mr-2 flex items-center gap-2 rounded-lg bg-white border border-gray-200 px-3 py-1.5 backdrop-blur-sm shadow-lg" style={{ width: boxW }}>
-          <span className="text-[10px] text-gray-400 mr-1">Set as:</span>
-          {showStartFrame && (
-            <button
-              className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                startFrameId === selectedItem!.id
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-              onClick={() =>
-                setStartFrame(startFrameId === selectedItem!.id ? null : selectedItem!.id)
-              }
-            >
-              Start Frame
-            </button>
-          )}
-          {showEndFrame && (
-            <button
-              className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                endFrameId === selectedItem!.id
-                  ? "bg-red-600 text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-              onClick={() =>
-                useAppStore.getState().setEndFrame(endFrameId === selectedItem!.id ? null : selectedItem!.id)
-              }
-            >
-              End Frame
-            </button>
-          )}
-          {showInput && (() => {
-            const isAlreadyRef = currentInputIndex !== -1;
-            // Can add as next input if: already assigned OR is the next slot
-            const canAssign = isAlreadyRef || !inputRefs.includes(selectedItem!.id);
-            // Show numbered buttons: existing slots + the next available one
-            const maxSlots = Math.min(inputRefs.length + 1, 5);
-
-            return Array.from({ length: maxSlots }, (_, i) => {
-              const isThisItem = inputRefs[i] === selectedItem!.id;
-              const slotFilled = i < inputRefs.length;
-              // Only allow clicking the next unfilled slot or toggling an existing one
-              const isNextAvailable = i === inputRefs.length && !inputRefs.includes(selectedItem!.id);
-              const canClick = isThisItem || isNextAvailable;
-
-              return (
-                <button
-                  key={i}
-                  disabled={!canClick}
-                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                    isThisItem
-                      ? "bg-emerald-600 text-white"
-                      : slotFilled
-                      ? "bg-emerald-50 text-emerald-400 cursor-default"
-                      : canClick
-                      ? "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                      : "bg-gray-50 text-gray-300 cursor-not-allowed"
-                  }`}
-                  onClick={() => {
-                    if (!canClick) return;
-                    if (isThisItem) {
-                      // Remove this and all after it (cascade down)
-                      const newRefs = inputRefs.slice(0, i);
-                      useAppStore.setState({ inputRefs: newRefs });
-                    } else {
-                      useAppStore.getState().toggleInputRef(selectedItem!.id);
-                    }
-                  }}
-                >
-                  INPUT {i + 1}
-                </button>
-              );
-            });
-          })()}
-          {showAudioInput && (
-            <button
-              className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                audioInputId === selectedItem!.id
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-              onClick={() => setAudioInput(audioInputId === selectedItem!.id ? null : selectedItem!.id)}
-            >
-              Audio
-            </button>
-          )}
-        </div>
-      )}
+      {/* (The old "Set as: INPUT 1" row used to live here. It's been merged
+          into the always-visible RequirementsRow below the chatbox — each
+          pill doubles as both status and the click-to-assign action when a
+          compatible item is selected.) */}
 
       {/* Prompt chatbox (floating bottom-right) */}
       <div className="flex items-end justify-end px-2 pb-1">
@@ -1044,19 +959,43 @@ export function PromptBar() {
             </div>
           )}
 
-          {/* Always-visible requirements row — one pill per required input
-              on the current model, colored green when satisfied and orange
-              when still missing. This makes it obvious what the user needs
-              to drag in before hitting Generate. */}
+          {/* Always-visible requirements row. Doubles as the click-to-assign
+              target when an item is selected on the canvas — pill pulses to
+              indicate "ready to receive" and a click binds the selected item
+              to that slot (or clears the slot if it already points there). */}
           {selectedModel && (
             <RequirementsRow
               model={selectedModel}
               isDark={isDark}
+              selectedItem={selectedItem || null}
+              selectedIsImage={!!isSelectedImage}
+              selectedIsVideo={!!isSelectedVideo}
+              selectedIsAudio={!!isSelectedAudio}
+              startFrameId={startFrameId}
+              endFrameId={endFrameId}
+              audioInputId={audioInputId}
+              inputRefs={inputRefs}
+              refItems={refItems}
               hasStartFrame={!!startFrameId}
               hasEndFrame={!!endFrameId}
               hasImageRef={refItems.some((r) => r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image")) || !!startFrameId}
               hasVideoRef={refItems.some((r) => r.type === "video" || (r.type === "generation" && r.outputType === "video"))}
               hasAudio={!!audioItem}
+              onSetStartFrame={setStartFrame}
+              onSetEndFrame={setEndFrame}
+              onSetAudioInput={setAudioInput}
+              onToggleInputRef={(id) => useAppStore.getState().toggleInputRef(id)}
+              onClearInputRefsOfKind={(kind) => {
+                useAppStore.setState({
+                  inputRefs: inputRefs.filter((id) => {
+                    const it = items.find((x) => x.id === id);
+                    if (!it) return false;
+                    if (kind === "image") return !(it.type === "image" || it.type === "psd-layer" || (it.type === "generation" && it.outputType === "image"));
+                    if (kind === "video") return !(it.type === "video" || (it.type === "generation" && it.outputType === "video"));
+                    return true;
+                  }),
+                });
+              }}
             />
           )}
 
@@ -1410,26 +1349,61 @@ export function PromptBar() {
 function RequirementsRow({
   model,
   isDark,
+  selectedItem,
+  selectedIsImage,
+  selectedIsVideo,
+  selectedIsAudio,
+  startFrameId,
+  endFrameId,
+  audioInputId,
+  inputRefs,
+  refItems,
   hasStartFrame,
   hasEndFrame,
   hasImageRef,
   hasVideoRef,
   hasAudio,
+  onSetStartFrame,
+  onSetEndFrame,
+  onSetAudioInput,
+  onToggleInputRef,
+  onClearInputRefsOfKind,
 }: {
   model: AIModel;
   isDark: boolean;
+  selectedItem: BoardItem | null;
+  selectedIsImage: boolean;
+  selectedIsVideo: boolean;
+  selectedIsAudio: boolean;
+  startFrameId: string | null;
+  endFrameId: string | null;
+  audioInputId: string | null;
+  inputRefs: string[];
+  refItems: BoardItem[];
   hasStartFrame: boolean;
   hasEndFrame: boolean;
   hasImageRef: boolean;
   hasVideoRef: boolean;
   hasAudio: boolean;
+  onSetStartFrame: (id: string | null) => void;
+  onSetEndFrame: (id: string | null) => void;
+  onSetAudioInput: (id: string | null) => void;
+  onToggleInputRef: (id: string) => void;
+  onClearInputRefsOfKind: (kind: "image" | "video") => void;
 }) {
+  type Kind = "image" | "video" | "audio" | "start" | "end";
   type Req = {
+    kind: Kind;
     label: string;
     fullDesc: string;
     hint: string;
     ok: boolean;
     required: boolean;
+    // Interactive state: when a canvas item is selected, the pill becomes
+    // clickable if its type matches this slot. `onClick` runs the binding.
+    canClick: boolean;
+    clickMode: "set" | "clear" | null;
+    onClick: () => void;
   };
   const reqs: Req[] = [];
 
@@ -1452,48 +1426,89 @@ function RequirementsRow({
 
   if (model.type === "s2e") {
     reqs.push({
+      kind: "start",
       label: "Start frame",
       fullDesc: "First frame the video should begin on",
-      hint: "Right-click an image → Set as Start Frame",
+      hint: "Select an image, then click here",
       ok: hasStartFrame,
       required: true,
+      canClick: selectedIsImage,
+      clickMode: selectedIsImage && startFrameId === selectedItem?.id ? "clear" : selectedIsImage ? "set" : null,
+      onClick: () => {
+        if (!selectedItem || !selectedIsImage) return;
+        onSetStartFrame(startFrameId === selectedItem.id ? null : selectedItem.id);
+      },
     });
     reqs.push({
+      kind: "end",
       label: "End frame",
       fullDesc: "Last frame the video should end on",
-      hint: "Right-click an image → Set as End Frame",
+      hint: "Select an image, then click here",
       ok: hasEndFrame,
       required: true,
+      canClick: selectedIsImage,
+      clickMode: selectedIsImage && endFrameId === selectedItem?.id ? "clear" : selectedIsImage ? "set" : null,
+      onClick: () => {
+        if (!selectedItem || !selectedIsImage) return;
+        onSetEndFrame(endFrameId === selectedItem.id ? null : selectedItem.id);
+      },
     });
   } else {
     for (const inp of model.inputs) {
       if (inp.type === "image") {
+        const selAlreadyInRefs = !!(selectedItem && inputRefs.includes(selectedItem.id) && selectedIsImage);
         reqs.push({
+          kind: "image",
           label: shortLabel(inp.description, "Image"),
           fullDesc: inp.description || "Image reference",
-          hint: "Right-click an image → Set as Input",
+          hint: "Select an image on the canvas, then click here",
           ok: hasImageRef,
           required: !!inp.required,
+          canClick: selectedIsImage,
+          clickMode: selAlreadyInRefs ? "clear" : selectedIsImage ? "set" : null,
+          onClick: () => {
+            if (!selectedItem || !selectedIsImage) return;
+            if (selAlreadyInRefs) onToggleInputRef(selectedItem.id);
+            else onToggleInputRef(selectedItem.id);
+          },
         });
       } else if (inp.type === "video") {
+        const selAlreadyInRefs = !!(selectedItem && inputRefs.includes(selectedItem.id) && selectedIsVideo);
         reqs.push({
+          kind: "video",
           label: shortLabel(inp.description, "Video"),
           fullDesc: inp.description || "Video reference",
-          hint: "Right-click a video → Set as Input",
+          hint: "Select a video on the canvas, then click here",
           ok: hasVideoRef,
           required: !!inp.required,
+          canClick: selectedIsVideo,
+          clickMode: selAlreadyInRefs ? "clear" : selectedIsVideo ? "set" : null,
+          onClick: () => {
+            if (!selectedItem || !selectedIsVideo) return;
+            onToggleInputRef(selectedItem.id);
+          },
         });
       } else if (inp.type === "audio") {
         reqs.push({
+          kind: "audio",
           label: shortLabel(inp.description, "Audio"),
           fullDesc: inp.description || "Audio reference",
-          hint: "Right-click an audio clip → Set as Input",
+          hint: "Select an audio clip, then click here",
           ok: hasAudio,
           required: !!inp.required,
+          canClick: selectedIsAudio,
+          clickMode: selectedIsAudio && audioInputId === selectedItem?.id ? "clear" : selectedIsAudio ? "set" : null,
+          onClick: () => {
+            if (!selectedItem || !selectedIsAudio) return;
+            onSetAudioInput(audioInputId === selectedItem.id ? null : selectedItem.id);
+          },
         });
       }
     }
   }
+  // Unused-hook suppression for tree-shaking tools.
+  void refItems;
+  void onClearInputRefsOfKind;
 
   if (reqs.length === 0) return null;
 
@@ -1503,31 +1518,48 @@ function RequirementsRow({
         Needs
       </span>
       {reqs.map((r, i) => {
+        const armed = r.canClick && r.clickMode !== null;
         const tone = r.ok
           ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/40"
           : r.required
             ? "bg-[#f26522]/15 text-[#f26522] border-[#f26522]/40"
             : (isDark ? "bg-white/[0.04] text-gray-400 border-gray-700" : "bg-gray-100 text-gray-500 border-gray-200");
+        // When a matching canvas item is selected, the pill gets a bold
+        // orange outline + tiny caret hint so it's obvious you can click it
+        // to bind the selection.
+        const armedClass = armed
+          ? (r.clickMode === "clear"
+              ? "ring-2 ring-emerald-500/60 shadow-md cursor-pointer"
+              : "ring-2 ring-[#f26522]/80 shadow-md cursor-pointer animate-pulse")
+          : "cursor-default";
         const status = r.ok ? "set" : r.required ? "required" : "optional";
         const statusTone = r.ok
           ? "bg-emerald-600/20 text-emerald-600"
           : r.required
             ? "bg-[#f26522]/25 text-[#f26522]"
             : (isDark ? "bg-white/10 text-gray-400" : "bg-black/10 text-gray-500");
+        const tooltip = armed
+          ? (r.clickMode === "clear"
+              ? `Click to clear ${r.label}`
+              : `Click to set selected as ${r.label}`)
+          : (r.ok ? `${r.label} — set` : `${r.fullDesc}\n\n${r.hint}`);
         return (
-          <span
+          <button
             key={i}
-            title={r.ok ? `${r.label} — set` : `${r.fullDesc}\n\n${r.hint}`}
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-[2px] text-[10.5px] font-bold ${tone}`}
+            type="button"
+            disabled={!armed}
+            onClick={r.onClick}
+            title={tooltip}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-[2px] text-[10.5px] font-bold transition-all ${tone} ${armedClass}`}
           >
             <span aria-hidden className="text-[11px] leading-none">
               {r.ok ? "✓" : r.required ? "!" : "○"}
             </span>
             <span>{r.label}</span>
             <span className={`rounded-full px-1.5 py-[1px] text-[8.5px] font-black uppercase tracking-wider ${statusTone}`}>
-              {status}
+              {armed && r.clickMode === "set" ? "click" : armed && r.clickMode === "clear" ? "unset" : status}
             </span>
-          </span>
+          </button>
         );
       })}
     </div>
