@@ -215,6 +215,25 @@ export const models: AIModel[] = [
   },
 
   {
+    id: "bytedance/seedance-2.0/s2e",
+    name: "Seedance 2.0 S2E",
+    provider: "replicate", type: "s2e", category: "Video",
+    description: "Seedance 2.0 start-to-end: give it a start frame + end frame and it animates the transition between them with native audio.",
+    cost: "~RM0.65/s (720p)", creditCost: 325, speed: "~3m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+    },
+    perSecond: { noAudio720p: 0.65, withAudio720p: 0.65, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
     id: "wan-video/wan-2.2-animate-replace",
     name: "Wan 2.2 Animate — Camera Movement",
     provider: "replicate", type: "v2v", category: "Video",
