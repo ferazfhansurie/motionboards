@@ -81,6 +81,13 @@ async function normalizeImageForV2V(sourceUrl: string, origin: string, userId: s
   const magic = sniffMagic(inputBuf);
   console.log(`[V2V normalize] src=${sourceUrl} via=${via} bytes=${inputBuf.byteLength} mime=${detectedMime} magic=${magic}`);
 
+  // Catch the common misclick where the user tagged a video into the image slot.
+  // Much friendlier than letting sharp throw a generic "unsupported format".
+  const looksLikeVideo = (detectedMime || "").startsWith("video/") || ["mp4", "webm", "mov", "heic", "avif"].includes(magic);
+  if (looksLikeVideo) {
+    throw new Error(`this slot needs an image, but you tagged a ${detectedMime || magic} file`);
+  }
+
   const sharp = (await import("sharp")).default;
   try {
     const normalized = await sharp(inputBuf, { failOn: "none" })
