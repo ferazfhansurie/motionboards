@@ -104,6 +104,8 @@ export function PromptBar() {
     theme,
     audioInputId,
     setAudioInput,
+    slotAssignments,
+    setSlotAssignment,
   } = useAppStore();
   const isDark = theme === "dark";
 
@@ -508,6 +510,16 @@ export function PromptBar() {
       const endFrameUrl = await resolveUrl(endItem);
       const inputAudioUrl = await resolveUrl(audioItem);
 
+      // Resolve explicit per-slot assignments (user clicked a specific
+      // requirement pill). These override the type-based auto-routing above.
+      const slotInputs: Record<string, string> = {};
+      for (const [slotName, itemId] of Object.entries(slotAssignments)) {
+        const it = items.find((i) => i.id === itemId);
+        if (!it) continue;
+        const url = await resolveUrl(it);
+        if (url) slotInputs[slotName] = url;
+      }
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -521,6 +533,7 @@ export function PromptBar() {
           startFrame: startFrameUrl,
           endFrame: endFrameUrl,
           inputAudio: inputAudioUrl,
+          slotInputs: Object.keys(slotInputs).length > 0 ? slotInputs : undefined,
           generationOptions: Object.keys(generationOptions).length > 0 ? generationOptions : undefined,
         }),
       });
@@ -985,10 +998,12 @@ export function PromptBar() {
               hasImageRef={refItems.some((r) => r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image")) || !!startFrameId}
               hasVideoRef={refItems.some((r) => r.type === "video" || (r.type === "generation" && r.outputType === "video"))}
               hasAudio={!!audioItem}
+              slotAssignments={slotAssignments}
               onSetStartFrame={setStartFrame}
               onSetEndFrame={setEndFrame}
               onSetAudioInput={setAudioInput}
               onToggleInputRef={(id) => useAppStore.getState().toggleInputRef(id)}
+              onSetSlotAssignment={setSlotAssignment}
               onClearInputRefsOfKind={(kind) => {
                 useAppStore.setState({
                   inputRefs: inputRefs.filter((id) => {
@@ -1367,10 +1382,12 @@ function RequirementsRow({
   hasImageRef,
   hasVideoRef,
   hasAudio,
+  slotAssignments,
   onSetStartFrame,
   onSetEndFrame,
   onSetAudioInput,
   onToggleInputRef,
+  onSetSlotAssignment,
   onClearInputRefsOfKind,
 }: {
   model: AIModel;
@@ -1389,10 +1406,12 @@ function RequirementsRow({
   hasImageRef: boolean;
   hasVideoRef: boolean;
   hasAudio: boolean;
+  slotAssignments: Record<string, string>;
   onSetStartFrame: (id: string | null) => void;
   onSetEndFrame: (id: string | null) => void;
   onSetAudioInput: (id: string | null) => void;
   onToggleInputRef: (id: string) => void;
+  onSetSlotAssignment: (slotName: string, itemId: string | null) => void;
   onClearInputRefsOfKind: (kind: "image" | "video") => void;
 }) {
   type Kind = "image" | "video" | "audio" | "start" | "end";
@@ -1460,36 +1479,54 @@ function RequirementsRow({
   } else {
     for (const inp of model.inputs) {
       if (inp.type === "image") {
-        const selAlreadyInRefs = !!(selectedItem && inputRefs.includes(selectedItem.id) && selectedIsImage);
+        const assignedId = slotAssignments[inp.name];
+        // Pill is "set" when this specific slot has an explicit item assigned
+        // OR when type-based auto-routing will find something. Keeps legacy
+        // ergonomics for models the user hasn't explicitly slotted.
+        const slotOk = !!assignedId || (!slotAssignments[inp.name] && hasImageRef);
+        const selIsThisSlot = !!(selectedItem && assignedId === selectedItem.id);
         reqs.push({
           kind: "image",
           label: shortLabel(inp.description, "Image"),
           fullDesc: inp.description || "Image reference",
           hint: "Select an image on the canvas, then click here",
-          ok: hasImageRef,
+          ok: slotOk,
           required: !!inp.required,
           canClick: selectedIsImage,
-          clickMode: selAlreadyInRefs ? "clear" : selectedIsImage ? "set" : null,
+          clickMode: selIsThisSlot ? "clear" : selectedIsImage ? "set" : null,
           onClick: () => {
             if (!selectedItem || !selectedIsImage) return;
-            if (selAlreadyInRefs) onToggleInputRef(selectedItem.id);
-            else onToggleInputRef(selectedItem.id);
+            if (selIsThisSlot) {
+              // Unbind from this specific slot. Leave inputRefs alone — the
+              // user might want the item tagged generally even after un-slotting.
+              onSetSlotAssignment(inp.name, null);
+            } else {
+              onSetSlotAssignment(inp.name, selectedItem.id);
+              if (!inputRefs.includes(selectedItem.id)) onToggleInputRef(selectedItem.id);
+            }
           },
         });
       } else if (inp.type === "video") {
-        const selAlreadyInRefs = !!(selectedItem && inputRefs.includes(selectedItem.id) && selectedIsVideo);
+        const assignedId = slotAssignments[inp.name];
+        const slotOk = !!assignedId || (!slotAssignments[inp.name] && hasVideoRef);
+        const selIsThisSlot = !!(selectedItem && assignedId === selectedItem.id);
         reqs.push({
           kind: "video",
           label: shortLabel(inp.description, "Video"),
           fullDesc: inp.description || "Video reference",
           hint: "Select a video on the canvas, then click here",
-          ok: hasVideoRef,
+          ok: slotOk,
           required: !!inp.required,
           canClick: selectedIsVideo,
-          clickMode: selAlreadyInRefs ? "clear" : selectedIsVideo ? "set" : null,
+          clickMode: selIsThisSlot ? "clear" : selectedIsVideo ? "set" : null,
           onClick: () => {
             if (!selectedItem || !selectedIsVideo) return;
-            onToggleInputRef(selectedItem.id);
+            if (selIsThisSlot) {
+              onSetSlotAssignment(inp.name, null);
+            } else {
+              onSetSlotAssignment(inp.name, selectedItem.id);
+              if (!inputRefs.includes(selectedItem.id)) onToggleInputRef(selectedItem.id);
+            }
           },
         });
       } else if (inp.type === "audio") {
