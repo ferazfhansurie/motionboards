@@ -21,6 +21,27 @@ async function storeOutput(
   return `${origin}/api/files/${id}`;
 }
 
+// Re-encode a user-supplied image to a clean 8-bit sRGB JPEG before handing
+// the URL to an external model. Wan Animate (and other OpenCV-based pipelines)
+// call cv2.imread under the hood, which silently returns None for things like
+// HEIC, AVIF, 16-bit PNGs, paletted PNGs, or PNGs with unusual ICC profiles.
+// Downstream code then crashes with "NoneType is not subscriptable". Normalizing
+// here strips every one of those sharp-edges in a single pass.
+async function normalizeImageForV2V(sourceUrl: string, origin: string, userId: string): Promise<string> {
+  const res = await fetch(sourceUrl);
+  if (!res.ok) throw new Error(`Failed to fetch image ${sourceUrl}: ${res.status}`);
+  const inputBuf = Buffer.from(await res.arrayBuffer());
+  const sharp = (await import("sharp")).default;
+  const normalized = await sharp(inputBuf, { failOn: "none" })
+    .rotate() // honor EXIF orientation so the model sees the image upright
+    .flatten({ background: "#000000" }) // drop alpha so RGBA → RGB
+    .toColorspace("srgb")
+    .jpeg({ quality: 95, chromaSubsampling: "4:4:4", mozjpeg: true })
+    .toBuffer();
+  const { id } = await putFile(normalized, "image/jpeg", userId);
+  return `${origin}/api/files/${id}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Auth check
@@ -635,6 +656,23 @@ export async function POST(req: NextRequest) {
           // strip it if empty so we don't bias the model.
           if (!prompt?.trim()) delete repInput.prompt;
           repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "480";
+
+          // Normalize every image input first so the model's cv2.imread can't
+          // choke on an unusual PNG/HEIC/etc. Do this sequentially instead of
+          // in parallel — usually there's only one image, and keeping it serial
+          // makes the error surface point at the specific input that failed.
+          for (const inp of modelInfo.inputs) {
+            if (inp.type === "image" && typeof input[inp.name] === "string") {
+              try {
+                input[inp.name] = await normalizeImageForV2V(input[inp.name] as string, req.nextUrl.origin, user.id);
+              } catch (normErr) {
+                const msg = normErr instanceof Error ? normErr.message : "Image normalize failed";
+                await updateGeneration(generation.id, { status: "failed", error: `Could not prepare input "${inp.name}": ${msg}`, duration: 0 });
+                return NextResponse.json({ error: `Could not prepare input "${inp.name}". Try a different image.` }, { status: 400 });
+              }
+            }
+          }
+
           for (const inp of modelInfo.inputs) {
             if ((inp.type === "image" || inp.type === "video") && input[inp.name] !== undefined) {
               repInput[inp.name] = input[inp.name];
