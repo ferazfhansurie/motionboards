@@ -323,6 +323,23 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
   },
 
+  {
+    id: "wan-video/wan-2.2-animate-animation",
+    name: "Wan 2.2 Animate — Character Animation",
+    provider: "replicate", type: "v2v", category: "Video",
+    description: "Animate your character image to mimic the motion of a reference video. Unlike Pose to Character (which swaps the performer in the reference scene), this generates a fresh clip of your character performing the motion from scratch.",
+    cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: false, description: "Optional caption" },
+      { name: "character_image", type: "image", required: true, description: "Character image (the person to animate)" },
+      { name: "video", type: "video", required: true, description: "Motion reference video (source of the motion to copy)" },
+    ],
+    options: {
+      resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
+    },
+    perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
+  },
+
   // ═══════════════ SOUND EFFECTS ═══════════════
 
   {
