@@ -314,11 +314,11 @@ export const models: AIModel[] = [
     cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Optional caption" },
-      { name: "image_url", type: "image", required: true, description: "Character image (the person to render)" },
+      { name: "character_image", type: "image", required: true, description: "Character image (the person to render)" },
       { name: "video_url", type: "video", required: true, description: "Pose reference video (motion + camera are preserved)" },
     ],
     options: {
-      resolution: { values: ["480p", "580p", "720p"], default: "480p", label: "Resolution" },
+      resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
     },
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
   },
