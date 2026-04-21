@@ -29,14 +29,15 @@ async function storeOutput(
 // here strips every one of those sharp-edges in a single pass.
 async function normalizeImageForV2V(sourceUrl: string, origin: string, userId: string): Promise<string> {
   const res = await fetch(sourceUrl);
-  if (!res.ok) throw new Error(`Failed to fetch image ${sourceUrl}: ${res.status}`);
+  if (!res.ok) throw new Error(`fetch ${sourceUrl} returned ${res.status}`);
   const inputBuf = Buffer.from(await res.arrayBuffer());
+  if (inputBuf.byteLength === 0) throw new Error(`fetched 0 bytes from ${sourceUrl}`);
   const sharp = (await import("sharp")).default;
   const normalized = await sharp(inputBuf, { failOn: "none" })
     .rotate() // honor EXIF orientation so the model sees the image upright
     .flatten({ background: "#000000" }) // drop alpha so RGBA → RGB
     .toColorspace("srgb")
-    .jpeg({ quality: 95, chromaSubsampling: "4:4:4", mozjpeg: true })
+    .jpeg({ quality: 92 })
     .toBuffer();
   const { id } = await putFile(normalized, "image/jpeg", userId);
   return `${origin}/api/files/${id}`;
@@ -667,8 +668,9 @@ export async function POST(req: NextRequest) {
                 input[inp.name] = await normalizeImageForV2V(input[inp.name] as string, req.nextUrl.origin, user.id);
               } catch (normErr) {
                 const msg = normErr instanceof Error ? normErr.message : "Image normalize failed";
+                console.error(`[V2V normalize] ${inp.name} failed:`, normErr);
                 await updateGeneration(generation.id, { status: "failed", error: `Could not prepare input "${inp.name}": ${msg}`, duration: 0 });
-                return NextResponse.json({ error: `Could not prepare input "${inp.name}". Try a different image.` }, { status: 400 });
+                return NextResponse.json({ error: `Could not prepare input "${inp.name}": ${msg}` }, { status: 400 });
               }
             }
           }
