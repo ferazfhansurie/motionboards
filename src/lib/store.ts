@@ -554,6 +554,7 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: idSet.has(s.endFrameId || "") ? null : s.endFrameId,
         inputRefs: s.inputRefs.filter((r) => !idSet.has(r)),
         audioInputId: idSet.has(s.audioInputId || "") ? null : s.audioInputId,
+        slotAssignments: Object.fromEntries(Object.entries(s.slotAssignments).filter(([, v]) => !idSet.has(v))),
       };
     }),
   moveItem: (id, x, y) =>
