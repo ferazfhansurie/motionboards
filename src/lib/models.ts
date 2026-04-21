@@ -323,6 +323,29 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
   },
 
+  // Placeholder: matches the yaroflasher 3-input flow (character + reference
+  // performance video + separate camera-path video). The generate route today
+  // only threads a single video through `inputVideo`, so the second video slot
+  // needs multi-video plumbing once a real provider is picked. Marked
+  // stable: false so it's visible in the catalog but clearly WIP.
+  {
+    id: "placeholder/camera-movement-3input",
+    name: "Camera Movement (3-input)",
+    provider: "replicate", type: "v2v", category: "Video",
+    description: "Character image + a reference performance video + a separate camera-movement video. Coming soon — swap the provider ID once the ComfyUI / Wan workflow is hosted.",
+    cost: "TBD", creditCost: 150, speed: "~4m", stable: false,
+    inputs: [
+      { name: "prompt", type: "text", required: false, description: "Optional caption" },
+      { name: "image_url", type: "image", required: true, description: "Character image (the person to render)" },
+      { name: "video_url", type: "video", required: true, description: "Reference video (performance / motion source)" },
+      { name: "camera_video_url", type: "video", required: true, description: "Camera movement video (the path the camera follows)" },
+    ],
+    options: {
+      resolution: { values: ["480p", "580p", "720p"], default: "480p", label: "Resolution" },
+    },
+    perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
+  },
+
   // ═══════════════ SOUND EFFECTS ═══════════════
 
   {
