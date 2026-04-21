@@ -892,11 +892,19 @@ async function restoreFromImageCache() {
 
 // Flush pending saves on page close / refresh
 if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", () => {
+  window.addEventListener("beforeunload", (e) => {
     if (lsSaveTimeout) clearTimeout(lsSaveTimeout);
     if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
     const state = useAppStore.getState();
     saveToLocalStorage(state);
+    // Warn the user if a generation is still running. Modern browsers show a
+    // generic dialog ("Leave site?") — custom messages are ignored for
+    // anti-phishing reasons. Setting returnValue is what actually triggers it.
+    const hasInFlightGeneration = state.items.some((i) => i.status === "processing");
+    if (hasInFlightGeneration) {
+      e.preventDefault();
+      e.returnValue = "A generation is still running. Leaving may interrupt it.";
+    }
     // Try to save to DB via sendBeacon (works during page unload)
     const boards = getCurrentBoards(state);
     const blob = new Blob(
