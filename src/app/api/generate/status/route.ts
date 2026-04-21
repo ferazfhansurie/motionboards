@@ -2,6 +2,49 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings, updateGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
 import { models } from "@/lib/models";
 
+// Translate Veo error strings into something actionable. Google's default
+// messages are verbose and rarely tell the user *why* — "Veo could not
+// generate N videos based on the prompt provided. You will not be charged…
+// Support codes: 42237218. Try again." almost always means the safety filter
+// soft-declined without disclosing the reason. Collapse those into a plain
+// "safety filter" toast and drop the marketing boilerplate.
+function humanizeVeoError(raw: string): string {
+  const r = (raw || "").trim();
+  if (!r) return "Veo returned no video. Try again.";
+
+  // Explicit safety / policy signals get the direct message.
+  if (/SAFE|PROHIBIT|POLICY|RAI|CHILD|HARM|HATE|HARASS|SEXUAL|VIOLEN|COPYRIG|RECITAT/i.test(r)) {
+    return "Blocked by content policy. Rephrase the prompt or swap the reference frames.";
+  }
+  // Google's generic "could not generate" soft-decline. In practice this is
+  // either a filter trip with no reason given, or a transient Veo internal
+  // error — treat both as a rephrase-or-retry toast and don't echo their
+  // verbose support-code trailer.
+  if (/could not generate|did not generate|no video(s)? (were|was) generated/i.test(r)) {
+    return "Veo couldn't generate this one. It's usually a content-policy soft decline or a transient Veo error — rephrase the prompt, swap the reference frames, or try again.";
+  }
+  if (/RESOURCE_EXHAUSTED|429|quota|rate ?limit/i.test(r)) {
+    return "Veo is rate-limited right now. Wait a minute and try again.";
+  }
+  if (/PERMISSION_DENIED|credential|API key/i.test(r)) {
+    return "Veo credentials are missing or invalid. Contact the admin.";
+  }
+  if (/timeout|timed out/i.test(r)) {
+    return "Veo timed out. Try a shorter duration or lower resolution.";
+  }
+
+  // Fallback — trim the useless trailing bits Google appends.
+  let cleaned = r
+    .replace(/\s*Support codes?:[^.]*\.?/gi, "")
+    .replace(/\s*You will not be charged for this request\.?/gi, "")
+    .replace(/\s*If you think this was an error[^.]*\.?/gi, "")
+    .replace(/\s*Try rephrasing the prompt\.?/gi, "")
+    .replace(/\s*Try again\.?\s*$/gi, "")
+    .trim();
+  if (!cleaned) cleaned = "Veo returned no video.";
+  return cleaned;
+}
+
 // Status polling for async generations.
 // Currently only Gemini Veo (long-running operation) needs polling — every other
 // provider in the catalog is synchronous and returns the result from /api/generate.
@@ -54,7 +97,8 @@ export async function GET(req: NextRequest) {
           // Check for operation-level error first (response may be undefined)
           const opError = (operation as unknown as Record<string, unknown>).error as Record<string, string> | undefined;
           if (opError || !operation.response) {
-            const errMsg = opError?.message || "Video generation failed — no response from Google.";
+            const raw = opError?.message || "Video generation failed — no response from Google.";
+            const errMsg = humanizeVeoError(raw);
             console.error("[Veo] Operation error:", JSON.stringify(opError || "no response"));
             await updateGeneration(generationId, { status: "failed", error: errMsg, duration: 0 });
             return NextResponse.json({ status: "failed", error: errMsg });
@@ -111,17 +155,9 @@ export async function GET(req: NextRequest) {
             ((operation.response as Record<string, unknown>)?.blockReason as string | undefined) ||
             ((operation.response as Record<string, unknown>)?.raiMediaFilteredReasons as string | undefined);
 
-          const looksLikePolicy = !!rawReason && /SAFE|PROHIBIT|POLICY|RAI|CHILD|HARM|HATE|HARASS|SEXUAL|VIOLEN|COPYRIG|RECITAT/i.test(String(rawReason));
-
-          let errDetail: string;
-          if (looksLikePolicy) {
-            errDetail = `Blocked by content policy (${rawReason}). Try rephrasing the prompt or swapping reference frames.`;
-          } else if (rawReason) {
-            errDetail = `Video failed: ${rawReason}. Try again.`;
-          } else {
-            errDetail =
-              "Veo returned no video. Transient errors on Veo are common — try Generate again. If it keeps failing, tweak the prompt or swap the start/end frames.";
-          }
+          const errDetail = rawReason
+            ? humanizeVeoError(String(rawReason))
+            : "Veo returned no video. Transient errors on Veo are common — try Generate again. If it keeps failing, tweak the prompt or swap the start/end frames.";
           console.error("[Veo] No video output:", JSON.stringify(operation.response).slice(0, 1500));
           await updateGeneration(generationId, { status: "failed", error: errDetail, duration: 0 });
           return NextResponse.json({ status: "failed", error: errDetail });
