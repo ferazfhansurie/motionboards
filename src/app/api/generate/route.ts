@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, createGeneration, updateGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
+import { getSettings, createGeneration, updateGeneration, getUserFromToken, deductCredits, putFile, getFile } from "@/lib/db";
 import { models } from "@/lib/models";
 import { submitPrompt, uploadFromUrl } from "@/lib/comfy";
 import wanAnimatePoseWorkflow from "@/lib/comfy-workflows/wan-animate-pose.json";
@@ -27,11 +27,39 @@ async function storeOutput(
 // HEIC, AVIF, 16-bit PNGs, paletted PNGs, or PNGs with unusual ICC profiles.
 // Downstream code then crashes with "NoneType is not subscriptable". Normalizing
 // here strips every one of those sharp-edges in a single pass.
-async function normalizeImageForV2V(sourceUrl: string, origin: string, userId: string): Promise<string> {
+// For URLs that point at our own /api/files/:id, read the bytes directly from
+// Neon rather than issuing an HTTP fetch back to the deployment. Vercel's
+// platform-level routing/auth can intercept self-origin fetches and return an
+// HTML shell, which is what sharp saw when it complained "unsupported image
+// format" on a known-good PNG.
+function extractOwnFileId(url: string, origin: string): string | null {
+  try {
+    const u = url.startsWith("/") ? new URL(url, origin) : new URL(url);
+    const originHost = new URL(origin).host;
+    if (u.host !== originHost) return null;
+    const m = u.pathname.match(/^\/api\/files\/([^/?#]+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadImageBytes(sourceUrl: string, origin: string): Promise<Buffer> {
+  const ownId = extractOwnFileId(sourceUrl, origin);
+  if (ownId) {
+    const file = await getFile(ownId);
+    if (!file) throw new Error(`file ${ownId} not found in storage`);
+    return Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength);
+  }
   const res = await fetch(sourceUrl);
   if (!res.ok) throw new Error(`fetch ${sourceUrl} returned ${res.status}`);
-  const inputBuf = Buffer.from(await res.arrayBuffer());
-  if (inputBuf.byteLength === 0) throw new Error(`fetched 0 bytes from ${sourceUrl}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.byteLength === 0) throw new Error(`fetched 0 bytes from ${sourceUrl}`);
+  return buf;
+}
+
+async function normalizeImageForV2V(sourceUrl: string, origin: string, userId: string): Promise<string> {
+  const inputBuf = await loadImageBytes(sourceUrl, origin);
   const sharp = (await import("sharp")).default;
   const normalized = await sharp(inputBuf, { failOn: "none" })
     .rotate() // honor EXIF orientation so the model sees the image upright
