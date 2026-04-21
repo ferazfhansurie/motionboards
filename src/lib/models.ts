@@ -308,37 +308,14 @@ export const models: AIModel[] = [
 
   {
     id: "wan-video/wan-2.2-animate-replace",
-    name: "Wan 2.2 Animate — Camera Movement",
+    name: "Wan 2.2 Animate — Pose to Character",
     provider: "replicate", type: "v2v", category: "Video",
-    description: "Swap the performer in a reference video for your character image while keeping the camera movement, lighting, and motion 1:1. Tag a video + an image as inputs.",
+    description: "Upload a character image and a pose reference video. Wan Animate generates a pose estimation internally and renders your character performing the same motion, preserving camera movement and lighting.",
     cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Optional caption" },
-      { name: "image_url", type: "image", required: true, description: "Character image (the person to inject)" },
-      { name: "video_url", type: "video", required: true, description: "Reference video (camera, scene, and motion are preserved)" },
-    ],
-    options: {
-      resolution: { values: ["480p", "580p", "720p"], default: "480p", label: "Resolution" },
-    },
-    perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
-  },
-
-  // Placeholder: matches the yaroflasher 3-input flow (character + reference
-  // performance video + separate camera-path video). The generate route today
-  // only threads a single video through `inputVideo`, so the second video slot
-  // needs multi-video plumbing once a real provider is picked. Marked
-  // stable: false so it's visible in the catalog but clearly WIP.
-  {
-    id: "placeholder/camera-movement-3input",
-    name: "Camera Movement (3-input)",
-    provider: "replicate", type: "v2v", category: "Video",
-    description: "Character image + a reference performance video + a separate camera-movement video. Coming soon — swap the provider ID once the ComfyUI / Wan workflow is hosted.",
-    cost: "TBD", creditCost: 150, speed: "~4m", stable: false,
-    inputs: [
-      { name: "prompt", type: "text", required: false, description: "Optional caption" },
       { name: "image_url", type: "image", required: true, description: "Character image (the person to render)" },
-      { name: "video_url", type: "video", required: true, description: "Reference video (performance / motion source)" },
-      { name: "camera_video_url", type: "video", required: true, description: "Camera movement video (the path the camera follows)" },
+      { name: "video_url", type: "video", required: true, description: "Pose reference video (motion + camera are preserved)" },
     ],
     options: {
       resolution: { values: ["480p", "580p", "720p"], default: "480p", label: "Resolution" },
