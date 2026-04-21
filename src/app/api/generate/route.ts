@@ -233,6 +233,14 @@ export async function POST(req: NextRequest) {
           if (res) videoConfig.resolution = res;
           const dur = (input.duration as string) || modelInfo.options?.duration?.default;
           if (dur) videoConfig.durationSeconds = parseInt(dur.toString().replace("s", ""));
+          // Veo exposes a generateAudio toggle — defaults to true when the
+          // model declares the option, but the user can turn it off to get a
+          // silent clip (and occasionally bypass flakey audio-path failures).
+          if (modelInfo.options?.generate_audio) {
+            videoConfig.generateAudio = input.generate_audio !== undefined
+              ? !!input.generate_audio
+              : (modelInfo.options.generate_audio.default ?? true);
+          }
 
           // Build image input for I2V / S2E (first frame)
           let imageInput: { imageBytes: string; mimeType: string } | undefined;
