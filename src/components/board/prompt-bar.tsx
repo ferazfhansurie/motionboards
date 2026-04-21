@@ -41,6 +41,105 @@ function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>):
   return `~RM${total} (${seconds}s × RM${rate.toFixed(2)}/s)`;
 }
 
+// Module-scoped registry of items we're actively polling, so a remount (or
+// a second PromptBar instance) never doubles up the poll for the same id.
+const activePollers = new Set<string>();
+
+// Start a poll loop for a generation that's currently running on a provider's
+// async pipeline. Called from the submit flow (fresh generation) AND from the
+// refresh-resume effect (in-flight generation whose client poll was killed
+// by a page reload).
+function startPolling(params: {
+  itemId: string;
+  requestId: string;
+  modelId: string;
+  generationId: string;
+  pollProvider: NonNullable<BoardItem["pollProvider"]>;
+  outputType?: BoardItem["outputType"];
+}) {
+  if (activePollers.has(params.itemId)) return;
+  activePollers.add(params.itemId);
+
+  const flagQuery =
+    params.pollProvider === "gemini" ? "&geminiVideo=true" :
+    params.pollProvider === "openai" ? "&openaiVideo=true" :
+    params.pollProvider === "replicate" ? "&replicateVideo=true" :
+    params.pollProvider === "byteplus" ? "&byteplusVideo=true" :
+    "&comfyVideo=true";
+
+  const finalize = (patch: Partial<BoardItem>) => {
+    useAppStore.getState().updateItem(params.itemId, {
+      ...patch,
+      progressText: undefined,
+      requestId: undefined,
+      pollProvider: undefined,
+    });
+    activePollers.delete(params.itemId);
+  };
+
+  const poll = async () => {
+    try {
+      const url =
+        `/api/generate/status?requestId=${encodeURIComponent(params.requestId)}` +
+        `&modelId=${encodeURIComponent(params.modelId)}` +
+        `&generationId=${encodeURIComponent(params.generationId)}` +
+        flagQuery;
+      const res = await fetch(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any;
+      try { data = await res.json(); }
+      catch {
+        const text = await res.text().catch(() => "");
+        data = { status: "failed", error: text ? text.slice(0, 200) : `HTTP ${res.status}` };
+      }
+
+      if (data.status === "completed") {
+        finalize({ status: "completed", outputUrl: data.outputUrl });
+        if (data.outputUrl) {
+          if (params.outputType === "image") {
+            const img = new window.Image();
+            img.onload = () => {
+              const maxW = 250;
+              const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+              useAppStore.getState().updateItem(params.itemId, {
+                width: Math.round(img.naturalWidth * scale),
+                height: Math.round(img.naturalHeight * scale),
+              });
+            };
+            img.src = data.outputUrl;
+          } else if (params.outputType === "video") {
+            const vid = document.createElement("video");
+            vid.preload = "metadata";
+            vid.onloadedmetadata = () => {
+              const maxW = 250;
+              const scale = vid.videoWidth > maxW ? maxW / vid.videoWidth : 1;
+              useAppStore.getState().updateItem(params.itemId, {
+                width: Math.round(vid.videoWidth * scale),
+                height: Math.round(vid.videoHeight * scale),
+              });
+            };
+            vid.src = data.outputUrl;
+          }
+        }
+        return;
+      }
+      if (data.status === "failed") {
+        finalize({ status: "failed", error: data.error || "Generation failed" });
+        return;
+      }
+
+      // Still running — refresh progress text and poll again.
+      const msg = data.log || (data.position != null ? `Queued #${data.position}` : data.status === "queued" ? "Queued..." : "Processing...");
+      useAppStore.getState().updateItem(params.itemId, { progressText: msg });
+      setTimeout(poll, 3000);
+    } catch {
+      setTimeout(poll, 5000);
+    }
+  };
+
+  poll();
+}
+
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
@@ -116,6 +215,26 @@ export function PromptBar() {
   };
 
   useEffect(() => { autoResize(); }, [prompt, boxMinH]);
+
+  // Resume polling for any generation that was mid-flight when the page was
+  // last closed/refreshed. Runs on mount only — startPolling is idempotent
+  // via a module-level Set keyed by item id, and the submit handler kicks off
+  // its own poller for fresh generations.
+  useEffect(() => {
+    const items = useAppStore.getState().items;
+    for (const it of items) {
+      if (it.status !== "processing") continue;
+      if (!it.requestId || !it.generationId || !it.pollProvider || !it.model) continue;
+      startPolling({
+        itemId: it.id,
+        requestId: it.requestId,
+        modelId: it.model,
+        generationId: it.generationId,
+        pollProvider: it.pollProvider,
+        outputType: it.outputType,
+      });
+    }
+  }, []);
 
   // Drag resize — attaches to document so it works even over canvas
   useEffect(() => {
@@ -580,7 +699,24 @@ export function PromptBar() {
       const isReplicateVideo = data.replicateVideo || false;
       const isByteplusVideo = data.byteplusVideo || false;
       const isComfyVideo = data.comfyVideo || false;
-      useAppStore.getState().updateItem(genItem.id, { progressText: ttsStep ? "Cloning voice..." : "Queued..." });
+      // Persist the polling handles onto the canvas item so a page refresh
+      // mid-generation can resume where it left off. Skip for the voice-clone
+      // TTS 2-step flow — that one mutates requestId during polling and would
+      // need extra plumbing to survive a reload.
+      const pollProvider: BoardItem["pollProvider"] =
+        isGeminiVideo ? "gemini" :
+        isOpenaiVideo ? "openai" :
+        isReplicateVideo ? "replicate" :
+        isByteplusVideo ? "byteplus" :
+        isComfyVideo ? "comfy" : undefined;
+      useAppStore.getState().updateItem(genItem.id, {
+        progressText: ttsStep ? "Cloning voice..." : "Queued...",
+        ...(pollProvider && !ttsStep ? {
+          requestId: data.requestId,
+          generationId: data.generationId,
+          pollProvider,
+        } : {}),
+      });
 
       const poll = async () => {
         try {

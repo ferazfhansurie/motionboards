@@ -166,6 +166,12 @@ export interface BoardItem {
   cost?: string;
   progressText?: string;
   expectedDuration?: number; // seconds, for progress estimation
+  // Persisted polling state so generations resume if the page refreshes.
+  // Written when /api/generate returns a requestId; cleared once we hit
+  // the terminal state on the next poll.
+  requestId?: string;
+  generationId?: string;
+  pollProvider?: "gemini" | "openai" | "replicate" | "byteplus" | "comfy";
   createdAt: string;
   // PSD layer metadata
   psdGroupId?: string;
