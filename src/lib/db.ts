@@ -120,6 +120,21 @@ export async function getUserById(id: string): Promise<User | undefined> {
   return rows.length > 0 ? rowToUser(rows[0]) : undefined;
 }
 
+// Operator email with access to the admin surfaces (logs, registered users).
+// Kept alongside the `role === "admin"` DB flag — either grants access, so
+// the owner email works out-of-the-box without a DB update.
+export const ADMIN_EMAIL = "hello@adleticagency.com";
+
+export function isAdmin(user: User | null | undefined): boolean {
+  if (!user) return false;
+  return user.role === "admin" || user.email.toLowerCase() === ADMIN_EMAIL;
+}
+
+export async function listUsers(limit = 500): Promise<User[]> {
+  const rows = await sql`SELECT * FROM mb_users ORDER BY created_at DESC LIMIT ${limit}`;
+  return rows.map(rowToUser);
+}
+
 export async function addCredits(userId: string, amount: number): Promise<User | undefined> {
   const rows = await sql`
     UPDATE mb_users SET credits = credits + ${amount} WHERE id = ${userId} RETURNING *
