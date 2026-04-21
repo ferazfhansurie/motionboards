@@ -998,7 +998,9 @@ export function PromptBar() {
               hasImageRef={refItems.some((r) => r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image")) || !!startFrameId}
               hasVideoRef={refItems.some((r) => r.type === "video" || (r.type === "generation" && r.outputType === "video"))}
               hasAudio={!!audioItem}
-              slotAssignments={slotAssignments}
+              slotAssignments={Object.fromEntries(
+                Object.entries(slotAssignments).filter(([, id]) => items.some((i) => i.id === id))
+              )}
               onSetStartFrame={setStartFrame}
               onSetEndFrame={setEndFrame}
               onSetAudioInput={setAudioInput}
