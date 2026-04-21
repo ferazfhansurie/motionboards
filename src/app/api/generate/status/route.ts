@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings, updateGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
 import { models } from "@/lib/models";
+import { downloadOutput, getHistoryOutputs, getJobStatus, pickOutputFile } from "@/lib/comfy";
 
 // Translate Veo error strings into something actionable. Google's default
 // messages are verbose and rarely tell the user *why* — "Veo could not
@@ -62,6 +63,7 @@ export async function GET(req: NextRequest) {
     const openaiVideo = req.nextUrl.searchParams.get("openaiVideo");
     const replicateVideo = req.nextUrl.searchParams.get("replicateVideo");
     const byteplusVideo = req.nextUrl.searchParams.get("byteplusVideo");
+    const comfyVideo = req.nextUrl.searchParams.get("comfyVideo");
 
     if (!requestId || !modelId || !generationId) {
       return NextResponse.json({ error: "Missing params" }, { status: 400 });
@@ -372,6 +374,45 @@ export async function GET(req: NextRequest) {
         });
       } catch (repErr) {
         const msg = repErr instanceof Error ? repErr.message : "Replicate status check failed";
+        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ status: "failed", error: msg });
+      }
+    }
+
+    // --- Comfy Cloud polling (ComfyUI workflow on cloud.comfy.org) ---
+    if (comfyVideo === "true") {
+      if (!process.env.COMFY_CLOUD_API_KEY) {
+        return NextResponse.json({ error: "Comfy Cloud API key not configured" }, { status: 500 });
+      }
+      try {
+        const status = await getJobStatus(requestId);
+        if (status === "completed") {
+          const outputs = await getHistoryOutputs(requestId);
+          const file = pickOutputFile(outputs);
+          if (!file) {
+            await updateGeneration(generationId, { status: "failed", error: "Comfy returned no output file", duration: 0 });
+            return NextResponse.json({ status: "failed", error: "Comfy returned no output file" });
+          }
+          const { buffer, mimeType } = await downloadOutput(file);
+          const { id: fileId } = await putFile(buffer, mimeType, user.id);
+          const outputUrl = `${req.nextUrl.origin}/api/files/${fileId}`;
+
+          const modelInfo = models.find((m) => m.id === modelId);
+          if (modelInfo) await deductCredits(user.id, modelInfo.creditCost);
+          await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+          return NextResponse.json({ status: "completed", outputUrl });
+        }
+        if (status === "failed" || status === "cancelled") {
+          const msg = status === "cancelled" ? "Generation was cancelled." : "Comfy workflow failed.";
+          await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+          return NextResponse.json({ status: "failed", error: msg });
+        }
+        return NextResponse.json({
+          status: "processing",
+          log: status === "pending" ? "Queued on Comfy Cloud..." : "Running ComfyUI workflow...",
+        });
+      } catch (comfyErr) {
+        const msg = comfyErr instanceof Error ? comfyErr.message : "Comfy status check failed";
         await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
         return NextResponse.json({ status: "failed", error: msg });
       }

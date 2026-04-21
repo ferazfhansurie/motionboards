@@ -39,7 +39,7 @@ export interface PerSecondRate {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "openai" | "replicate" | "segmind" | "gemini" | "fish" | "byteplus";
+  provider: "openai" | "replicate" | "segmind" | "gemini" | "fish" | "byteplus" | "comfy";
   type: ModelType;
   category: ModelCategory;
   description: string;
@@ -307,20 +307,16 @@ export const models: AIModel[] = [
   },
 
   {
-    id: "wan-video/wan-2.2-animate-replace",
+    id: "comfy/wan-animate-pose",
     name: "Wan 2.2 Animate — Pose to Character",
-    provider: "replicate", type: "v2v", category: "Video",
-    description: "Upload a character image and a pose reference video. Wan Animate generates a pose estimation internally and renders your character performing the same motion, preserving camera movement and lighting.",
-    cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
+    provider: "comfy", type: "v2v", category: "Video",
+    description: "Upload a character image and a pose reference video. Wan Animate generates a pose estimation internally and renders your character performing the same motion, preserving camera movement and lighting. Runs on Comfy Cloud.",
+    cost: "~RM1.50", creditCost: 150, speed: "~4m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Optional caption" },
       { name: "character_image", type: "image", required: true, description: "Character image (the person to render)" },
       { name: "video", type: "video", required: true, description: "Pose reference video (motion + camera are preserved)" },
     ],
-    options: {
-      resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
-    },
-    perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
   },
 
   // ═══════════════ SOUND EFFECTS ═══════════════

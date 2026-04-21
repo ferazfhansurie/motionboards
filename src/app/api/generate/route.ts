@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings, createGeneration, updateGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
 import { models } from "@/lib/models";
+import { submitPrompt, uploadFromUrl } from "@/lib/comfy";
+import wanAnimatePoseWorkflow from "@/lib/comfy-workflows/wan-animate-pose.json";
 
 // Synchronous providers (Segmind, Gemini image, Fish TTS, OpenAI TTS) block the
 // route until the upstream returns. Nano Banana 2 at 4K can take 60–120s, so
@@ -690,6 +692,66 @@ export async function POST(req: NextRequest) {
         });
       } catch (repErr) {
         const msg = repErr instanceof Error ? repErr.message : "Replicate error";
+        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
+    // Comfy Cloud: async ComfyUI workflow. Upload inputs, patch the workflow
+    // graph at known node IDs, submit, then poll in the status route.
+    if (modelInfo.provider === "comfy") {
+      if (!process.env.COMFY_CLOUD_API_KEY) {
+        await updateGeneration(generation.id, { status: "failed", error: "Comfy Cloud API key not configured", duration: 0 });
+        return NextResponse.json({ error: "Comfy Cloud API key not configured." }, { status: 500 });
+      }
+      try {
+        // Pick the workflow template + node IDs for this model. Only Wan Animate
+        // Pose-to-Character is wired today; add a switch here for additional
+        // Comfy workflows later.
+        let workflowTemplate: Record<string, unknown>;
+        let imageNodeId: string;
+        let videoNodeId: string;
+        let promptNodeId: string | null;
+        if (modelId === "comfy/wan-animate-pose") {
+          workflowTemplate = wanAnimatePoseWorkflow as Record<string, unknown>;
+          imageNodeId = "479";
+          videoNodeId = "420";
+          promptNodeId = null; // this workflow doesn't surface a caption slot
+        } else {
+          await updateGeneration(generation.id, { status: "failed", error: "Unknown Comfy workflow", duration: 0 });
+          return NextResponse.json({ error: `No Comfy workflow registered for model "${modelId}".` }, { status: 400 });
+        }
+
+        const characterImageUrl = input.character_image as string | undefined;
+        const poseVideoUrl = input.video as string | undefined;
+        if (!characterImageUrl || !poseVideoUrl) {
+          await updateGeneration(generation.id, { status: "failed", error: "Missing character image or pose video", duration: 0 });
+          return NextResponse.json({ error: "Both a character image and a pose reference video are required." }, { status: 400 });
+        }
+
+        const [characterUpload, poseUpload] = await Promise.all([
+          uploadFromUrl(characterImageUrl, `character_${generation.id}.png`),
+          uploadFromUrl(poseVideoUrl, `pose_${generation.id}.mp4`),
+        ]);
+
+        // Deep clone so concurrent generations don't stomp on each other.
+        const workflow = JSON.parse(JSON.stringify(workflowTemplate)) as Record<string, { inputs: Record<string, unknown> }>;
+        if (workflow[imageNodeId]) workflow[imageNodeId].inputs.image = characterUpload.name;
+        if (workflow[videoNodeId]) workflow[videoNodeId].inputs.file = poseUpload.name;
+        if (promptNodeId && workflow[promptNodeId] && prompt?.trim()) {
+          workflow[promptNodeId].inputs.text = prompt.trim();
+        }
+
+        const promptId = await submitPrompt(workflow);
+        return NextResponse.json({
+          generationId: generation.id,
+          requestId: promptId,
+          modelId,
+          status: "processing",
+          comfyVideo: true,
+        });
+      } catch (comfyErr) {
+        const msg = comfyErr instanceof Error ? comfyErr.message : "Comfy Cloud error";
         await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
