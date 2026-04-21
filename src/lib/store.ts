@@ -241,11 +241,6 @@ export interface AppState {
   endFrameId: string | null;
   inputRefs: string[]; // item IDs selected as INPUT
   audioInputId: string | null; // item ID for audio input
-  // Explicit slot → item mapping keyed on the active model's input field names
-  // (e.g. "character_image", "video"). Takes precedence over the type-based
-  // auto-routing when both exist; the user clicking a specific requirement
-  // pill writes into this record.
-  slotAssignments: Record<string, string>;
 
   // Generation
   isGenerating: boolean;
@@ -302,8 +297,6 @@ export interface AppState {
   toggleInputRef: (id: string) => void;
   setAudioInput: (id: string | null) => void;
   clearRefs: () => void;
-  setSlotAssignment: (slotName: string, itemId: string | null) => void;
-  clearSlotAssignmentsForItem: (itemId: string) => void;
   setIsGenerating: (v: boolean) => void;
   setGenerationOptions: (opts: Record<string, unknown>) => void;
   setGenerationOption: (key: string, value: unknown) => void;
@@ -373,7 +366,6 @@ export const useAppStore = create<AppState>((set) => {
   endFrameId: null,
   inputRefs: [],
   audioInputId: null,
-  slotAssignments: {} as Record<string, string>,
   isGenerating: false,
   generationOptions: {},
   isEditMode: false,
@@ -456,7 +448,6 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: null,
         inputRefs: [],
         audioInputId: null,
-        slotAssignments: {},
         undoStack: [],
         redoStack: [],
       };
@@ -484,7 +475,6 @@ export const useAppStore = create<AppState>((set) => {
       endFrameId: s.endFrameId === id ? null : s.endFrameId,
       inputRefs: s.inputRefs.filter((r) => r !== id),
       audioInputId: s.audioInputId === id ? null : s.audioInputId,
-      slotAssignments: Object.fromEntries(Object.entries(s.slotAssignments).filter(([, v]) => v !== id)),
     })),
   selectItem: (id) => set({ selectedItemId: id, selectedItemIds: id ? [id] : [] }),
   selectItems: (ids) => set({ selectedItemIds: ids, selectedItemId: ids[0] || null }),
@@ -554,7 +544,6 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: idSet.has(s.endFrameId || "") ? null : s.endFrameId,
         inputRefs: s.inputRefs.filter((r) => !idSet.has(r)),
         audioInputId: idSet.has(s.audioInputId || "") ? null : s.audioInputId,
-        slotAssignments: Object.fromEntries(Object.entries(s.slotAssignments).filter(([, v]) => !idSet.has(v))),
       };
     }),
   moveItem: (id, x, y) =>
@@ -581,26 +570,7 @@ export const useAppStore = create<AppState>((set) => {
         : [...s.inputRefs, id],
     })),
   setAudioInput: (id) => set({ audioInputId: id }),
-  clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [], audioInputId: null, slotAssignments: {} }),
-  setSlotAssignment: (slotName, itemId) =>
-    set((s) => {
-      const next = { ...s.slotAssignments };
-      if (itemId) {
-        // Clear any other slot that currently points at this item so the
-        // user can't have one canvas item occupying two requirements at once.
-        for (const k of Object.keys(next)) if (next[k] === itemId && k !== slotName) delete next[k];
-        next[slotName] = itemId;
-      } else {
-        delete next[slotName];
-      }
-      return { slotAssignments: next };
-    }),
-  clearSlotAssignmentsForItem: (itemId) =>
-    set((s) => {
-      const next: Record<string, string> = {};
-      for (const [k, v] of Object.entries(s.slotAssignments)) if (v !== itemId) next[k] = v;
-      return { slotAssignments: next };
-    }),
+  clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [], audioInputId: null }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setGenerationOptions: (generationOptions) => set({ generationOptions }),
   setGenerationOption: (key, value) => set((s) => ({ generationOptions: { ...s.generationOptions, [key]: value } })),
@@ -658,7 +628,6 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: null,
         inputRefs: [],
         audioInputId: null,
-        slotAssignments: {},
       };
     }),
   insertImportedBoard: (board) =>
@@ -686,7 +655,6 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: null,
         inputRefs: [],
         audioInputId: null,
-        slotAssignments: {},
         undoStack: [],
         redoStack: [],
       };
@@ -715,7 +683,6 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: null,
         inputRefs: [],
         audioInputId: null,
-        slotAssignments: {},
       };
     }),
   deleteBoard: (boardId) =>
@@ -738,7 +705,6 @@ export const useAppStore = create<AppState>((set) => {
           endFrameId: null,
           inputRefs: [],
           audioInputId: null,
-          slotAssignments: {},
         };
       }
       return { boards: remaining };

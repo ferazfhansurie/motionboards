@@ -91,8 +91,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Session expired. Please login again." }, { status: 401 });
 
     const body = await req.json();
-    const { prompt, model: modelId, inputImage, inputImages, inputVideo, startFrame, endFrame, inputAudio, slotInputs, generationOptions } = body;
-    const explicitSlots: Record<string, string> = (slotInputs && typeof slotInputs === "object") ? slotInputs : {};
+    const { prompt, model: modelId, inputImage, inputImages, inputVideo, startFrame, endFrame, inputAudio, generationOptions } = body;
 
     const modelInfo = models.find((m) => m.id === modelId);
     if (!modelInfo) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
@@ -160,14 +159,6 @@ export async function POST(req: NextRequest) {
       else if (inputImage && modelInfo.type === "sfx") input[inp.name] = inputImage;
     }
     for (const inp of audioInputs) { if (inputAudio) input[inp.name] = inputAudio; }
-
-    // Explicit per-slot overrides (user clicked a specific requirement pill on
-    // the canvas). These beat the type-based auto-routing above so a model
-    // with two same-type slots — or one where auto-routing picked the wrong
-    // item — still gets the bindings the user intended.
-    for (const [slotName, url] of Object.entries(explicitSlots)) {
-      if (typeof url === "string" && url) input[slotName] = url;
-    }
 
     // Create generation record
     const generation = await createGeneration({
