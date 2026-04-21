@@ -21,17 +21,8 @@ async function storeOutput(
   return `${origin}/api/files/${id}`;
 }
 
-// Re-encode a user-supplied image to a clean 8-bit sRGB JPEG before handing
-// the URL to an external model. Wan Animate (and other OpenCV-based pipelines)
-// call cv2.imread under the hood, which silently returns None for things like
-// HEIC, AVIF, 16-bit PNGs, paletted PNGs, or PNGs with unusual ICC profiles.
-// Downstream code then crashes with "NoneType is not subscriptable". Normalizing
-// here strips every one of those sharp-edges in a single pass.
-// For URLs that point at our own /api/files/:id, read the bytes directly from
-// Neon rather than issuing an HTTP fetch back to the deployment. Vercel's
-// platform-level routing/auth can intercept self-origin fetches and return an
-// HTML shell, which is what sharp saw when it complained "unsupported image
-// format" on a known-good PNG.
+// Parse a same-origin /api/files/:id URL and return the file id, or null if
+// the URL points somewhere else (external / unrelated path).
 function extractOwnFileId(url: string, origin: string): string | null {
   try {
     const u = url.startsWith("/") ? new URL(url, origin) : new URL(url);
@@ -44,64 +35,51 @@ function extractOwnFileId(url: string, origin: string): string | null {
   }
 }
 
-async function loadImageBytes(sourceUrl: string, origin: string): Promise<{ buf: Buffer; via: "db" | "fetch"; detectedMime: string | null }> {
-  const ownId = extractOwnFileId(sourceUrl, origin);
-  if (ownId) {
-    const file = await getFile(ownId);
-    if (!file) throw new Error(`file ${ownId} not found in storage`);
-    return {
-      buf: Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength),
-      via: "db",
-      detectedMime: file.mimeType,
-    };
-  }
-  const res = await fetch(sourceUrl);
-  if (!res.ok) throw new Error(`fetch ${sourceUrl} returned ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.byteLength === 0) throw new Error(`fetched 0 bytes from ${sourceUrl}`);
-  return { buf, via: "fetch", detectedMime: res.headers.get("content-type") };
+function mimeKind(mime: string | null | undefined): "image" | "video" | "audio" | "other" {
+  const m = (mime || "").toLowerCase();
+  if (m.startsWith("image/")) return "image";
+  if (m.startsWith("video/")) return "video";
+  if (m.startsWith("audio/")) return "audio";
+  return "other";
 }
 
-function sniffMagic(buf: Buffer): string {
-  if (buf.byteLength < 4) return `too-small(${buf.byteLength})`;
-  const head = buf.subarray(0, 16).toString("hex");
-  if (head.startsWith("89504e470d0a1a0a")) return "png";
-  if (head.startsWith("ffd8ff")) return "jpeg";
-  if (head.startsWith("474946383")) return "gif";
-  if (head.startsWith("52494646") && head.substring(16, 24) === "57454250") return "webp";
-  if (head.startsWith("00000018667479706865696") || head.startsWith("00000020667479706865696")) return "heic";
-  if (head.startsWith("00000020667479706176696") || head.startsWith("00000018667479706176696")) return "avif";
-  if (buf.subarray(0, 5).toString("ascii") === "<?xml") return "svg?";
-  if (buf.subarray(0, 9).toString("ascii").toLowerCase() === "<!doctype") return "html";
-  return `unknown(${head.slice(0, 32)})`;
-}
+// For each file-typed input, confirm the bytes actually match the declared
+// slot type (image/video/audio). Canvas lets users drag any item into any
+// slot, and without this check an MP4 tagged as an image blows up deep in
+// the provider's pipeline with an opaque error. Reads the stored mime from
+// Neon (fast — no byte transfer) for same-origin URLs; HEAD-requests external
+// URLs. Skips on any network failure — downstream branches still report.
+async function validateInputTypes(
+  input: Record<string, unknown>,
+  modelInputs: { name: string; type: string; description: string }[],
+  origin: string,
+): Promise<string | null> {
+  for (const inp of modelInputs) {
+    if (inp.type !== "image" && inp.type !== "video" && inp.type !== "audio") continue;
+    const url = input[inp.name];
+    if (typeof url !== "string" || !url) continue;
 
-async function normalizeImageForV2V(sourceUrl: string, origin: string, userId: string): Promise<string> {
-  const { buf: inputBuf, via, detectedMime } = await loadImageBytes(sourceUrl, origin);
-  const magic = sniffMagic(inputBuf);
-  console.log(`[V2V normalize] src=${sourceUrl} via=${via} bytes=${inputBuf.byteLength} mime=${detectedMime} magic=${magic}`);
+    let mime: string | null = null;
+    const ownId = extractOwnFileId(url, origin);
+    if (ownId) {
+      const file = await getFile(ownId);
+      if (!file) continue; // let downstream report the missing file
+      mime = file.mimeType;
+    } else {
+      try {
+        const headRes = await fetch(url, { method: "HEAD" });
+        mime = headRes.headers.get("content-type");
+      } catch {
+        continue;
+      }
+    }
 
-  // Catch the common misclick where the user tagged a video into the image slot.
-  // Much friendlier than letting sharp throw a generic "unsupported format".
-  const looksLikeVideo = (detectedMime || "").startsWith("video/") || ["mp4", "webm", "mov", "heic", "avif"].includes(magic);
-  if (looksLikeVideo) {
-    throw new Error(`this slot needs an image, but you tagged a ${detectedMime || magic} file`);
+    const actual = mimeKind(mime);
+    if (actual !== "other" && actual !== inp.type) {
+      return `Input "${inp.description}" needs ${inp.type === "audio" ? "an audio file" : `a ${inp.type}`}, but you tagged a ${mime || actual} file.`;
+    }
   }
-
-  const sharp = (await import("sharp")).default;
-  try {
-    const normalized = await sharp(inputBuf, { failOn: "none" })
-      .rotate()
-      .flatten({ background: "#000000" })
-      .toColorspace("srgb")
-      .jpeg({ quality: 92 })
-      .toBuffer();
-    const { id } = await putFile(normalized, "image/jpeg", userId);
-    return `${origin}/api/files/${id}`;
-  } catch (sharpErr) {
-    const msg = sharpErr instanceof Error ? sharpErr.message : "sharp failed";
-    throw new Error(`${msg} [via=${via}, bytes=${inputBuf.byteLength}, mime=${detectedMime}, magic=${magic}]`);
-  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -199,6 +177,14 @@ export async function POST(req: NextRequest) {
       if (inp.required && !input[inp.name]) {
         return NextResponse.json({ error: `Missing required input: ${inp.description}. Please set it as a reference on the canvas.` }, { status: 400 });
       }
+    }
+
+    // Type-check every file input — catches the misclick where a video is
+    // tagged into an image slot (or vice versa) before it reaches the provider.
+    const typeErr = await validateInputTypes(input, modelInfo.inputs, req.nextUrl.origin);
+    if (typeErr) {
+      await updateGeneration(generation.id, { status: "failed", error: typeErr, duration: 0 });
+      return NextResponse.json({ error: typeErr }, { status: 400 });
     }
 
     // OpenAI Sora: async video generation via openai.videos.create
@@ -718,24 +704,6 @@ export async function POST(req: NextRequest) {
           // strip it if empty so we don't bias the model.
           if (!prompt?.trim()) delete repInput.prompt;
           repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "480";
-
-          // Normalize every image input first so the model's cv2.imread can't
-          // choke on an unusual PNG/HEIC/etc. Do this sequentially instead of
-          // in parallel — usually there's only one image, and keeping it serial
-          // makes the error surface point at the specific input that failed.
-          for (const inp of modelInfo.inputs) {
-            if (inp.type === "image" && typeof input[inp.name] === "string") {
-              try {
-                input[inp.name] = await normalizeImageForV2V(input[inp.name] as string, req.nextUrl.origin, user.id);
-              } catch (normErr) {
-                const msg = normErr instanceof Error ? normErr.message : "Image normalize failed";
-                console.error(`[V2V normalize] ${inp.name} failed:`, normErr);
-                await updateGeneration(generation.id, { status: "failed", error: `Could not prepare input "${inp.name}": ${msg}`, duration: 0 });
-                return NextResponse.json({ error: `Could not prepare input "${inp.name}": ${msg}` }, { status: 400 });
-              }
-            }
-          }
-
           for (const inp of modelInfo.inputs) {
             if ((inp.type === "image" || inp.type === "video") && input[inp.name] !== undefined) {
               repInput[inp.name] = input[inp.name];
