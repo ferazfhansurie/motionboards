@@ -627,13 +627,17 @@ export async function POST(req: NextRequest) {
             repInput.video = input.video_url;
           }
         } else if (isV2V) {
-          // Wan Animate and friends: character image + reference video, with
-          // the camera, scene, and motion coming from the video. The prompt
-          // is optional — strip it if empty so we don't bias the model.
+          // Wan Animate and friends: each model declares its exact Replicate
+          // schema names in models.ts (e.g. `character_image`), so forward
+          // image + video inputs 1:1 without renaming. Prompt is optional —
+          // strip it if empty so we don't bias the model.
           if (!prompt?.trim()) delete repInput.prompt;
-          repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "480p";
-          if (input.image_url) repInput.image = input.image_url;
-          if (input.video_url) repInput.video = input.video_url;
+          repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "480";
+          for (const inp of modelInfo.inputs) {
+            if ((inp.type === "image" || inp.type === "video") && input[inp.name] !== undefined) {
+              repInput[inp.name] = input[inp.name];
+            }
+          }
         } else {
           // Video pipeline (Seedance 1.x, Seedance 2.x, and similar Replicate
           // video models). Field names are aspect_ratio / resolution /
