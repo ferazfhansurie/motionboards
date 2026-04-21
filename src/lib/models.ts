@@ -315,7 +315,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Optional caption" },
       { name: "character_image", type: "image", required: true, description: "Character image (the person to render)" },
-      { name: "video_url", type: "video", required: true, description: "Pose reference video (motion + camera are preserved)" },
+      { name: "video", type: "video", required: true, description: "Pose reference video (motion + camera are preserved)" },
     ],
     options: {
       resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
