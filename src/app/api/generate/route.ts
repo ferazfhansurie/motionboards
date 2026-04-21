@@ -44,31 +44,57 @@ function extractOwnFileId(url: string, origin: string): string | null {
   }
 }
 
-async function loadImageBytes(sourceUrl: string, origin: string): Promise<Buffer> {
+async function loadImageBytes(sourceUrl: string, origin: string): Promise<{ buf: Buffer; via: "db" | "fetch"; detectedMime: string | null }> {
   const ownId = extractOwnFileId(sourceUrl, origin);
   if (ownId) {
     const file = await getFile(ownId);
     if (!file) throw new Error(`file ${ownId} not found in storage`);
-    return Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength);
+    return {
+      buf: Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength),
+      via: "db",
+      detectedMime: file.mimeType,
+    };
   }
   const res = await fetch(sourceUrl);
   if (!res.ok) throw new Error(`fetch ${sourceUrl} returned ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   if (buf.byteLength === 0) throw new Error(`fetched 0 bytes from ${sourceUrl}`);
-  return buf;
+  return { buf, via: "fetch", detectedMime: res.headers.get("content-type") };
+}
+
+function sniffMagic(buf: Buffer): string {
+  if (buf.byteLength < 4) return `too-small(${buf.byteLength})`;
+  const head = buf.subarray(0, 16).toString("hex");
+  if (head.startsWith("89504e470d0a1a0a")) return "png";
+  if (head.startsWith("ffd8ff")) return "jpeg";
+  if (head.startsWith("474946383")) return "gif";
+  if (head.startsWith("52494646") && head.substring(16, 24) === "57454250") return "webp";
+  if (head.startsWith("00000018667479706865696") || head.startsWith("00000020667479706865696")) return "heic";
+  if (head.startsWith("00000020667479706176696") || head.startsWith("00000018667479706176696")) return "avif";
+  if (buf.subarray(0, 5).toString("ascii") === "<?xml") return "svg?";
+  if (buf.subarray(0, 9).toString("ascii").toLowerCase() === "<!doctype") return "html";
+  return `unknown(${head.slice(0, 32)})`;
 }
 
 async function normalizeImageForV2V(sourceUrl: string, origin: string, userId: string): Promise<string> {
-  const inputBuf = await loadImageBytes(sourceUrl, origin);
+  const { buf: inputBuf, via, detectedMime } = await loadImageBytes(sourceUrl, origin);
+  const magic = sniffMagic(inputBuf);
+  console.log(`[V2V normalize] src=${sourceUrl} via=${via} bytes=${inputBuf.byteLength} mime=${detectedMime} magic=${magic}`);
+
   const sharp = (await import("sharp")).default;
-  const normalized = await sharp(inputBuf, { failOn: "none" })
-    .rotate() // honor EXIF orientation so the model sees the image upright
-    .flatten({ background: "#000000" }) // drop alpha so RGBA → RGB
-    .toColorspace("srgb")
-    .jpeg({ quality: 92 })
-    .toBuffer();
-  const { id } = await putFile(normalized, "image/jpeg", userId);
-  return `${origin}/api/files/${id}`;
+  try {
+    const normalized = await sharp(inputBuf, { failOn: "none" })
+      .rotate()
+      .flatten({ background: "#000000" })
+      .toColorspace("srgb")
+      .jpeg({ quality: 92 })
+      .toBuffer();
+    const { id } = await putFile(normalized, "image/jpeg", userId);
+    return `${origin}/api/files/${id}`;
+  } catch (sharpErr) {
+    const msg = sharpErr instanceof Error ? sharpErr.message : "sharp failed";
+    throw new Error(`${msg} [via=${via}, bytes=${inputBuf.byteLength}, mime=${detectedMime}, magic=${magic}]`);
+  }
 }
 
 export async function POST(req: NextRequest) {
