@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Eye, EyeOff, Loader2, CheckCircle, ExternalLink, ArrowLeft } from "lucide-react";
+import { Save, Eye, EyeOff, Loader2, CheckCircle, ExternalLink, ArrowLeft, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { imgCacheClear } from "@/lib/image-cache";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -22,6 +23,28 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("ai-generation");
+  const [clearing, setClearing] = useState(false);
+  const [cleared, setCleared] = useState(false);
+
+  const handleClearCache = async () => {
+    setClearing(true);
+    setCleared(false);
+    try {
+      // IndexedDB image cache (pasted / dropped image bytes)
+      await imgCacheClear();
+      // HTTP CacheStorage (service-worker / fetch cache, if any exists)
+      if (typeof window !== "undefined" && "caches" in window) {
+        try {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        } catch {}
+      }
+      setCleared(true);
+      setTimeout(() => setCleared(false), 3000);
+    } finally {
+      setClearing(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/settings")
@@ -301,8 +324,26 @@ export default function SettingsPage() {
             )}
 
             {activeSection === "general" && (
-              <div className="text-center py-8">
-                <p className="text-sm text-white/30">General settings coming soon</p>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-white">Clear cache</Label>
+                  <p className="text-xs text-white/40 mt-1">
+                    Drops the local image cache (IndexedDB) and any HTTP cache entries. Use this if thumbnails or generated media are loading stale or stuck. Your boards and uploads are safe — they live in the database.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleClearCache}
+                  disabled={clearing}
+                  className="bg-white/5 text-white hover:bg-white/10 border border-white/10"
+                >
+                  {clearing ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Clearing…</>
+                  ) : cleared ? (
+                    <><CheckCircle className="mr-2 h-4 w-4 text-green-400" /> Cleared — refresh to see changes</>
+                  ) : (
+                    <><Trash2 className="mr-2 h-4 w-4" /> Clear cache</>
+                  )}
+                </Button>
               </div>
             )}
           </div>
