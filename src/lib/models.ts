@@ -80,6 +80,21 @@ export const models: AIModel[] = [
   },
 
   {
+    id: "gpt-image-1",
+    name: "ChatGPT Image 2",
+    provider: "openai", type: "t2i", category: "Image",
+    description: "OpenAI's gpt-image-1 — the model behind ChatGPT's image generator. Strong prompt following, readable text rendering, photo + illustration range. Optional reference image turns it into an editor.",
+    cost: "~RM0.25", creditCost: 25, speed: "~25s", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Image description" },
+      { name: "image_url", type: "image", required: false, description: "Reference image to edit (optional)" },
+    ],
+    options: {
+      aspect_ratio: { values: ["auto", "1024x1024", "1024x1536", "1536x1024"], default: "auto", label: "Size" },
+    },
+  },
+
+  {
     id: "black-forest-labs/flux-schnell",
     name: "FLUX Schnell",
     provider: "replicate", type: "t2i", category: "Image",

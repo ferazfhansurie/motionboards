@@ -243,6 +243,83 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // OpenAI image generation (gpt-image-1 / ChatGPT Image): synchronous.
+    // Routes to /v1/images/generations when no reference image, or
+    // /v1/images/edits when the user tagged one as image_url.
+    if (modelInfo.provider === "openai" && ["t2i", "i2i"].includes(modelInfo.type)) {
+      if (!settings.openaiApiKey) {
+        return NextResponse.json({ error: "OpenAI API key not configured." }, { status: 500 });
+      }
+      try {
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({ apiKey: settings.openaiApiKey });
+
+        const requestedSize = (input.aspect_ratio as string) || "auto";
+        const allowedSizes = ["auto", "1024x1024", "1024x1536", "1536x1024"];
+        const size = (allowedSizes.includes(requestedSize) ? requestedSize : "auto") as "auto" | "1024x1024" | "1024x1536" | "1536x1024";
+        const p = prompt?.trim() || "";
+        if (!p) {
+          await finalizeGeneration(generation.id, { status: "failed", error: "Prompt is required" });
+          return NextResponse.json({ error: "Prompt is required." }, { status: 400 });
+        }
+
+        const refImageUrl = input.image_url as string | undefined;
+        let b64: string | undefined;
+        if (refImageUrl) {
+          // Edit mode: fetch the reference image and upload it as form data.
+          // Pull from Neon directly for same-origin /api/files/:id URLs so we
+          // don't round-trip through the public origin.
+          const ownId = extractOwnFileId(refImageUrl, req.nextUrl.origin);
+          let imgBytes: Buffer;
+          let imgMime = "image/png";
+          if (ownId) {
+            const file = await getFile(ownId);
+            if (!file) throw new Error("Reference image not found");
+            imgBytes = Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength);
+            imgMime = file.mimeType || "image/png";
+          } else {
+            const imgRes = await fetch(refImageUrl);
+            if (!imgRes.ok) throw new Error(`Couldn't fetch reference image (${imgRes.status})`);
+            imgBytes = Buffer.from(await imgRes.arrayBuffer());
+            imgMime = imgRes.headers.get("content-type") || "image/png";
+          }
+          const ext = imgMime.includes("jpeg") ? "jpg" : imgMime.includes("webp") ? "webp" : "png";
+          const imgFile = new File([new Uint8Array(imgBytes)], `ref.${ext}`, { type: imgMime });
+          const edit = await openai.images.edit({
+            model: modelId,
+            image: imgFile,
+            prompt: p,
+            size,
+            n: 1,
+          });
+          b64 = edit.data?.[0]?.b64_json;
+        } else {
+          const gen = await openai.images.generate({
+            model: modelId,
+            prompt: p,
+            size,
+            n: 1,
+          });
+          b64 = gen.data?.[0]?.b64_json;
+        }
+
+        if (!b64) {
+          await finalizeGeneration(generation.id, { status: "failed", error: "No image returned" });
+          return NextResponse.json({ error: "OpenAI returned no image." }, { status: 500 });
+        }
+
+        const buffer = Buffer.from(b64, "base64");
+        const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "image/png", user.id);
+        await deductCredits(user.id, creditCost);
+        await finalizeGeneration(generation.id, { status: "completed", outputUrl });
+        return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
+      } catch (oaiErr) {
+        const msg = oaiErr instanceof Error ? oaiErr.message : "OpenAI image error";
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
     // Segmind: synchronous API — call directly and return result
     if (modelInfo.provider === "segmind") {
       if (!settings.segmindApiKey) {
