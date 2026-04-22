@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle, RotateCcw, Trash2, Save, Lock, Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
+import { X, Zap, History, LogOut, Loader2, CreditCard, Clock, AlertTriangle, RotateCcw, Trash2, Save, Lock, Eye, EyeOff, LogIn, UserPlus, Check, Eraser } from "lucide-react";
 import { useAppStore, saveBoardSnapshotWithLabel } from "@/lib/store";
+import { imgCacheClear } from "@/lib/image-cache";
 
 interface VersionSummary {
   id: string;
@@ -190,6 +191,26 @@ export function ProfilePanel() {
   };
   const [topupLoading, setTopupLoading] = useState(false);
   const [topupAmount, setTopupAmount] = useState("10");
+  const [cacheClearing, setCacheClearing] = useState(false);
+  const [cacheCleared, setCacheCleared] = useState(false);
+
+  const handleClearCache = async () => {
+    setCacheClearing(true);
+    setCacheCleared(false);
+    try {
+      await imgCacheClear();
+      if (typeof window !== "undefined" && "caches" in window) {
+        try {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        } catch {}
+      }
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 3000);
+    } finally {
+      setCacheClearing(false);
+    }
+  };
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -345,6 +366,31 @@ export function ProfilePanel() {
                     className="h-3.5 w-3.5 rounded border-gray-300 accent-[#f26522] shrink-0"
                   />
                 </label>
+
+                <button
+                  type="button"
+                  onClick={handleClearCache}
+                  disabled={cacheClearing}
+                  className={`w-full flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg border transition-colors text-left ${
+                    cacheClearing
+                      ? isDark ? "border-gray-700 text-gray-500" : "border-gray-200 text-gray-400"
+                      : isDark ? "border-gray-700 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className={`text-[11px] font-semibold ${isDark ? "text-white" : "text-[#0d1117]"}`}>Clear image cache</p>
+                    <p className={`text-[9px] mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                      Drops local image cache if thumbnails look stale or stuck. Doesn&apos;t touch boards, uploads, or login.
+                    </p>
+                  </div>
+                  {cacheClearing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                  ) : cacheCleared ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  ) : (
+                    <Eraser className={`h-3.5 w-3.5 shrink-0 ${isDark ? "text-gray-400" : "text-gray-500"}`} />
+                  )}
+                </button>
               </div>
 
               {/* Version history */}
