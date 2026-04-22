@@ -143,6 +143,7 @@ function startPolling(params: {
 export function PromptBar() {
   const [prompt, setPrompt] = useState("");
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
+  const [modelStats, setModelStats] = useState<Record<string, { avgSeconds: number; count: number }>>({});
   const [boardIoBusy, setBoardIoBusy] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importAbortRef = useRef<AbortController | null>(null);
@@ -215,6 +216,20 @@ export function PromptBar() {
   };
 
   useEffect(() => { autoResize(); }, [prompt, boxMinH]);
+
+  // Fetch empirical per-model processing times once on mount.
+  useEffect(() => {
+    fetch("/api/model-stats")
+      .then((r) => r.ok ? r.json() : { stats: [] })
+      .then((data) => {
+        const map: Record<string, { avgSeconds: number; count: number }> = {};
+        for (const s of (data.stats || []) as Array<{ model: string; avgSeconds: number; count: number }>) {
+          map[s.model] = { avgSeconds: s.avgSeconds, count: s.count };
+        }
+        setModelStats(map);
+      })
+      .catch(() => {});
+  }, []);
 
   // Resume polling for any generation that was mid-flight when the page was
   // last closed/refreshed. Runs on mount only — startPolling is idempotent
@@ -360,6 +375,16 @@ export function PromptBar() {
     const m = speed.match(/(\d+)\s*m/);
     const s = speed.match(/(\d+)\s*s/);
     return (m ? parseInt(m[1]) * 60 : 0) + (s ? parseInt(s[1]) : 0) || 60;
+  };
+
+  // Live per-model averages from /api/model-stats. Replaces the static
+  // `speed: "~4m"` estimate when we have enough history (>= 3 completed runs
+  // on that model) to trust the number. Refreshed on mount; falls back to
+  // the string hint otherwise.
+  const estimateDurationForModel = (modelId: string, fallbackSpeed?: string): number => {
+    const stat = modelStats[modelId];
+    if (stat && stat.count >= 3 && stat.avgSeconds > 0) return stat.avgSeconds;
+    return parseModelSpeed(fallbackSpeed);
   };
 
   // Load export jobs + auto-poll while the board menu is open
@@ -521,7 +546,7 @@ export function PromptBar() {
       status: "processing",
       outputType,
       progressText: "Starting...",
-      expectedDuration: parseModelSpeed(selectedModel.speed),
+      expectedDuration: estimateDurationForModel(selectedModel.id, selectedModel.speed),
       createdAt: new Date().toISOString(),
     };
 

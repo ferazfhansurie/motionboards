@@ -289,6 +289,48 @@ export async function getGeneration(id: string): Promise<Generation | undefined>
   return rows.length > 0 ? rowToGeneration(rows[0]) : undefined;
 }
 
+// Mark a generation as completed or failed and record its real wall-clock
+// duration (in seconds, derived from created_at by the database so clock
+// drift between the request and the response doesn't skew the number).
+// All providers (sync and async) should use this instead of updateGeneration
+// on the terminal hop so the stats endpoint has accurate numbers to average.
+export async function finalizeGeneration(
+  id: string,
+  patch: { status: "completed" | "failed"; outputUrl?: string | null; error?: string | null },
+): Promise<Generation | undefined> {
+  const rows = await sql`
+    UPDATE mb_generations SET
+      status = ${patch.status},
+      output_url = COALESCE(${patch.outputUrl ?? null}, output_url),
+      error = ${patch.error ?? null},
+      duration = GREATEST(0, EXTRACT(EPOCH FROM (NOW() - created_at))::int),
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rows.length > 0 ? rowToGeneration(rows[0]) : undefined;
+}
+
+// Per-model average wall-clock time for successful generations. Used by the
+// client to replace the hardcoded `speed: "~4m"` with a live estimate.
+// Only includes runs that completed and have a real duration recorded — the
+// historical backlog of `duration = 0` rows gets filtered out.
+export async function getModelDurationStats(): Promise<Array<{ model: string; avgSeconds: number; count: number }>> {
+  const rows = await sql`
+    SELECT model,
+           AVG(duration)::int  AS avg_seconds,
+           COUNT(*)::int        AS count
+    FROM mb_generations
+    WHERE status = 'completed' AND duration IS NOT NULL AND duration > 0
+    GROUP BY model
+  `;
+  return rows.map((r) => ({
+    model: r.model as string,
+    avgSeconds: Number(r.avg_seconds) || 0,
+    count: Number(r.count) || 0,
+  }));
+}
+
 export async function deleteGeneration(id: string): Promise<boolean> {
   const rows = await sql`DELETE FROM mb_generations WHERE id = ${id} RETURNING id`;
   return rows.length > 0;

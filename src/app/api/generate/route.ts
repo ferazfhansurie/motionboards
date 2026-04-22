@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, createGeneration, updateGeneration, getUserFromToken, deductCredits, putFile, getFile } from "@/lib/db";
+import { getSettings, createGeneration, finalizeGeneration, getUserFromToken, deductCredits, putFile, getFile } from "@/lib/db";
 import { models } from "@/lib/models";
 import { submitPrompt, uploadFromUrl } from "@/lib/comfy";
 import wanAnimatePoseWorkflow from "@/lib/comfy-workflows/wan-animate-pose.json";
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
     // tagged into an image slot (or vice versa) before it reaches the provider.
     const typeErr = await validateInputTypes(input, modelInfo.inputs, req.nextUrl.origin);
     if (typeErr) {
-      await updateGeneration(generation.id, { status: "failed", error: typeErr, duration: 0 });
+      await finalizeGeneration(generation.id, { status: "failed", error: typeErr });
       return NextResponse.json({ error: typeErr }, { status: 400 });
     }
 
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
         });
       } catch (oaiErr) {
         const msg = oaiErr instanceof Error ? oaiErr.message : "OpenAI API error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
         });
         if (!segRes.ok) {
           const errData = await segRes.json().catch(() => ({ error: "Segmind API error" }));
-          await updateGeneration(generation.id, { status: "failed", error: (errData as Record<string, string>).error || "Generation failed", duration: 0 });
+          await finalizeGeneration(generation.id, { status: "failed", error: (errData as Record<string, string>).error || "Generation failed" });
           return NextResponse.json({ error: (errData as Record<string, string>).error || "Segmind generation failed" }, { status: 400 });
         }
         // Response is base64 image string — store as a real file in Neon
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
         const buffer = Buffer.from(b64, "base64");
         const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "image/png", user.id);
         await deductCredits(user.id, creditCost);
-        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({
           generationId: generation.id,
           status: "completed",
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
         });
       } catch (segErr) {
         const msg = segErr instanceof Error ? segErr.message : "Segmind error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
@@ -373,12 +373,12 @@ export async function POST(req: NextRequest) {
         if (imageUrls && imageUrls.length > 0) {
           for (const url of imageUrls) {
             if (!url || url.startsWith("blob:")) {
-              await updateGeneration(generation.id, { status: "failed", error: "Image not ready", duration: 0 });
+              await finalizeGeneration(generation.id, { status: "failed", error: "Image not ready" });
               return NextResponse.json({ error: "One or more images are still processing. Please wait and try again." }, { status: 400 });
             }
             const imgRes = await fetch(url);
             if (!imgRes.ok) {
-              await updateGeneration(generation.id, { status: "failed", error: "Failed to fetch image", duration: 0 });
+              await finalizeGeneration(generation.id, { status: "failed", error: "Failed to fetch image" });
               return NextResponse.json({ error: "Failed to fetch input image. Try refreshing the page." }, { status: 400 });
             }
             const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
@@ -431,7 +431,7 @@ export async function POST(req: NextRequest) {
           } else if (finishReason) {
             userMsg = "Blocked by content policy. Rephrase the prompt.";
           }
-          await updateGeneration(generation.id, { status: "failed", error: userMsg, duration: 0 });
+          await finalizeGeneration(generation.id, { status: "failed", error: userMsg });
           return NextResponse.json({ error: userMsg }, { status: 400 });
         }
 
@@ -440,7 +440,7 @@ export async function POST(req: NextRequest) {
         const outputUrl = await storeOutput(req.nextUrl.origin, buffer, imageMime, user.id);
 
         await deductCredits(user.id, creditCost);
-        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({
           generationId: generation.id,
           status: "completed",
@@ -461,7 +461,7 @@ export async function POST(req: NextRequest) {
           userMsg = "Image credentials are missing or invalid. Contact the admin.";
           status = 500;
         }
-        await updateGeneration(generation.id, { status: "failed", error: userMsg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: userMsg });
         return NextResponse.json({ error: userMsg }, { status });
       }
     }
@@ -488,11 +488,11 @@ export async function POST(req: NextRequest) {
         const buffer = Buffer.from(await speech.arrayBuffer());
         const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "audio/mpeg", user.id);
         await deductCredits(user.id, creditCost);
-        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
       } catch (ttsErr) {
         const msg = ttsErr instanceof Error ? ttsErr.message : "OpenAI TTS error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
@@ -561,7 +561,7 @@ export async function POST(req: NextRequest) {
         }).catch(() => {});
 
         await deductCredits(user.id, creditCost);
-        await updateGeneration(generation.id, { status: "completed", outputUrl, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({
           generationId: generation.id,
           status: "completed",
@@ -569,7 +569,7 @@ export async function POST(req: NextRequest) {
         });
       } catch (fishErr) {
         const msg = fishErr instanceof Error ? fishErr.message : "Fish Audio error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
@@ -651,7 +651,7 @@ export async function POST(req: NextRequest) {
           const errObj = (createData.error as Record<string, unknown>) || createData;
           const errMsg = (errObj.message as string) || (errObj.code as string) || "ByteDance Ark submission failed";
           console.error("[ByteplusArk] Submission rejected", createRes.status, JSON.stringify(createData).slice(0, 500));
-          await updateGeneration(generation.id, { status: "failed", error: errMsg, duration: 0 });
+          await finalizeGeneration(generation.id, { status: "failed", error: errMsg });
           return NextResponse.json({ error: errMsg }, { status: 400 });
         }
 
@@ -664,7 +664,7 @@ export async function POST(req: NextRequest) {
         });
       } catch (arkErr) {
         const msg = arkErr instanceof Error ? arkErr.message : "ByteDance Ark error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
@@ -748,7 +748,7 @@ export async function POST(req: NextRequest) {
           else if (predData.detail && typeof predData.detail === "object") errMsg = JSON.stringify(predData.detail);
           else if (typeof predData.error === "string") errMsg = predData.error;
           console.error("[Replicate] Submission rejected", predRes.status, JSON.stringify(predData).slice(0, 500));
-          await updateGeneration(generation.id, { status: "failed", error: errMsg, duration: 0 });
+          await finalizeGeneration(generation.id, { status: "failed", error: errMsg });
           return NextResponse.json({ error: errMsg }, { status: 400 });
         }
 
@@ -761,7 +761,7 @@ export async function POST(req: NextRequest) {
         });
       } catch (repErr) {
         const msg = repErr instanceof Error ? repErr.message : "Replicate error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
@@ -770,7 +770,7 @@ export async function POST(req: NextRequest) {
     // graph at known node IDs, submit, then poll in the status route.
     if (modelInfo.provider === "comfy") {
       if (!process.env.COMFY_CLOUD_API_KEY) {
-        await updateGeneration(generation.id, { status: "failed", error: "Comfy Cloud API key not configured", duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: "Comfy Cloud API key not configured" });
         return NextResponse.json({ error: "Comfy Cloud API key not configured." }, { status: 500 });
       }
       try {
@@ -787,14 +787,14 @@ export async function POST(req: NextRequest) {
           videoNodeId = "420";
           promptNodeId = null; // this workflow doesn't surface a caption slot
         } else {
-          await updateGeneration(generation.id, { status: "failed", error: "Unknown Comfy workflow", duration: 0 });
+          await finalizeGeneration(generation.id, { status: "failed", error: "Unknown Comfy workflow" });
           return NextResponse.json({ error: `No Comfy workflow registered for model "${modelId}".` }, { status: 400 });
         }
 
         const characterImageUrl = input.character_image as string | undefined;
         const poseVideoUrl = input.video as string | undefined;
         if (!characterImageUrl || !poseVideoUrl) {
-          await updateGeneration(generation.id, { status: "failed", error: "Missing character image or pose video", duration: 0 });
+          await finalizeGeneration(generation.id, { status: "failed", error: "Missing character image or pose video" });
           return NextResponse.json({ error: "Both a character image and a pose reference video are required." }, { status: 400 });
         }
 
@@ -821,13 +821,13 @@ export async function POST(req: NextRequest) {
         });
       } catch (comfyErr) {
         const msg = comfyErr instanceof Error ? comfyErr.message : "Comfy Cloud error";
-        await updateGeneration(generation.id, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
         return NextResponse.json({ error: msg }, { status: 500 });
       }
     }
 
     // No matching provider
-    await updateGeneration(generation.id, { status: "failed", error: "Provider not supported", duration: 0 });
+    await finalizeGeneration(generation.id, { status: "failed", error: "Provider not supported" });
     return NextResponse.json({ error: `Provider "${modelInfo.provider}" is not supported.` }, { status: 400 });
   } catch (error) {
     console.error("Generate error:", error);

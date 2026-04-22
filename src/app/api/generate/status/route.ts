@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, updateGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
+import { getSettings, finalizeGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
 import { models } from "@/lib/models";
 import { downloadOutput, getHistoryOutputs, getJobStatus, pickOutputFile } from "@/lib/comfy";
 
@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
             const raw = opError?.message || "Video generation failed — no response from Google.";
             const errMsg = humanizeVeoError(raw);
             console.error("[Veo] Operation error:", JSON.stringify(opError || "no response"));
-            await updateGeneration(generationId, { status: "failed", error: errMsg, duration: 0 });
+            await finalizeGeneration(generationId, { status: "failed", error: errMsg });
             return NextResponse.json({ status: "failed", error: errMsg });
           }
 
@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
             const actualCreditCost = modelInfo?.creditCost || 0;
             const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
             await deductCredits(user.id, actualCreditCost);
-            await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+            await finalizeGeneration(generationId, { status: "completed", outputUrl });
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
           }
 
@@ -161,14 +161,14 @@ export async function GET(req: NextRequest) {
             ? humanizeVeoError(String(rawReason))
             : "Veo returned no video. Transient errors on Veo are common — try Generate again. If it keeps failing, tweak the prompt or swap the start/end frames.";
           console.error("[Veo] No video output:", JSON.stringify(operation.response).slice(0, 1500));
-          await updateGeneration(generationId, { status: "failed", error: errDetail, duration: 0 });
+          await finalizeGeneration(generationId, { status: "failed", error: errDetail });
           return NextResponse.json({ status: "failed", error: errDetail });
         }
 
         return NextResponse.json({ status: "processing", log: "Generating video..." });
       } catch (gemErr) {
         const msg = gemErr instanceof Error ? gemErr.message : "Gemini status check failed";
-        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generationId, { status: "failed", error: msg });
         return NextResponse.json({ status: "failed", error: msg });
       }
     }
@@ -192,7 +192,7 @@ export async function GET(req: NextRequest) {
             outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
           } catch (dlErr) {
             console.error("Failed to download Sora video:", dlErr);
-            await updateGeneration(generationId, { status: "failed", error: "Failed to download video from OpenAI", duration: 0 });
+            await finalizeGeneration(generationId, { status: "failed", error: "Failed to download video from OpenAI" });
             return NextResponse.json({ status: "failed", error: "Failed to download video from OpenAI" });
           }
 
@@ -200,13 +200,13 @@ export async function GET(req: NextRequest) {
           const actualCreditCost = modelInfo?.creditCost || 0;
           const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
           await deductCredits(user.id, actualCreditCost);
-          await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+          await finalizeGeneration(generationId, { status: "completed", outputUrl });
           return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
         }
 
         if (video.status === "failed") {
           const errMsg = video.error?.message || "Sora generation failed";
-          await updateGeneration(generationId, { status: "failed", error: errMsg, duration: 0 });
+          await finalizeGeneration(generationId, { status: "failed", error: errMsg });
           return NextResponse.json({ status: "failed", error: errMsg });
         }
 
@@ -217,7 +217,7 @@ export async function GET(req: NextRequest) {
         });
       } catch (oaiErr) {
         const msg = oaiErr instanceof Error ? oaiErr.message : "OpenAI status check failed";
-        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generationId, { status: "failed", error: msg });
         return NextResponse.json({ status: "failed", error: msg });
       }
     }
@@ -239,7 +239,7 @@ export async function GET(req: NextRequest) {
           const contentObj = task.content as Record<string, unknown> | undefined;
           const videoUrl = contentObj?.video_url as string | undefined;
           if (!videoUrl) {
-            await updateGeneration(generationId, { status: "failed", error: "No video URL returned", duration: 0 });
+            await finalizeGeneration(generationId, { status: "failed", error: "No video URL returned" });
             return NextResponse.json({ status: "failed", error: "No video URL returned" });
           }
 
@@ -262,7 +262,7 @@ export async function GET(req: NextRequest) {
           const actualCreditCost = modelInfo?.creditCost || 0;
           const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
           await deductCredits(user.id, actualCreditCost);
-          await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+          await finalizeGeneration(generationId, { status: "completed", outputUrl });
           return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
         }
 
@@ -282,7 +282,7 @@ export async function GET(req: NextRequest) {
             friendly = "The generation took too long and expired. Try a shorter duration or lower resolution.";
           }
           console.error("[ByteplusArk] Task failed", JSON.stringify(task).slice(0, 800));
-          await updateGeneration(generationId, { status: "failed", error: friendly, duration: 0 });
+          await finalizeGeneration(generationId, { status: "failed", error: friendly });
           return NextResponse.json({ status: "failed", error: friendly });
         }
 
@@ -290,7 +290,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ status: "processing", log: `Seedance: ${status || "queued"}...` });
       } catch (arkErr) {
         const msg = arkErr instanceof Error ? arkErr.message : "ByteDance Ark status check failed";
-        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generationId, { status: "failed", error: msg });
         return NextResponse.json({ status: "failed", error: msg });
       }
     }
@@ -330,11 +330,11 @@ export async function GET(req: NextRequest) {
             const actualCreditCost = modelInfo?.creditCost || 0;
             const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
             await deductCredits(user.id, actualCreditCost);
-            await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+            await finalizeGeneration(generationId, { status: "completed", outputUrl });
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
           }
 
-          await updateGeneration(generationId, { status: "failed", error: "No output received", duration: 0 });
+          await finalizeGeneration(generationId, { status: "failed", error: "No output received" });
           return NextResponse.json({ status: "failed", error: "No output received from Replicate" });
         }
 
@@ -361,7 +361,7 @@ export async function GET(req: NextRequest) {
             friendly = "The model rejected the input config. Double-check your aspect ratio / resolution / duration.";
           }
 
-          await updateGeneration(generationId, { status: "failed", error: friendly, duration: 0 });
+          await finalizeGeneration(generationId, { status: "failed", error: friendly });
           return NextResponse.json({ status: "failed", error: friendly });
         }
 
@@ -374,7 +374,7 @@ export async function GET(req: NextRequest) {
         });
       } catch (repErr) {
         const msg = repErr instanceof Error ? repErr.message : "Replicate status check failed";
-        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generationId, { status: "failed", error: msg });
         return NextResponse.json({ status: "failed", error: msg });
       }
     }
@@ -390,7 +390,7 @@ export async function GET(req: NextRequest) {
           const outputs = await getHistoryOutputs(requestId);
           const file = pickOutputFile(outputs);
           if (!file) {
-            await updateGeneration(generationId, { status: "failed", error: "Comfy returned no output file", duration: 0 });
+            await finalizeGeneration(generationId, { status: "failed", error: "Comfy returned no output file" });
             return NextResponse.json({ status: "failed", error: "Comfy returned no output file" });
           }
           const { buffer, mimeType } = await downloadOutput(file);
@@ -399,12 +399,12 @@ export async function GET(req: NextRequest) {
 
           const modelInfo = models.find((m) => m.id === modelId);
           if (modelInfo) await deductCredits(user.id, modelInfo.creditCost);
-          await updateGeneration(generationId, { status: "completed", outputUrl, duration: 0 });
+          await finalizeGeneration(generationId, { status: "completed", outputUrl });
           return NextResponse.json({ status: "completed", outputUrl });
         }
         if (status === "failed" || status === "cancelled") {
           const msg = status === "cancelled" ? "Generation was cancelled." : "Comfy workflow failed.";
-          await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+          await finalizeGeneration(generationId, { status: "failed", error: msg });
           return NextResponse.json({ status: "failed", error: msg });
         }
         return NextResponse.json({
@@ -413,7 +413,7 @@ export async function GET(req: NextRequest) {
         });
       } catch (comfyErr) {
         const msg = comfyErr instanceof Error ? comfyErr.message : "Comfy status check failed";
-        await updateGeneration(generationId, { status: "failed", error: msg, duration: 0 });
+        await finalizeGeneration(generationId, { status: "failed", error: msg });
         return NextResponse.json({ status: "failed", error: msg });
       }
     }
