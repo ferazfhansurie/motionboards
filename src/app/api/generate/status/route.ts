@@ -17,6 +17,13 @@ function humanizeVeoError(raw: string): string {
   if (/SAFE|PROHIBIT|POLICY|RAI|CHILD|HARM|HATE|HARASS|SEXUAL|VIOLEN|COPYRIG|RECITAT/i.test(r)) {
     return "Blocked by content policy. Rephrase the prompt or swap the reference frames.";
   }
+  // Vertex's "N videos were filtered out because they violated..." phrasing.
+  // This is Veo's safety filter tripping silently — usually on financial
+  // claims, named people / brands, or location-specific content. Point the
+  // user at rephrasing rather than at Google support.
+  if (/filtered out|violated .*usage guidelines/i.test(r)) {
+    return "Veo's safety filter blocked this video. Common triggers: financial claims (\"below market price\"), named people, brand/location names, or anything reading as advice. Rephrase as pure scene description or try Sora 2 / Seedance.";
+  }
   // Google's generic "could not generate" soft-decline. In practice this is
   // either a filter trip with no reason given, or a transient Veo internal
   // error — treat both as a rephrase-or-retry toast and don't echo their

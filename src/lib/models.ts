@@ -80,10 +80,10 @@ export const models: AIModel[] = [
   },
 
   {
-    id: "gpt-image-1",
+    id: "gpt-image-2",
     name: "ChatGPT Image 2",
     provider: "openai", type: "t2i", category: "Image",
-    description: "OpenAI's gpt-image-1 — the model behind ChatGPT's image generator. Strong prompt following, readable text rendering, photo + illustration range. Optional reference image turns it into an editor.",
+    description: "OpenAI's gpt-image-2 — state-of-the-art image generation and editing. Strong prompt following, readable text, flexible sizes. Optional reference image turns it into an editor.",
     cost: "~RM0.25", creditCost: 25, speed: "~25s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
