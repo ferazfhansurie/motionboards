@@ -217,6 +217,18 @@ export function PromptBar() {
 
   useEffect(() => { autoResize(); }, [prompt, boxMinH]);
 
+  // If the persisted selectedModelId no longer exists in the catalog (the
+  // model was removed or renamed between deploys) or is now marked disabled,
+  // reset to a safe default — otherwise the first generate click returns a
+  // server-side "Invalid model" error with no obvious way to recover.
+  useEffect(() => {
+    if (!selectedModelId) return;
+    const m = getModelById(selectedModelId);
+    if (!m || m.disabled) {
+      useAppStore.getState().setSelectedModel("gemini-3.1-flash-image-preview");
+    }
+  }, [selectedModelId]);
+
   // Fetch empirical per-model processing times once on mount.
   useEffect(() => {
     fetch("/api/model-stats")

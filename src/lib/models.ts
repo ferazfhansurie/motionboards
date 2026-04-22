@@ -50,6 +50,11 @@ export interface AIModel {
   stable: boolean;
   options?: ModelOptions;
   perSecond?: PerSecondRate;
+  // When true, the model is visible in the picker but can't be selected.
+  // Use for tiers that exist upstream but aren't hooked up on our side
+  // (e.g. Seedance Fast, which lives on ByteDance Ark not Replicate).
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 // Rate: 1 USD = 3.7 RM. Margin: +RM0.03 photo/audio, +RM0.05 video
@@ -244,6 +249,66 @@ export const models: AIModel[] = [
       generate_audio: { default: true, label: "Native audio" },
     },
     perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  // Seedance 2.0 Fast — hosted on ByteDance Ark, not Replicate. Visible but
+  // disabled so users can see the tier exists; re-enable when the Ark
+  // integration is back.
+  {
+    id: "dreamina-seedance-2-0-fast-260128",
+    name: "Seedance 2.0 Fast",
+    provider: "byteplus", type: "t2v", category: "Video",
+    description: "Cheaper, quicker Seedance tier. Runs on ByteDance Ark — not wired up on this deployment.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
+    disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+  },
+
+  {
+    id: "dreamina-seedance-2-0-fast-260128/i2v",
+    name: "Seedance 2.0 Fast I2V",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Cheaper, quicker Seedance image-to-video. Runs on ByteDance Ark — not wired up on this deployment.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
+    disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How the image should animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+  },
+
+  {
+    id: "dreamina-seedance-2-0-fast-260128/s2e",
+    name: "Seedance 2.0 Fast S2E",
+    provider: "byteplus", type: "s2e", category: "Video",
+    description: "Cheaper, quicker Seedance start-to-end. Runs on ByteDance Ark — not wired up on this deployment.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
+    disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
   },
 
   {

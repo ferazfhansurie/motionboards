@@ -94,7 +94,18 @@ export async function POST(req: NextRequest) {
     const { prompt, model: modelId, inputImage, inputImages, inputVideo, startFrame, endFrame, inputAudio, generationOptions } = body;
 
     const modelInfo = models.find((m) => m.id === modelId);
-    if (!modelInfo) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+    if (!modelInfo) {
+      return NextResponse.json(
+        { error: "This model isn't available anymore. Pick another one from the model picker." },
+        { status: 400 }
+      );
+    }
+    if (modelInfo.disabled) {
+      return NextResponse.json(
+        { error: modelInfo.disabledReason || `${modelInfo.name} is currently unavailable.` },
+        { status: 400 }
+      );
+    }
 
     // Check credits
     const creditCost = modelInfo.creditCost;

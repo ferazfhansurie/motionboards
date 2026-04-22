@@ -81,27 +81,41 @@ export function ModelPanel() {
             <div className="space-y-1">
               {visibleModels.map((model) => {
                 const isSelected = selectedModelId === model.id;
+                const isDisabled = !!model.disabled;
                 return (
                   <button
                     key={model.id}
                     type="button"
-                    onClick={() => { setSelectedModel(model.id); setModelPanelOpen(false); }}
+                    disabled={isDisabled}
+                    title={isDisabled ? (model.disabledReason || "Unavailable") : undefined}
+                    onClick={() => {
+                      if (isDisabled) return;
+                      setSelectedModel(model.id);
+                      setModelPanelOpen(false);
+                    }}
                     className={`w-full text-left rounded-xl px-3 py-2.5 border transition-all ${
-                      isSelected
-                        ? "bg-[#f26522]/10 border-[#f26522]/40"
-                        : isDark ? "border-transparent hover:border-gray-700 hover:bg-white/[0.03]" : "border-transparent hover:border-gray-200 hover:bg-gray-50"
+                      isDisabled
+                        ? (isDark ? "border-transparent bg-white/[0.02] opacity-50 cursor-not-allowed" : "border-transparent bg-gray-50 opacity-50 cursor-not-allowed")
+                        : isSelected
+                          ? "bg-[#f26522]/10 border-[#f26522]/40"
+                          : isDark ? "border-transparent hover:border-gray-700 hover:bg-white/[0.03]" : "border-transparent hover:border-gray-200 hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-start gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className={`text-[12px] font-semibold truncate ${isSelected ? "text-[#f26522]" : isDark ? "text-white" : "text-[#0d1117]"}`}>
+                          <span className={`text-[12px] font-semibold truncate ${isDisabled ? (isDark ? "text-gray-500" : "text-gray-400") : isSelected ? "text-[#f26522]" : isDark ? "text-white" : "text-[#0d1117]"}`}>
                             {model.name}
                           </span>
-                          {isSelected && (
+                          {isSelected && !isDisabled && (
                             <div className="h-3.5 w-3.5 rounded-full bg-[#f26522] flex items-center justify-center shrink-0">
                               <Check className="h-2 w-2 text-white" />
                             </div>
+                          )}
+                          {isDisabled && (
+                            <span className={`rounded-full px-1.5 py-[1px] text-[8.5px] font-black uppercase tracking-wider ${isDark ? "bg-white/10 text-gray-400" : "bg-black/10 text-gray-500"}`}>
+                              Unavailable
+                            </span>
                           )}
                         </div>
                         <p className={`text-[10px] mt-0.5 line-clamp-2 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
@@ -109,7 +123,7 @@ export function ModelPanel() {
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-[11px] font-bold text-[#f26522] whitespace-nowrap">{model.cost}</p>
+                        <p className={`text-[11px] font-bold whitespace-nowrap ${isDisabled ? (isDark ? "text-gray-500" : "text-gray-400") : "text-[#f26522]"}`}>{model.cost}</p>
                         <p className={`text-[9px] mt-0.5 whitespace-nowrap ${isDark ? "text-gray-600" : "text-gray-400"}`}>
                           {model.speed}
                         </p>
