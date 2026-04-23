@@ -786,14 +786,21 @@ export async function POST(req: NextRequest) {
             repInput.video = input.video_url;
           }
         } else if (isV2V) {
-          // Wan Animate and friends: each model declares its exact Replicate
-          // schema names in models.ts (e.g. `character_image`), so forward
-          // image + video inputs 1:1 without renaming. Prompt is optional —
-          // strip it if empty so we don't bias the model.
+          // Wan Animate, lip-sync models, and friends. Each model declares
+          // its exact Replicate schema names in models.ts, so forward the
+          // image / video / audio inputs 1:1 without renaming. Prompt is
+          // optional — strip it if empty so we don't bias the model.
           if (!prompt?.trim()) delete repInput.prompt;
-          repInput.resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "480";
+          // Resolution only applies to models that actually declare it
+          // (Wan Animate does, lip-sync models don't).
+          if (modelInfo.options?.resolution) {
+            repInput.resolution = (input.resolution as string) || modelInfo.options.resolution.default || "480";
+          }
           for (const inp of modelInfo.inputs) {
-            if ((inp.type === "image" || inp.type === "video") && input[inp.name] !== undefined) {
+            if (
+              (inp.type === "image" || inp.type === "video" || inp.type === "audio") &&
+              input[inp.name] !== undefined
+            ) {
               repInput[inp.name] = input[inp.name];
             }
           }

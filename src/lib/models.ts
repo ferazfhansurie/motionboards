@@ -360,6 +360,35 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
   },
 
+  // Sync Labs lip-sync — drop a video + audio track, get back the video
+  // with the subject's lips matched to the audio. The Pro variant uses the
+  // higher-quality path; the non-Pro is faster / cheaper.
+  {
+    id: "sync/lipsync-2-pro",
+    name: "Lipsync 2 Pro",
+    provider: "replicate", type: "v2v", category: "Video",
+    description: "Sync Labs' studio-grade lip-sync. Drop any video + an audio track and it re-renders the subject's lips to match the audio. Highest-quality tier.",
+    cost: "~RM0.75/s", creditCost: 75, speed: "~2m", stable: true,
+    inputs: [
+      { name: "video", type: "video", required: true, description: "Video to re-lip-sync" },
+      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match" },
+    ],
+    perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "sync/lipsync-2",
+    name: "Lipsync 2",
+    provider: "replicate", type: "v2v", category: "Video",
+    description: "Sync Labs' fast + cheap lip-sync. Same input shape as Pro — video + audio — tuned for speed over maximum fidelity.",
+    cost: "~RM0.30/s", creditCost: 30, speed: "~1m", stable: true,
+    inputs: [
+      { name: "video", type: "video", required: true, description: "Video to re-lip-sync" },
+      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match" },
+    ],
+    perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
+  },
+
   // ═══════════════ SOUND EFFECTS ═══════════════
 
   {
