@@ -771,8 +771,15 @@ export async function POST(req: NextRequest) {
 
         const repInput: Record<string, unknown> = {
           prompt: prompt?.trim() || (isSfx ? "Generate audio" : isImage ? "Generate an image" : "Generate a video"),
-          seed: Math.floor(Math.random() * 2_147_483_647),
         };
+        // MiniMax Music and ACE-Step reject unknown fields. Everything else
+        // on Replicate accepts `seed` for reproducibility.
+        const acceptsSeed =
+          !replicateModel.startsWith("minimax/music") &&
+          replicateModel !== "lucataco/ace-step";
+        if (acceptsSeed) {
+          repInput.seed = Math.floor(Math.random() * 2_147_483_647);
+        }
 
         if (isImage) {
           // FLUX Schnell, etc. — aspect_ratio only (duration/resolution irrelevant)

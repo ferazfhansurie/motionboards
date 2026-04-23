@@ -369,7 +369,10 @@ export async function GET(req: NextRequest) {
           } else if (/timeout|timed out/i.test(raw)) {
             friendly = "The generation timed out. Try a shorter duration or lower resolution.";
           } else if (/input .*invalid|validation|unexpected keyword|unknown field/i.test(raw)) {
-            friendly = "The model rejected the input config. Double-check your aspect ratio / resolution / duration.";
+            // Surface the raw message — it names the specific field — so users
+            // and we can actually tell what the model rejected instead of
+            // guessing at aspect/resolution/duration.
+            friendly = `The model rejected the input: ${raw.slice(0, 240)}`;
           }
 
           await finalizeGeneration(generationId, { status: "failed", error: friendly });
