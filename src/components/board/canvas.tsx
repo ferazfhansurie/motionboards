@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useEffect, useState } from "react";
-import { Download, Copy, Trash2, X } from "lucide-react";
+import { Download, Copy, Trash2, X, LayoutGrid } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { BoardItemCard } from "./board-item";
 import { PromptBar } from "./prompt-bar";
@@ -57,6 +57,8 @@ export function Canvas() {
     theme,
     connectingFromId,
     isAIPromptOpen,
+    organizeMode,
+    organizeActiveId,
   } = useAppStore();
 
   // AI panel is user-resizable; the panel dispatches ai-panel-width events.
@@ -121,6 +123,19 @@ export function Canvas() {
       // Tool shortcuts (only when not typing in an input)
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+
+      // Organize mode — arrow keys drive cycle + nudge, Enter auto-packs.
+      // Handled before other shortcuts so Escape exits the mode rather than
+      // switching tools.
+      const st = useAppStore.getState();
+      if (st.organizeMode) {
+        if (e.key === "ArrowUp") { e.preventDefault(); st.cycleOrganizeActive("prev"); return; }
+        if (e.key === "ArrowDown") { e.preventDefault(); st.cycleOrganizeActive("next"); return; }
+        if (e.key === "ArrowLeft") { e.preventDefault(); st.nudgeOrganizeActive(-20, 0); return; }
+        if (e.key === "ArrowRight") { e.preventDefault(); st.nudgeOrganizeActive(20, 0); return; }
+        if (e.key === "Enter") { e.preventDefault(); st.autoPackSelection(); return; }
+        if (e.key === "Escape") { e.preventDefault(); st.toggleOrganizeMode(); return; }
+      }
       if (e.key === "v" || e.key === "V") useAppStore.getState().setActiveCanvasTool("select");
       if (e.key === "t" || e.key === "T") useAppStore.getState().setActiveCanvasTool("text");
       if (e.key === "d" || e.key === "D") useAppStore.getState().setActiveCanvasTool("draw");
@@ -886,6 +901,19 @@ export function Canvas() {
           </button>
           <button
             type="button"
+            title={organizeMode ? "Exit organize mode (Esc)" : "Organize — ↑↓ pick item · ←→ nudge · Enter auto-pack"}
+            onClick={() => useAppStore.getState().toggleOrganizeMode()}
+            className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+              organizeMode
+                ? "bg-[#f26522]/15 text-[#f26522]"
+                : isDark ? "text-gray-300 hover:bg-white/10 hover:text-white" : "text-gray-600 hover:bg-gray-100 hover:text-[#0d1117]"
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            {organizeMode ? "Organizing" : "Organize"}
+          </button>
+          <button
+            type="button"
             title="Delete (Del)"
             onClick={() => {
               if (confirm(`Delete ${selectedItemIds.length} items?`)) {
@@ -910,6 +938,50 @@ export function Canvas() {
           </button>
         </div>
       )}
+
+      {/* Organize mode hint — keyboard legend under the bulk bar */}
+      {organizeMode && selectedItemIds.length > 1 && !marquee && (
+        <div
+          className={`fixed top-[84px] left-1/2 -translate-x-1/2 z-[45] rounded-lg border px-3 py-1.5 text-[10px] shadow-md backdrop-blur-md pointer-events-none flex items-center gap-2 ${
+            isDark ? "bg-[#161b22]/95 border-[#f26522]/40 text-gray-300" : "bg-white/95 border-[#f26522]/40 text-gray-700"
+          }`}
+        >
+          <kbd className={`px-1 rounded ${isDark ? "bg-white/10" : "bg-black/10"}`}>↑↓</kbd>
+          <span>pick item</span>
+          <span className="opacity-30">·</span>
+          <kbd className={`px-1 rounded ${isDark ? "bg-white/10" : "bg-black/10"}`}>←→</kbd>
+          <span>nudge</span>
+          <span className="opacity-30">·</span>
+          <kbd className={`px-1 rounded ${isDark ? "bg-white/10" : "bg-black/10"}`}>Enter</kbd>
+          <span>auto-pack</span>
+          <span className="opacity-30">·</span>
+          <kbd className={`px-1 rounded ${isDark ? "bg-white/10" : "bg-black/10"}`}>Esc</kbd>
+          <span>exit</span>
+        </div>
+      )}
+
+      {/* Organize active-item ring — a pulsing amber outline over the item
+          currently being controlled by the keyboard. Rendered in screen space
+          so it tracks pan/zoom through the same transform as the canvas. */}
+      {organizeMode && organizeActiveId && (() => {
+        const it = items.find((i) => i.id === organizeActiveId);
+        if (!it) return null;
+        const pad = 6;
+        const iw = it.width || 200;
+        const ih = it.height || 200;
+        return (
+          <div
+            className="pointer-events-none fixed z-[5] rounded-[6px] border-2 border-amber-400 animate-pulse"
+            style={{
+              left: panX + (it.x - pad) * zoom,
+              top: panY + (it.y - pad) * zoom,
+              width: (iw + pad * 2) * zoom,
+              height: (ih + pad * 2) * zoom,
+              boxShadow: "0 0 20px rgba(251,191,36,0.35)",
+            }}
+          />
+        );
+      })()}
 
       {/* Zoom preview */}
       {previewItem && (

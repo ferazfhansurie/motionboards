@@ -305,6 +305,16 @@ export interface AppState {
   setAudioInput: (id: string | null) => void;
   toggleStar: (id: string) => void;
   clearRefs: () => void;
+  // Organize mode — drag-select N items, hit Organize, then use arrow keys
+  // to tetris them into place. Up/Down cycles which item is active inside
+  // the selection; Left/Right nudges it by a grid step; Enter auto-packs
+  // the whole group into a tight reading-order grid; Esc exits.
+  organizeMode: boolean;
+  organizeActiveId: string | null;
+  toggleOrganizeMode: () => void;
+  cycleOrganizeActive: (dir: "next" | "prev") => void;
+  nudgeOrganizeActive: (dx: number, dy: number) => void;
+  autoPackSelection: () => void;
   setIsGenerating: (v: boolean) => void;
   setGenerationOptions: (opts: Record<string, unknown>) => void;
   setGenerationOption: (key: string, value: unknown) => void;
@@ -374,6 +384,8 @@ export const useAppStore = create<AppState>((set) => {
   endFrameId: null,
   inputRefs: [],
   audioInputId: null,
+  organizeMode: false,
+  organizeActiveId: null,
   isGenerating: false,
   generationOptions: {},
   isEditMode: false,
@@ -582,6 +594,97 @@ export const useAppStore = create<AppState>((set) => {
     set((s) => ({
       items: s.items.map((i) => (i.id === id ? { ...i, starred: !i.starred } : i)),
     })),
+
+  toggleOrganizeMode: () =>
+    set((s) => {
+      // Exiting — clear active id.
+      if (s.organizeMode) return { organizeMode: false, organizeActiveId: null };
+      // Entering — need at least one selected item.
+      const ids = s.selectedItemIds.length > 0
+        ? s.selectedItemIds
+        : (s.selectedItemId ? [s.selectedItemId] : []);
+      if (ids.length === 0) return s;
+      // First-active = the selection's top-left (reading order).
+      const first = s.items
+        .filter((i) => ids.includes(i.id))
+        .sort((a, b) => (Math.abs(a.y - b.y) > 50 ? a.y - b.y : a.x - b.x))[0];
+      return { organizeMode: true, organizeActiveId: first ? first.id : null };
+    }),
+
+  cycleOrganizeActive: (dir) =>
+    set((s) => {
+      const ids = s.selectedItemIds;
+      if (ids.length === 0) return s;
+      const sorted = ids
+        .map((id) => s.items.find((i) => i.id === id))
+        .filter((it): it is BoardItem => !!it)
+        .sort((a, b) => (Math.abs(a.y - b.y) > 50 ? a.y - b.y : a.x - b.x))
+        .map((it) => it.id);
+      const cur = s.organizeActiveId && sorted.includes(s.organizeActiveId)
+        ? sorted.indexOf(s.organizeActiveId)
+        : -1;
+      const next = dir === "next"
+        ? (cur + 1) % sorted.length
+        : (cur - 1 + sorted.length) % sorted.length;
+      return { organizeActiveId: sorted[next] };
+    }),
+
+  nudgeOrganizeActive: (dx, dy) =>
+    set((s) => {
+      if (!s.organizeActiveId) return s;
+      return {
+        items: s.items.map((it) =>
+          it.id === s.organizeActiveId ? { ...it, x: it.x + dx, y: it.y + dy } : it
+        ),
+      };
+    }),
+
+  // One-shot pack — reading-order bin-pack into a tight grid anchored at the
+  // top-left of the current selection. Each item keeps its own size, gets a
+  // 12px gap, wraps when the running row exceeds ~sqrt(total area × 2).
+  autoPackSelection: () =>
+    set((s) => {
+      const ids = s.selectedItemIds.length > 1
+        ? s.selectedItemIds
+        : (s.selectedItemId ? [s.selectedItemId] : []);
+      if (ids.length < 2) return s;
+      const idSet = new Set(ids);
+      const selected = s.items.filter((i) => idSet.has(i.id));
+      if (selected.length < 2) return s;
+      const sorted = [...selected].sort((a, b) =>
+        Math.abs(a.y - b.y) > 50 ? a.y - b.y : a.x - b.x
+      );
+      const anchorX = Math.min(...selected.map((it) => it.x));
+      const anchorY = Math.min(...selected.map((it) => it.y));
+      const GAP = 12;
+      const totalArea = sorted.reduce(
+        (sum, it) => sum + (it.width || 200) * (it.height || 200),
+        0
+      );
+      const targetRowW = Math.max(400, Math.sqrt(totalArea * 2));
+      let x = anchorX;
+      let y = anchorY;
+      let rowH = 0;
+      const updates = new Map<string, { x: number; y: number }>();
+      for (const it of sorted) {
+        const w = it.width || 200;
+        const h = it.height || 200;
+        if (x > anchorX && (x - anchorX) + w > targetRowW) {
+          x = anchorX;
+          y += rowH + GAP;
+          rowH = 0;
+        }
+        updates.set(it.id, { x, y });
+        x += w + GAP;
+        if (h > rowH) rowH = h;
+      }
+      return {
+        items: s.items.map((it) => {
+          const u = updates.get(it.id);
+          return u ? { ...it, x: u.x, y: u.y } : it;
+        }),
+      };
+    }),
   clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [], audioInputId: null }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setGenerationOptions: (generationOptions) => set({ generationOptions }),
