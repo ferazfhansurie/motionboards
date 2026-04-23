@@ -789,12 +789,26 @@ export async function POST(req: NextRequest) {
           if (replicateModel === "zsxkib/mmaudio" && input.video_url) {
             repInput.video = input.video_url;
           }
-          // MiniMax Music expects the prompt in `prompt` (already set above)
-          // and writes its own lyrics when lyrics_optimizer is on. We don't
-          // expose a separate lyrics input yet, so flip the optimizer so the
-          // user doesn't need to supply structured verse/chorus text.
+          // MiniMax Music: if the user wrote a "LYRICS:" block in their
+          // prompt, split it out and send it verbatim via the `lyrics` field
+          // (with optimizer OFF). Otherwise let the optimizer write the
+          // lyrics from the natural-language description.
           if (replicateModel.startsWith("minimax/music")) {
-            repInput.lyrics_optimizer = true;
+            const promptText = (repInput.prompt as string) || "";
+            const m = promptText.match(/^\s*lyrics:/im);
+            if (m && m.index !== undefined) {
+              const before = promptText.slice(0, m.index).trim();
+              const lyricsBlock = promptText.slice(m.index).replace(/^\s*lyrics:\s*/i, "").trim();
+              if (lyricsBlock) {
+                repInput.prompt = before || "song";
+                repInput.lyrics = lyricsBlock;
+                repInput.lyrics_optimizer = false;
+              } else {
+                repInput.lyrics_optimizer = true;
+              }
+            } else {
+              repInput.lyrics_optimizer = true;
+            }
           }
         } else if (isV2V) {
           // Wan Animate, lip-sync models, and friends. Each model declares
