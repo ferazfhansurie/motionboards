@@ -778,12 +778,23 @@ export async function POST(req: NextRequest) {
           // FLUX Schnell, etc. — aspect_ratio only (duration/resolution irrelevant)
           repInput.aspect_ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "1:1";
         } else if (isSfx) {
-          // MMAudio can take a video reference; Stable Audio is text-only.
-          const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "8s";
-          const dur = parseInt(durStr.replace("s", ""));
-          if (dur > 0) repInput.duration = dur;
+          // Only send `duration` to models that actually declare the option
+          // — MiniMax Music / ACE-Step auto-determine length and choke if we
+          // force one on them.
+          if (modelInfo.options?.duration) {
+            const durStr = (input.duration as string) || modelInfo.options.duration.default || "8s";
+            const dur = parseInt(durStr.replace("s", ""));
+            if (dur > 0) repInput.duration = dur;
+          }
           if (replicateModel === "zsxkib/mmaudio" && input.video_url) {
             repInput.video = input.video_url;
+          }
+          // MiniMax Music expects the prompt in `prompt` (already set above)
+          // and writes its own lyrics when lyrics_optimizer is on. We don't
+          // expose a separate lyrics input yet, so flip the optimizer so the
+          // user doesn't need to supply structured verse/chorus text.
+          if (replicateModel.startsWith("minimax/music")) {
+            repInput.lyrics_optimizer = true;
           }
         } else if (isV2V) {
           // Wan Animate, lip-sync models, and friends. Each model declares

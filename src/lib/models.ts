@@ -420,6 +420,31 @@ export const models: AIModel[] = [
     },
   },
 
+  // Full-song (lyrics + vocals + beats) generation. MiniMax 2.6 is MiniMax's
+  // newest tier and handles the auto-lyrics flow when you only pass a prompt.
+  // ACE-Step is the open-source cheap tier for throwaway drafts.
+  {
+    id: "minimax/music-2.6",
+    name: "MiniMax Music 2.6",
+    provider: "replicate", type: "sfx", category: "Sound Effects",
+    description: "Full-length songs with singing + lyrics + instrumentation from a single prompt. Describe genre, mood, BPM, key, voice type — MiniMax writes the lyrics. Up to ~6 minutes.",
+    cost: "~RM0.30", creditCost: 30, speed: "~1m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Song description — genre, mood, BPM, key, voice type, instruments" },
+    ],
+  },
+
+  {
+    id: "lucataco/ace-step",
+    name: "ACE-Step",
+    provider: "replicate", type: "sfx", category: "Sound Effects",
+    description: "Open-source full-song generator. Lower fidelity than MiniMax but 4× cheaper — great for testing ideas before committing to a premium run.",
+    cost: "~RM0.08", creditCost: 8, speed: "~1m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Song description — genre, mood, tempo, voice, instruments" },
+    ],
+  },
+
   // ═══════════════ VOICE ═══════════════
 
   {
