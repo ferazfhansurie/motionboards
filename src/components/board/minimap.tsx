@@ -3,20 +3,49 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 
-// Width / height of the minimap widget on screen.
-const MM_W = 200;
-const MM_H = 140;
+// Default size + position. Whatever the user drags / resizes to overrides
+// these and gets written to localStorage.
+const DEFAULT_W = 200;
+const DEFAULT_H = 140;
+const MIN_W = 140;
+const MIN_H = 100;
+const MAX_W = 500;
+const MAX_H = 400;
 // Padding (in canvas coordinates) around the content bounds so items never
 // sit flush against the minimap edge.
 const PAD = 200;
+const STORAGE_KEY = "motionboards_minimap_state";
+
+interface MinimapState {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function loadState(): MinimapState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.x === "number" && typeof parsed?.y === "number" && typeof parsed?.w === "number" && typeof parsed?.h === "number") {
+      return parsed as MinimapState;
+    }
+  } catch {}
+  return null;
+}
+
+function saveState(s: MinimapState) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+}
 
 export function Minimap() {
   const { items, panX, panY, zoom, setPan, theme, selectedItemId, selectedItemIds } = useAppStore();
   const isDark = theme === "dark";
-  const ref = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
 
-  // Re-read the viewport whenever the window resizes — the visible rect in
-  // canvas coords depends on innerWidth / innerHeight.
+  // Viewport (browser window) dimensions.
   const [vp, setVp] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const update = () => setVp({ w: window.innerWidth, h: window.innerHeight });
@@ -24,6 +53,28 @@ export function Minimap() {
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+  // Minimap size + on-screen position (both persistable). Default: bottom-left.
+  const [state, setState] = useState<MinimapState>({
+    x: 12,
+    y: 0, // computed after mount, when vp.h is known
+    w: DEFAULT_W,
+    h: DEFAULT_H,
+  });
+  // Hydrate from localStorage once the window dimensions are known so a stale
+  // saved position doesn't end up off-screen after a resize.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || vp.w === 0) return;
+    hydratedRef.current = true;
+    const saved = loadState();
+    const w = saved?.w ? Math.min(Math.max(saved.w, MIN_W), MAX_W) : DEFAULT_W;
+    const h = saved?.h ? Math.min(Math.max(saved.h, MIN_H), MAX_H) : DEFAULT_H;
+    const defaultY = vp.h - h - 96; // 96px clears the prompt bar
+    const x = saved?.x != null ? Math.min(Math.max(saved.x, 0), vp.w - w) : 12;
+    const y = saved?.y != null ? Math.min(Math.max(saved.y, 0), vp.h - h - 22) : defaultY;
+    setState({ x, y, w, h });
+  }, [vp.w, vp.h]);
 
   // World-space bounding box: everything the user has on the board PLUS the
   // current viewport. Including the viewport means the minimap always shows
@@ -53,44 +104,36 @@ export function Minimap() {
     return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, viewX, viewY, viewW, viewH };
   }, [items, panX, panY, zoom, vp.w, vp.h]);
 
-  // Scale the world bounding box into the minimap rect, preserving aspect so
-  // nothing squishes. Whichever side is the binding constraint drives the
-  // scale; the other side gets centered.
   const scale = bounds.w > 0 && bounds.h > 0
-    ? Math.min(MM_W / bounds.w, MM_H / bounds.h)
+    ? Math.min(state.w / bounds.w, state.h / bounds.h)
     : 1;
   const contentW = bounds.w * scale;
   const contentH = bounds.h * scale;
-  const offsetX = (MM_W - contentW) / 2;
-  const offsetY = (MM_H - contentH) / 2;
+  const offsetX = (state.w - contentW) / 2;
+  const offsetY = (state.h - contentH) / 2;
 
   const worldToMap = (wx: number, wy: number) => ({
     x: offsetX + (wx - bounds.minX) * scale,
     y: offsetY + (wy - bounds.minY) * scale,
   });
 
-  // Click / drag on the minimap to pan. The viewport-rect center moves to
-  // wherever the user clicked.
+  // ---- Pan-via-click on the map surface ----
   const handleJump = (clientX: number, clientY: number) => {
-    const el = ref.current;
+    const el = mapRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const mx = clientX - rect.left;
     const my = clientY - rect.top;
-    // minimap px → world coords
     const wx = bounds.minX + (mx - offsetX) / scale;
     const wy = bounds.minY + (my - offsetY) / scale;
-    // Center the viewport on (wx, wy): panX such that view center world-x = wx
-    // Screen center = (vp.w/2, vp.h/2); view center world = (-panX + vp.w/2)/zoom
-    // So: panX = -wx * zoom + vp.w/2
     setPan(-wx * zoom + vp.w / 2, -wy * zoom + vp.h / 2);
   };
 
-  const [dragging, setDragging] = useState(false);
+  const [panDragging, setPanDragging] = useState(false);
   useEffect(() => {
-    if (!dragging) return;
+    if (!panDragging) return;
     const move = (e: MouseEvent) => handleJump(e.clientX, e.clientY);
-    const up = () => setDragging(false);
+    const up = () => setPanDragging(false);
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
     return () => {
@@ -98,14 +141,69 @@ export function Minimap() {
       window.removeEventListener("mouseup", up);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging, bounds.minX, bounds.minY, scale, zoom, vp.w, vp.h]);
+  }, [panDragging, bounds.minX, bounds.minY, scale, zoom, vp.w, vp.h, offsetX, offsetY]);
 
-  // Collapse state — persisted in localStorage so it survives refreshes.
+  // ---- Reposition-via-drag on the header ----
+  const moveRef = useRef<{ startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
+  const [moving, setMoving] = useState(false);
+  useEffect(() => {
+    if (!moving) return;
+    const onMove = (e: MouseEvent) => {
+      const d = moveRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.startClientX;
+      const dy = e.clientY - d.startClientY;
+      const headerH = 22;
+      const nextX = Math.min(Math.max(d.startX + dx, 0), vp.w - state.w);
+      const nextY = Math.min(Math.max(d.startY + dy, 0), vp.h - state.h - headerH);
+      setState((prev) => ({ ...prev, x: nextX, y: nextY }));
+    };
+    const onUp = () => {
+      setMoving(false);
+      moveRef.current = null;
+      setState((prev) => { saveState(prev); return prev; });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [moving, vp.w, vp.h, state.w, state.h]);
+
+  // ---- Resize-via-drag on the corner handle ----
+  const resizeRef = useRef<{ startClientX: number; startClientY: number; startW: number; startH: number } | null>(null);
+  const [resizing, setResizing] = useState(false);
+  useEffect(() => {
+    if (!resizing) return;
+    const onMove = (e: MouseEvent) => {
+      const d = resizeRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.startClientX;
+      const dy = e.clientY - d.startClientY;
+      const nextW = Math.min(Math.max(d.startW + dx, MIN_W), MAX_W);
+      const nextH = Math.min(Math.max(d.startH + dy, MIN_H), MAX_H);
+      setState((prev) => ({ ...prev, w: nextW, h: nextH }));
+    };
+    const onUp = () => {
+      setResizing(false);
+      resizeRef.current = null;
+      setState((prev) => { saveState(prev); return prev; });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [resizing]);
+
+  // ---- Collapse ----
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     setCollapsed(typeof window !== "undefined" && localStorage.getItem("motionboards_minimap_collapsed") === "true");
   }, []);
-  const toggle = () => {
+  const toggleCollapse = () => {
     setCollapsed((prev) => {
       const next = !prev;
       try { localStorage.setItem("motionboards_minimap_collapsed", String(next)); } catch {}
@@ -123,9 +221,10 @@ export function Minimap() {
     return (
       <button
         type="button"
-        onClick={toggle}
+        onClick={toggleCollapse}
         title="Show minimap"
-        className={`fixed bottom-24 left-3 z-[40] rounded-lg border px-2 py-1 text-[10px] font-semibold shadow-md transition-colors ${
+        style={{ left: state.x, top: state.y + state.h }}
+        className={`fixed z-[40] rounded-lg border px-2 py-1 text-[10px] font-semibold shadow-md transition-colors ${
           isDark ? "bg-[#161b22]/90 border-gray-700 text-gray-300 hover:text-white" : "bg-white/90 border-gray-200 text-gray-600 hover:text-[#0d1117]"
         }`}
       >
@@ -136,30 +235,42 @@ export function Minimap() {
 
   return (
     <div
-      className={`fixed bottom-24 left-3 z-[40] rounded-lg border shadow-lg backdrop-blur-md ${
+      className={`fixed z-[40] rounded-lg border shadow-lg backdrop-blur-md ${
         isDark ? "bg-[#161b22]/90 border-gray-700" : "bg-white/90 border-gray-200"
       }`}
-      style={{ width: MM_W + 2, height: MM_H + 22 }}
+      style={{ left: state.x, top: state.y, width: state.w + 2, height: state.h + 22 }}
     >
-      <div className={`flex items-center justify-between px-2 h-5 text-[9px] uppercase tracking-wider font-black ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+      {/* Header — drag it to reposition the minimap. */}
+      <div
+        className={`flex items-center justify-between px-2 h-5 text-[9px] uppercase tracking-wider font-black cursor-move ${isDark ? "text-gray-500" : "text-gray-400"}`}
+        onMouseDown={(e) => {
+          // Don't start a move when clicking the close button itself.
+          if ((e.target as HTMLElement).closest("[data-mm-nodrag]")) return;
+          e.preventDefault();
+          moveRef.current = { startClientX: e.clientX, startClientY: e.clientY, startX: state.x, startY: state.y };
+          setMoving(true);
+        }}
+      >
         <span>Minimap</span>
         <button
           type="button"
-          onClick={toggle}
+          data-mm-nodrag
+          onClick={toggleCollapse}
           title="Hide minimap"
           className={`leading-none ${isDark ? "hover:text-white" : "hover:text-[#0d1117]"}`}
         >
           ×
         </button>
       </div>
+
       <div
-        ref={ref}
+        ref={mapRef}
         className={`relative cursor-crosshair select-none ${isDark ? "bg-[#0d1117]" : "bg-gray-50"}`}
-        style={{ width: MM_W, height: MM_H, margin: "0 1px" }}
+        style={{ width: state.w, height: state.h, margin: "0 1px" }}
         onMouseDown={(e) => {
           e.preventDefault();
           handleJump(e.clientX, e.clientY);
-          setDragging(true);
+          setPanDragging(true);
         }}
       >
         {items.map((it) => {
@@ -170,19 +281,15 @@ export function Minimap() {
           const isGen = it.type === "generation";
           const isText = it.type === "text";
           const starred = !!it.starred;
-          // Everything uses the brand orange family so the minimap reads as
-          // "motionboards" at a glance. Differentiation is by opacity:
-          // selected is brightest, then generations, then other media, then
-          // text notes. Starred overrides with amber so it pops.
           const colour = starred
-            ? "rgba(251,191,36,0.9)"            // amber — starred always wins
+            ? "rgba(251,191,36,0.9)"
             : isSel
-              ? "rgba(242,101,34,1)"             // brand orange, full
+              ? "rgba(242,101,34,1)"
               : isGen
-                ? "rgba(242,101,34,0.75)"        // brand orange, slightly dim
+                ? "rgba(242,101,34,0.75)"
                 : isText
-                  ? "rgba(242,101,34,0.35)"      // brand orange, faded — text notes
-                  : "rgba(242,101,34,0.55)";     // brand orange, mid — media
+                  ? "rgba(242,101,34,0.35)"
+                  : "rgba(242,101,34,0.55)";
           return (
             <div
               key={it.id}
@@ -206,6 +313,21 @@ export function Minimap() {
             width: Math.max(4, viewW),
             height: Math.max(4, viewH),
             boxShadow: "0 0 0 1px rgba(0,0,0,0.25) inset",
+          }}
+        />
+
+        {/* Corner resize grip — drag to resize. */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation(); // don't start a pan-drag
+            resizeRef.current = { startClientX: e.clientX, startClientY: e.clientY, startW: state.w, startH: state.h };
+            setResizing(true);
+          }}
+          title="Drag to resize"
+          className="absolute bottom-0 right-0 h-3 w-3 cursor-nwse-resize"
+          style={{
+            background: `linear-gradient(135deg, transparent 0%, transparent 50%, ${isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)"} 50%, ${isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)"} 100%)`,
           }}
         />
       </div>
