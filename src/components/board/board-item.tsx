@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -625,7 +625,29 @@ export function BoardItemCard({
             PSD
           </Badge>
         )}
+        {item.starred && (
+          <Badge className="bg-amber-400 text-amber-900 text-[10px] px-1.5 py-0 flex items-center gap-1 border-0">
+            <Star className="h-2.5 w-2.5" fill="currentColor" />
+            STARRED
+          </Badge>
+        )}
       </div>
+
+      {/* Quick-toggle star button in the top-right corner. Always visible on
+          starred items, fades in on hover for unstarred ones so it doesn't
+          clutter the canvas. */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); useAppStore.getState().toggleStar(item.id); }}
+        title={item.starred ? "Unstar" : "Star"}
+        className={`absolute top-1 right-1 z-[5] rounded-md p-1 transition-all ${
+          item.starred
+            ? "bg-amber-400/90 text-amber-900 opacity-100"
+            : "bg-black/40 text-white opacity-0 group-hover:opacity-100 hover:bg-black/60"
+        }`}
+      >
+        <Star className="h-3 w-3" fill={item.starred ? "currentColor" : "none"} />
+      </button>
 
       {/* Card */}
       <div
@@ -1020,6 +1042,15 @@ export function BoardItemCard({
                 </button>
               </>
             ) : null}
+
+            <button
+              type="button"
+              className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+              onClick={() => { closeContextMenu(); useAppStore.getState().toggleStar(item.id); }}
+            >
+              <Star className={`h-3.5 w-3.5 ${item.starred ? "text-amber-400" : "text-gray-400"}`} fill={item.starred ? "currentColor" : "none"} />
+              {item.starred ? "Unstar" : "Star"}
+            </button>
 
             {/* Copy / Paste */}
             <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />

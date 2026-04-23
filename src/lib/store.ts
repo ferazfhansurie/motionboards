@@ -166,6 +166,7 @@ export interface BoardItem {
   cost?: string;
   progressText?: string;
   expectedDuration?: number; // seconds, for progress estimation
+  starred?: boolean;
   // Persisted polling state so generations resume if the page refreshes.
   // Written when /api/generate returns a requestId; cleared once we hit
   // the terminal state on the next poll.
@@ -302,6 +303,7 @@ export interface AppState {
   setEndFrame: (id: string | null) => void;
   toggleInputRef: (id: string) => void;
   setAudioInput: (id: string | null) => void;
+  toggleStar: (id: string) => void;
   clearRefs: () => void;
   setIsGenerating: (v: boolean) => void;
   setGenerationOptions: (opts: Record<string, unknown>) => void;
@@ -576,6 +578,10 @@ export const useAppStore = create<AppState>((set) => {
         : [...s.inputRefs, id],
     })),
   setAudioInput: (id) => set({ audioInputId: id }),
+  toggleStar: (id) =>
+    set((s) => ({
+      items: s.items.map((i) => (i.id === id ? { ...i, starred: !i.starred } : i)),
+    })),
   clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [], audioInputId: null }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setGenerationOptions: (generationOptions) => set({ generationOptions }),
