@@ -351,15 +351,19 @@ export async function GET(req: NextRequest) {
           console.error("[Replicate] Prediction failed", JSON.stringify({
             status: pred.status,
             error: pred.error,
+            input: pred.input,
             logs: (pred.logs as string)?.slice(-500),
           }));
+
+          const isSeedance = modelId.startsWith("bytedance/seedance");
 
           // Translate common Replicate errors into plain-English toasts so the
           // user knows whether to tweak the prompt, swap inputs, or retry.
           let friendly = raw;
           if (/flagged as sensitive|E005|NSFW|safety|content policy|sensitive content/i.test(raw)) {
-            friendly =
-              "Blocked by the model's safety filter. The prompt or one of your reference images tripped it — try rephrasing or swapping a different reference.";
+            friendly = isSeedance
+              ? "Replicate's content scanner flagged one of your inputs before Seedance even ran. It's a known false-positive trigger on dark scenes, fashion / swimwear, athletic poses, and some portraits. Try swapping a different reference frame — or run the same S2E on Veo 3.1 Fast, which uses a different moderation pipeline."
+              : "Blocked by the model's safety filter. The prompt or one of your reference images tripped it — try rephrasing or swapping a different reference.";
           } else if (/RESOURCE_EXHAUSTED|rate ?limit|429|quota/i.test(raw)) {
             friendly = "Model is rate-limited right now. Try again in a minute.";
           } else if (/timeout|timed out/i.test(raw)) {
