@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { getUserFromToken, getUserAIInstruction } from "@/lib/db";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Claude calls with attached images can take 20-40s; give the route headroom.
+// OpenAI calls with attached images can take 20–40s; give the route headroom.
 export const maxDuration = 60;
 
 // ADletic AI is a general-purpose assistant inside MotionBoards. It can hold
@@ -32,44 +32,16 @@ Prompt-crafting mode (when the user is clearly asking for a generation prompt):
 
 Figure out which mode the user wants from context. Err toward conversational unless they're obviously requesting a prompt.`;
 
-// Convert the OpenAI-shaped messages the client sends into Anthropic's format.
+// The client already sends OpenAI-shaped parts (text + image_url), so we just
+// pass them through to chat.completions after a shallow type cast.
 type ClientPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 
-type AnthropicMessage = {
+type ChatMessage = {
   role: "user" | "assistant";
-  content:
-    | string
-    | Array<
-        | { type: "text"; text: string }
-        | {
-            type: "image";
-            source:
-              | { type: "base64"; media_type: string; data: string }
-              | { type: "url"; url: string };
-          }
-      >;
+  content: string | ClientPart[];
 };
-
-function convertMessage(m: { role: "user" | "assistant"; content: string | ClientPart[] }): AnthropicMessage {
-  if (typeof m.content === "string") return { role: m.role, content: m.content };
-  const out: AnthropicMessage["content"] = [];
-  for (const p of m.content) {
-    if (p.type === "text") {
-      out.push({ type: "text", text: p.text });
-    } else if (p.type === "image_url") {
-      const url = p.image_url.url;
-      const match = url.match(/^data:([^;]+);base64,(.*)$/);
-      if (match) {
-        out.push({ type: "image", source: { type: "base64", media_type: match[1], data: match[2] } });
-      } else {
-        out.push({ type: "image", source: { type: "url", url } });
-      }
-    }
-  }
-  return { role: m.role, content: out };
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,8 +51,8 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
     }
 
     const { messages } = await req.json();
@@ -88,35 +60,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
 
-    // Keep last 10 messages for context
-    const converted = (messages.slice(-10) as Array<{ role: "user" | "assistant"; content: string | ClientPart[] }>).map(convertMessage);
+    // Keep last 10 messages for context.
+    const history = (messages.slice(-10) as ChatMessage[]);
 
-    // Per-account instruction gets appended — user's preference overrides defaults
+    // Per-account instruction gets appended — user's preference overrides defaults.
     const userInstruction = await getUserAIInstruction(user.id);
     const systemPrompt = userInstruction
       ? `${BASE_SYSTEM_PROMPT}\n\n## USER PREFERENCES (follow these)\n${userInstruction}`
       : BASE_SYSTEM_PROMPT;
 
-    // Stream the response so the panel can render text as Claude generates it
-    const claudeStream = anthropic.messages.stream({
-      model: "claude-sonnet-4-5",
-      max_tokens: 1500,
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      stream: true,
       temperature: 0.8,
-      system: systemPrompt,
-      messages: converted as Parameters<typeof anthropic.messages.create>[0]["messages"],
+      max_tokens: 1500,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...history.map((m) => ({
+          role: m.role,
+          content: m.content,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        })) as any,
+      ],
     });
 
     const encoder = new TextEncoder();
     const body = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of claudeStream) {
-            if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
-            ) {
-              controller.enqueue(encoder.encode(event.delta.text));
-            }
+          for await (const chunk of stream) {
+            const delta = chunk.choices?.[0]?.delta?.content;
+            if (delta) controller.enqueue(encoder.encode(delta));
           }
           controller.close();
         } catch (streamErr) {

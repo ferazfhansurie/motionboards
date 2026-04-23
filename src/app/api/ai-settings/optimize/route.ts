@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { getUserFromToken, getUserAIInstruction } from "@/lib/db";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // POST /api/ai-settings/optimize
 // Body: { prompts: string[] }  — prompts from generation items currently on the canvas
@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -57,18 +57,14 @@ ${capped.map((p: string, i: number) => `${i + 1}. ${p}`).join("\n")}
 
 Respond with ONLY the new instruction text — no preamble, no explanation, no markdown formatting. Start with a line like "Keep prompts…" or "Always produce…"`;
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
+    const response = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
       max_tokens: 600,
       temperature: 0.4,
       messages: [{ role: "user", content: analysisPrompt }],
     });
 
-    const suggestion = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n")
-      .trim();
+    const suggestion = (response.choices?.[0]?.message?.content || "").trim();
 
     if (!suggestion) {
       return NextResponse.json({ error: "Could not generate a suggestion" }, { status: 500 });

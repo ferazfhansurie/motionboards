@@ -8,8 +8,8 @@ import remarkBreaks from "remark-breaks";
 import { useAppStore } from "@/lib/store";
 
 // Message content is either a plain string (simple turns) or an array of parts
-// when the user attaches images/videos. OpenAI-shaped — the server converts to
-// Anthropic's schema before calling Claude.
+// when the user attaches images/videos. OpenAI-shaped — passes through to
+// chat.completions server-side.
 type MessagePart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
@@ -38,7 +38,7 @@ function messageText(content: MessageContent): string {
   return content.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("\n");
 }
 
-// Turn Claude's markdown-formatted reply into a clean plain-text prompt ready
+// Turn the model's markdown-formatted reply into a clean plain-text prompt ready
 // to paste into a video generator. Drops horizontal rules, strips bold/italic
 // markers (keeping the content), removes heading hashes and list bullets, and
 // prunes common "meta" lines like "Ready to use." or standalone title headers.
@@ -1033,7 +1033,7 @@ export function AIPromptPanel() {
             )}
             <div className="flex items-center justify-between mt-2">
               <p className={`text-[8px] ${isDark ? "text-gray-600" : "text-gray-300"}`}>
-                Powered by Claude Sonnet · Auto-saved for 14 days
+                Powered by GPT-4.1 mini · Auto-saved for 14 days
               </p>
               <a
                 href="https://wa.me/60112167672?text=Hi%2C%20I%20want%20to%20upgrade%20my%20AI%20on%20MotionBoards%20%F0%9F%9A%80"
