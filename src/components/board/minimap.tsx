@@ -125,7 +125,7 @@ export function Minimap() {
         type="button"
         onClick={toggle}
         title="Show minimap"
-        className={`fixed bottom-14 right-3 z-[40] rounded-lg border px-2 py-1 text-[10px] font-semibold shadow-md transition-colors ${
+        className={`fixed bottom-24 left-3 z-[40] rounded-lg border px-2 py-1 text-[10px] font-semibold shadow-md transition-colors ${
           isDark ? "bg-[#161b22]/90 border-gray-700 text-gray-300 hover:text-white" : "bg-white/90 border-gray-200 text-gray-600 hover:text-[#0d1117]"
         }`}
       >
@@ -136,7 +136,7 @@ export function Minimap() {
 
   return (
     <div
-      className={`fixed bottom-14 right-3 z-[40] rounded-lg border shadow-lg backdrop-blur-md ${
+      className={`fixed bottom-24 left-3 z-[40] rounded-lg border shadow-lg backdrop-blur-md ${
         isDark ? "bg-[#161b22]/90 border-gray-700" : "bg-white/90 border-gray-200"
       }`}
       style={{ width: MM_W + 2, height: MM_H + 22 }}
@@ -170,15 +170,19 @@ export function Minimap() {
           const isGen = it.type === "generation";
           const isText = it.type === "text";
           const starred = !!it.starred;
+          // Everything uses the brand orange family so the minimap reads as
+          // "motionboards" at a glance. Differentiation is by opacity:
+          // selected is brightest, then generations, then other media, then
+          // text notes. Starred overrides with amber so it pops.
           const colour = starred
-            ? "rgba(251,191,36,0.85)"           // amber
+            ? "rgba(251,191,36,0.9)"            // amber — starred always wins
             : isSel
-              ? "rgba(242,101,34,0.9)"          // brand orange
+              ? "rgba(242,101,34,1)"             // brand orange, full
               : isGen
-                ? "rgba(168,85,247,0.7)"        // purple for generations
+                ? "rgba(242,101,34,0.75)"        // brand orange, slightly dim
                 : isText
-                  ? "rgba(100,116,139,0.6)"      // slate for text notes
-                  : "rgba(59,130,246,0.7)";      // blue for media
+                  ? "rgba(242,101,34,0.35)"      // brand orange, faded — text notes
+                  : "rgba(242,101,34,0.55)";     // brand orange, mid — media
           return (
             <div
               key={it.id}
