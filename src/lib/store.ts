@@ -340,6 +340,10 @@ export interface AppState {
   cycleOrganizeActive: (dir: "next" | "prev") => void;
   nudgeOrganizeActive: (dx: number, dy: number) => void;
   autoPackSelection: () => void;
+  // Move every selected item (or the single selected item) by (dx, dy) in
+  // canvas units. Used by the arrow-key handler outside organize mode for
+  // Tetris-style step movement.
+  moveSelectedItems: (dx: number, dy: number) => void;
   setIsGenerating: (v: boolean) => void;
   setGenerationOptions: (opts: Record<string, unknown>) => void;
   setGenerationOption: (key: string, value: unknown) => void;
@@ -664,29 +668,55 @@ export const useAppStore = create<AppState>((set) => {
       };
     }),
 
-  // One-shot pack — reading-order bin-pack into a tight grid anchored at the
-  // top-left of the current selection. Each item keeps its own size, gets a
-  // 12px gap, wraps when the running row exceeds ~sqrt(total area × 2).
+  // One-shot pack — shelf-pack everything into a tight grid anchored at the
+  // top-left of whatever's being packed.
+  //
+  // Targeting:
+  //   - 2+ items selected → pack just the selection
+  //   - 0 or 1 selected   → pack ALL items on the board (the common case
+  //     when the user just clicks Organize → Enter on a messy board)
+  //
+  // Algorithm:
+  //   - Sort items by height desc → each row's tallest item sets the row
+  //     height; later rows can pack shorter items underneath without the
+  //     ragged-row gaps the old reading-order sort produced.
+  //   - Tight 8 px GAP (was 12 px) so the canvas reads as one cohesive grid
+  //     rather than a loose collage.
+  //   - Row width target ≈ sqrt(total area × 1.6) for a roughly landscape
+  //     aspect ratio (was × 2 → too tall when many items).
+  //   - Wraps when adding the next item would push the row past the target.
   autoPackSelection: () =>
     set((s) => {
-      const ids = s.selectedItemIds.length > 1
+      const selectionIds = s.selectedItemIds.length > 1
         ? s.selectedItemIds
         : (s.selectedItemId ? [s.selectedItemId] : []);
-      if (ids.length < 2) return s;
-      const idSet = new Set(ids);
-      const selected = s.items.filter((i) => idSet.has(i.id));
-      if (selected.length < 2) return s;
-      const sorted = [...selected].sort((a, b) =>
-        Math.abs(a.y - b.y) > 50 ? a.y - b.y : a.x - b.x
-      );
-      const anchorX = Math.min(...selected.map((it) => it.x));
-      const anchorY = Math.min(...selected.map((it) => it.y));
-      const GAP = 12;
+      const targetIds = selectionIds.length >= 2
+        ? selectionIds
+        : s.items.map((i) => i.id);
+      if (targetIds.length < 2) return s;
+      const idSet = new Set(targetIds);
+      const targets = s.items.filter((i) => idSet.has(i.id));
+      if (targets.length < 2) return s;
+
+      // Sort by height descending → tightest shelf-pack. Ties broken by
+      // width desc so similar-height items group consistently.
+      const sorted = [...targets].sort((a, b) => {
+        const hd = (b.height || 200) - (a.height || 200);
+        if (hd !== 0) return hd;
+        return (b.width || 200) - (a.width || 200);
+      });
+
+      const anchorX = Math.min(...targets.map((it) => it.x));
+      const anchorY = Math.min(...targets.map((it) => it.y));
+      const GAP = 8;
       const totalArea = sorted.reduce(
-        (sum, it) => sum + (it.width || 200) * (it.height || 200),
+        (sum, it) => sum + ((it.width || 200) + GAP) * ((it.height || 200) + GAP),
         0
       );
-      const targetRowW = Math.max(400, Math.sqrt(totalArea * 2));
+      // Aim for a roughly landscape grid (1.6:1). Floor at 600 so a tiny
+      // selection still gets a usable row width.
+      const targetRowW = Math.max(600, Math.sqrt(totalArea * 1.6));
+
       let x = anchorX;
       let y = anchorY;
       let rowH = 0;
@@ -694,6 +724,7 @@ export const useAppStore = create<AppState>((set) => {
       for (const it of sorted) {
         const w = it.width || 200;
         const h = it.height || 200;
+        // Wrap if this item would overflow the target row width
         if (x > anchorX && (x - anchorX) + w > targetRowW) {
           x = anchorX;
           y += rowH + GAP;
@@ -708,6 +739,20 @@ export const useAppStore = create<AppState>((set) => {
           const u = updates.get(it.id);
           return u ? { ...it, x: u.x, y: u.y } : it;
         }),
+      };
+    }),
+
+  moveSelectedItems: (dx, dy) =>
+    set((s) => {
+      const ids = s.selectedItemIds.length > 0
+        ? s.selectedItemIds
+        : (s.selectedItemId ? [s.selectedItemId] : []);
+      if (ids.length === 0) return s;
+      const idSet = new Set(ids);
+      return {
+        items: s.items.map((it) =>
+          idSet.has(it.id) ? { ...it, x: it.x + dx, y: it.y + dy } : it
+        ),
       };
     }),
   clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [], audioInputId: null }),

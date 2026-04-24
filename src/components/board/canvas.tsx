@@ -155,13 +155,55 @@ export function Canvas() {
       // Handled before other shortcuts so Escape exits the mode rather than
       // switching tools.
       const st = useAppStore.getState();
+
+      // Compute a Tetris-style step that's proportional to what's currently
+      // on screen. Each press moves one "screen column" — visible canvas
+      // width / 8 — so it feels like the same chunk regardless of zoom.
+      // Floor of 80 canvas units guarantees the press always does something
+      // useful even when zoomed way in.
+      const computeStep = () => {
+        const z = st.zoom || 1;
+        const visibleW = window.innerWidth / z;
+        const visibleH = window.innerHeight / z;
+        return {
+          x: Math.max(80, Math.floor(visibleW / 8)),
+          y: Math.max(80, Math.floor(visibleH / 8)),
+        };
+      };
+
       if (st.organizeMode) {
         if (e.key === "ArrowUp") { e.preventDefault(); st.cycleOrganizeActive("prev"); return; }
         if (e.key === "ArrowDown") { e.preventDefault(); st.cycleOrganizeActive("next"); return; }
-        if (e.key === "ArrowLeft") { e.preventDefault(); st.nudgeOrganizeActive(-20, 0); return; }
-        if (e.key === "ArrowRight") { e.preventDefault(); st.nudgeOrganizeActive(20, 0); return; }
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          const s = computeStep();
+          st.nudgeOrganizeActive(e.shiftKey ? -20 : -s.x, 0);
+          return;
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          const s = computeStep();
+          st.nudgeOrganizeActive(e.shiftKey ? 20 : s.x, 0);
+          return;
+        }
         if (e.key === "Enter") { e.preventDefault(); st.autoPackSelection(); return; }
         if (e.key === "Escape") { e.preventDefault(); st.toggleOrganizeMode(); return; }
+      }
+
+      // Normal mode — arrow keys MOVE the selected item(s) by a Tetris-style
+      // chunk proportional to the current viewport. Hold Shift for a fine
+      // 20-unit nudge. Only fires when there's actually a selection so the
+      // browser keeps its arrow-key page-scroll behavior on empty canvas.
+      const hasSel = st.selectedItemIds.length > 0 || !!st.selectedItemId;
+      if (hasSel && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        const s = computeStep();
+        const fine = e.shiftKey ? 20 : null;
+        if (e.key === "ArrowLeft") st.moveSelectedItems(fine !== null ? -fine : -s.x, 0);
+        else if (e.key === "ArrowRight") st.moveSelectedItems(fine !== null ? fine : s.x, 0);
+        else if (e.key === "ArrowUp") st.moveSelectedItems(0, fine !== null ? -fine : -s.y);
+        else if (e.key === "ArrowDown") st.moveSelectedItems(0, fine !== null ? fine : s.y);
+        return;
       }
       if (e.key === "v" || e.key === "V") useAppStore.getState().setActiveCanvasTool("select");
       if (e.key === "t" || e.key === "T") useAppStore.getState().setActiveCanvasTool("text");
@@ -932,7 +974,7 @@ export function Canvas() {
           </button>
           <button
             type="button"
-            title={organizeMode ? "Exit organize mode (Esc)" : "Organize — ↑↓ pick item · ←→ nudge · Enter auto-pack"}
+            title={organizeMode ? "Exit organize mode (Esc)" : "Organize — ↑↓ pick item · ←→ jump (Shift = fine) · Enter auto-pack tight grid"}
             onClick={() => useAppStore.getState().toggleOrganizeMode()}
             className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
               organizeMode
