@@ -478,6 +478,17 @@ export const models: AIModel[] = [
       { name: "audio_url", type: "audio", required: true, description: "Voice reference audio to clone", maxMB: 10 },
     ],
   },
+
+  {
+    id: "ryan5453/demucs",
+    name: "Vocal Extractor (Demucs)",
+    provider: "replicate", type: "a2a", category: "Voice",
+    description: "Extracts isolated vocals from any music track. Use it to clean a song before tagging the audio into Lipsync 2 / Pro for sharper mouth-shape sync.",
+    cost: "~RM0.15", creditCost: 15, speed: "~30s", stable: true,
+    inputs: [
+      { name: "audio", type: "audio", required: true, description: "Music file to extract vocals from", maxMB: 100 },
+    ],
+  },
 ];
 
 export const modelCategories: ModelCategory[] = [

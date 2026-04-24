@@ -312,11 +312,20 @@ export async function GET(req: NextRequest) {
         const pred = await predRes.json() as Record<string, unknown>;
 
         if (pred.status === "succeeded") {
-          // Output can be a URL string or an object with url field
+          // Output shape varies by model:
+          //   string                     → most v2v / image / video models
+          //   array of strings           → some image models (we take [0])
+          //   { url }                    → standard cog wrapper
+          //   { vocals }                 → Demucs with stem=vocals
+          //   { vocals, drums, bass, other } → Demucs with stem=none (we take vocals)
+          //   { audio }                  → some audio models
           let outputUrl: string | null = null;
           if (typeof pred.output === "string") outputUrl = pred.output;
           else if (Array.isArray(pred.output) && pred.output.length > 0) outputUrl = pred.output[0] as string;
-          else if (pred.output && typeof pred.output === "object") outputUrl = (pred.output as Record<string, unknown>).url as string;
+          else if (pred.output && typeof pred.output === "object") {
+            const obj = pred.output as Record<string, unknown>;
+            outputUrl = (obj.url || obj.vocals || obj.audio || obj.output) as string;
+          }
 
           if (outputUrl) {
             // Re-host in Neon so the URL persists under our 14-day TTL

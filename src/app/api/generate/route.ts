@@ -767,16 +767,17 @@ export async function POST(req: NextRequest) {
         const replicateModel = modelId.replace(/\/(i2v|s2e)$/, "");
         const isSfx = modelInfo.type === "sfx";
         const isImage = ["t2i", "i2i"].includes(modelInfo.type);
-        const isV2V = modelInfo.type === "v2v";
+        // V2V / A2A share the same "forward declared file inputs 1:1" path.
+        const isV2V = modelInfo.type === "v2v" || modelInfo.type === "a2a";
 
         const repInput: Record<string, unknown> = {
           prompt: prompt?.trim() || (isSfx ? "Generate audio" : isImage ? "Generate an image" : "Generate a video"),
         };
-        // MiniMax Music and ACE-Step reject unknown fields. Everything else
-        // on Replicate accepts `seed` for reproducibility.
+        // MiniMax Music, ACE-Step, and Demucs reject unknown fields like `seed`.
         const acceptsSeed =
           !replicateModel.startsWith("minimax/music") &&
-          replicateModel !== "lucataco/ace-step";
+          replicateModel !== "lucataco/ace-step" &&
+          replicateModel !== "ryan5453/demucs";
         if (acceptsSeed) {
           repInput.seed = Math.floor(Math.random() * 2_147_483_647);
         }
@@ -835,6 +836,14 @@ export async function POST(req: NextRequest) {
             ) {
               repInput[inp.name] = input[inp.name];
             }
+          }
+          // Demucs (vocal extractor): force stem=vocals so we get a single
+          // clean vocals file instead of all 4 stems, and request WAV for
+          // best downstream lipsync quality. Strip prompt — Demucs rejects it.
+          if (replicateModel === "ryan5453/demucs") {
+            repInput.stem = "vocals";
+            repInput.output_format = "wav";
+            delete repInput.prompt;
           }
         } else {
           // Video pipeline (Seedance 1.x, Seedance 2.x, and similar Replicate
