@@ -61,14 +61,24 @@ export function ProfilePanel() {
   };
 
   const handleRestore = async (id: string, label: string) => {
-    if (!confirm(`Restore snapshot "${label}"? Your current canvas will be replaced.`)) return;
+    if (!confirm(`Restore snapshot "${label}"? Your current canvas will be replaced — a "Before restoring…" checkpoint will be saved automatically so you can revert.`)) return;
     setRestoringId(id);
     try {
+      // Step 1: snapshot the CURRENT state with a clear "Before restoring …"
+      // label so the user can revert by restoring that one. Bypasses the
+      // hash + interval dedup because saveBoardSnapshotWithLabel always
+      // persists when given an explicit label.
+      const beforeLabel = `Before restoring "${label}" — ${new Date().toLocaleString()}`;
+      await saveBoardSnapshotWithLabel(useAppStore.getState(), beforeLabel);
+
+      // Step 2: fetch and apply the chosen snapshot.
       const res = await fetch(`/api/board-versions/${id}`);
       const data = await res.json();
       if (res.ok && data.version?.data) {
         restoreBoardsSnapshot(data.version.data);
-        setVersionStatus("Restored — canvas has been replaced with the snapshot.");
+        setVersionStatus("Restored — your previous state was saved as a new checkpoint at the top of the list.");
+        // Refresh the list so the new "Before restoring…" snapshot is visible.
+        loadVersions();
       } else {
         setVersionStatus(data.error || "Restore failed");
       }
@@ -76,7 +86,7 @@ export function ProfilePanel() {
       setVersionStatus("Restore failed");
     } finally {
       setRestoringId(null);
-      setTimeout(() => setVersionStatus(null), 4000);
+      setTimeout(() => setVersionStatus(null), 6000);
     }
   };
 

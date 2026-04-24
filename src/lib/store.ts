@@ -974,7 +974,11 @@ let dbLoadedOnce = false; // prevent overwriting DB before initial load complete
 // 14-day TTL sweep still runs, so storage stays bounded.
 let lastSnapshotAt = 0;
 let lastSnapshotHash = "";
-const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60 * 1000;
+// Auto-snapshot cadence — at most one snapshot every 2 hours per browser
+// session, gated additionally by a content-hash dedupe so identical state
+// never produces a new row. A separate setInterval fires every 2 hours so
+// even an idle session gets periodic checkpoints.
+const SNAPSHOT_MIN_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
 // Fast non-cryptographic string hash (djb2) — good enough to detect whether
 // anything in the serialized board state has changed since last snapshot.
@@ -1070,7 +1074,7 @@ useAppStore.subscribe((state) => {
 
   // DB: longer debounce (2s), only after initial DB load completes.
   // Version snapshot tries to piggyback on this; it's deduped by content
-  // hash and a 5-minute minimum interval so it only persists meaningful
+  // hash and a 2-hour minimum interval so it only persists meaningful
   // changes (see createAutoSnapshot).
   if (dbLoadedOnce) {
     if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
@@ -1080,6 +1084,17 @@ useAppStore.subscribe((state) => {
     }, 2000);
   }
 });
+
+// Heartbeat: even if the user doesn't make any changes, fire a snapshot
+// attempt every 2 hours. createAutoSnapshot's hash dedupe will skip if the
+// content hasn't changed, so this is cheap when idle but ensures long
+// editing sessions still produce regular checkpoints.
+if (typeof window !== "undefined") {
+  setInterval(() => {
+    if (!dbLoadedOnce) return;
+    createAutoSnapshot(useAppStore.getState());
+  }, 2 * 60 * 60 * 1000);
+}
 
 // Restore unfinalized image sources from IndexedDB into items with empty src.
 // Runs after state loads (from localStorage and/or DB) to rehydrate pasted/dropped
