@@ -167,6 +167,11 @@ export interface BoardItem {
   progressText?: string;
   expectedDuration?: number; // seconds, for progress estimation
   starred?: boolean;
+  // File size of the uploaded/dropped asset. Written when we know it
+  // (drop, paste, folder-add). Used to pre-flight per-model input limits
+  // before a generate call — so a 50 MB video can live on the canvas fine
+  // but we warn before burning credits on a model that caps at 20 MB.
+  sizeBytes?: number;
   // Persisted polling state so generations resume if the page refreshes.
   // Written when /api/generate returns a requestId; cleared once we hit
   // the terminal state on the next poll.

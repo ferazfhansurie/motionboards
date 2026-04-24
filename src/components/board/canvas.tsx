@@ -17,25 +17,6 @@ import { Minimap } from "./minimap";
 import { UILayer } from "@/components/ui/ui-layer";
 import { parsePsdBuffer } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
-import { showToast } from "@/lib/ui-store";
-
-// Vercel serverless functions cap the request body at ~4.5 MB on Hobby (and
-// /api/upload goes through a function). Hold back a little for multipart
-// overhead and reject anything over this on the client so the user doesn't
-// see "413" or "Image too large" after waiting for a background upload.
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
-
-function tooLargeMessage(file: { size: number; type?: string }): string {
-  const mb = (file.size / 1024 / 1024).toFixed(1);
-  const kind = (file.type || "").startsWith("video/")
-    ? "Video"
-    : (file.type || "").startsWith("audio/")
-      ? "Audio"
-      : (file.type || "").startsWith("image/")
-        ? "Image"
-        : "File";
-  return `${kind} too large (${mb} MB). Upload cap is 4 MB — compress and try again.`;
-}
 
 // Upload file to fal storage, returns URL. Falls back to data URI on failure.
 async function uploadFile(file: File): Promise<string> {
@@ -513,10 +494,6 @@ export function Canvas() {
           e.preventDefault();
           const file = clipItem.getAsFile();
           if (!file) continue;
-          if (file.size > MAX_UPLOAD_BYTES) {
-            showToast(tooLargeMessage(file), { kind: "error", durationMs: 6000 });
-            continue;
-          }
 
           // Show placeholder immediately with data URI (survives refresh unlike blob URLs)
           const placeholderId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -538,6 +515,7 @@ export function Canvas() {
                 height: h,
                 src: dataUri,
                 fileName: file.name,
+                sizeBytes: file.size,
                 createdAt: new Date().toISOString(),
               });
               // Upload in background, replace data URI with hosted URL
@@ -564,12 +542,6 @@ export function Canvas() {
       if (!canvasRect) return;
 
       files.forEach(async (file, i) => {
-        // Reject oversized files up front — the background /api/upload would
-        // otherwise 413 after the item's already on the canvas.
-        if (file.size > MAX_UPLOAD_BYTES && !file.name.toLowerCase().endsWith(".psd")) {
-          showToast(tooLargeMessage(file), { kind: "error", durationMs: 6000 });
-          return;
-        }
         const baseX = (e.clientX - canvasRect.left - panX) / zoom + i * 20;
         const baseY = (e.clientY - canvasRect.top - panY) / zoom + i * 20;
 
@@ -628,6 +600,7 @@ export function Canvas() {
               width: Math.round(img.naturalWidth * scale),
               height: Math.round(img.naturalHeight * scale),
               src: localUrl, fileName: file.name,
+              sizeBytes: file.size,
               createdAt: new Date().toISOString(),
             });
             // Upload in background
@@ -649,6 +622,7 @@ export function Canvas() {
               width: Math.round(vid.videoWidth * scale),
               height: Math.round(vid.videoHeight * scale),
               src: localUrl, fileName: file.name,
+              sizeBytes: file.size,
               createdAt: new Date().toISOString(),
             });
             uploadFile(file).then((url) => {
@@ -664,6 +638,7 @@ export function Canvas() {
               x: baseX, y: baseY,
               width: 280, height: 80,
               src: localUrl, fileName: file.name,
+              sizeBytes: file.size,
               createdAt: new Date().toISOString(),
             });
             uploadFile(file).then((url) => {

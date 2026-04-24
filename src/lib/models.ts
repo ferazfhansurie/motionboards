@@ -9,6 +9,12 @@ export interface ModelInput {
   type: "text" | "image" | "video" | "audio";
   required: boolean;
   description: string;
+  // Maximum file size (MB) the upstream provider accepts for THIS specific
+  // slot. Empty = no known limit (the generic platform-wide ceiling still
+  // applies). Enforced client-side before a generate call so the user sees
+  // a clear "Lipsync 2 Pro caps videos at 20 MB — yours is 47 MB" toast
+  // instead of an opaque 413 from the model.
+  maxMB?: number;
 }
 
 export interface ModelOption {
@@ -71,7 +77,7 @@ export const models: AIModel[] = [
     cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_urls", type: "image", required: false, description: "Reference images (optional)" },
+      { name: "image_urls", type: "image", required: false, description: "Reference images (optional)", maxMB: 7 },
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
@@ -87,7 +93,7 @@ export const models: AIModel[] = [
     cost: "~RM0.25", creditCost: 25, speed: "~25s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_url", type: "image", required: false, description: "Reference image to edit (optional)" },
+      { name: "image_url", type: "image", required: false, description: "Reference image to edit (optional)", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["auto", "1024x1024", "1024x1536", "1536x1024"], default: "auto", label: "Size" },
@@ -136,7 +142,7 @@ export const models: AIModel[] = [
     cost: "RM1.92", creditCost: 192, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
@@ -173,7 +179,7 @@ export const models: AIModel[] = [
     cost: "RM3.36", creditCost: 336, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How to animate the image" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
@@ -192,8 +198,8 @@ export const models: AIModel[] = [
     cost: "RM3.36", creditCost: 336, speed: "~2m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description" },
-      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
-      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 20 },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
@@ -235,7 +241,7 @@ export const models: AIModel[] = [
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -254,8 +260,8 @@ export const models: AIModel[] = [
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
-      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
-      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -296,7 +302,7 @@ export const models: AIModel[] = [
     disabled: true, disabledReason: "Requires ByteDance Ark integration.",
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -315,8 +321,8 @@ export const models: AIModel[] = [
     disabled: true, disabledReason: "Requires ByteDance Ark integration.",
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
-      { name: "first_frame_url", type: "image", required: true, description: "Start frame image" },
-      { name: "last_frame_url", type: "image", required: true, description: "End frame image" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -334,8 +340,8 @@ export const models: AIModel[] = [
     cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Optional caption" },
-      { name: "character_image", type: "image", required: true, description: "Character image (the person to render)" },
-      { name: "video", type: "video", required: true, description: "Pose reference video (motion + camera are preserved)" },
+      { name: "character_image", type: "image", required: true, description: "Character image (the person to render)", maxMB: 10 },
+      { name: "video", type: "video", required: true, description: "Pose reference video (motion + camera are preserved)", maxMB: 50 },
     ],
     options: {
       resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
@@ -351,8 +357,8 @@ export const models: AIModel[] = [
     cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Optional caption" },
-      { name: "character_image", type: "image", required: true, description: "Character image (the person to animate)" },
-      { name: "video", type: "video", required: true, description: "Motion reference video (source of the motion to copy)" },
+      { name: "character_image", type: "image", required: true, description: "Character image (the person to animate)", maxMB: 10 },
+      { name: "video", type: "video", required: true, description: "Motion reference video (source of the motion to copy)", maxMB: 50 },
     ],
     options: {
       resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
@@ -370,8 +376,8 @@ export const models: AIModel[] = [
     description: "Sync Labs' studio-grade lip-sync. Drop any video + an audio track and it re-renders the subject's lips to match the audio. Highest-quality tier.",
     cost: "~RM0.75/s", creditCost: 75, speed: "~2m", stable: true,
     inputs: [
-      { name: "video", type: "video", required: true, description: "Video to re-lip-sync" },
-      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match" },
+      { name: "video", type: "video", required: true, description: "Video to re-lip-sync", maxMB: 20 },
+      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 20 },
     ],
     perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
   },
@@ -383,8 +389,8 @@ export const models: AIModel[] = [
     description: "Sync Labs' fast + cheap lip-sync. Same input shape as Pro — video + audio — tuned for speed over maximum fidelity.",
     cost: "~RM0.30/s", creditCost: 30, speed: "~1m", stable: true,
     inputs: [
-      { name: "video", type: "video", required: true, description: "Video to re-lip-sync" },
-      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match" },
+      { name: "video", type: "video", required: true, description: "Video to re-lip-sync", maxMB: 20 },
+      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 20 },
     ],
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
   },
@@ -399,7 +405,7 @@ export const models: AIModel[] = [
     cost: "~RM0.03", creditCost: 3, speed: "~10s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Sound description (e.g. 'dog barking in a park')" },
-      { name: "video_url", type: "video", required: false, description: "Optional video to synchronize audio with" },
+      { name: "video_url", type: "video", required: false, description: "Optional video to synchronize audio with", maxMB: 20 },
     ],
     options: {
       duration: { values: ["2s", "4s", "6s", "8s", "10s"], default: "8s", label: "Duration" },
@@ -469,7 +475,7 @@ export const models: AIModel[] = [
     cost: "~RM0.06", creditCost: 6, speed: "~10s", stable: true,
     inputs: [
       { name: "text", type: "text", required: true, description: "Text to speak" },
-      { name: "audio_url", type: "audio", required: true, description: "Voice reference audio to clone" },
+      { name: "audio_url", type: "audio", required: true, description: "Voice reference audio to clone", maxMB: 10 },
     ],
   },
 ];

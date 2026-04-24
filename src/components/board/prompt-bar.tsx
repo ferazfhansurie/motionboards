@@ -659,6 +659,47 @@ export function PromptBar() {
         }
       };
 
+      // Pre-flight size check: each model declares a maxMB per file input.
+      // Walk the inputs the user has actually tagged, match each to the
+      // model's slot by type (image → image input, video → video input,
+      // audio → audio input), and reject before firing the generate call
+      // if any tagged item is over that slot's cap. The user keeps the file
+      // on their canvas — it just can't be used with THIS model.
+      const imageInputs = selectedModel.inputs.filter((i) => i.type === "image");
+      const videoInputs = selectedModel.inputs.filter((i) => i.type === "video");
+      const audioInputs = selectedModel.inputs.filter((i) => i.type === "audio");
+      const imageItemsTagged: Array<{ item: BoardItem; slot: typeof imageInputs[0] }> = [];
+      if (startItem && imageInputs[0]) imageItemsTagged.push({ item: startItem, slot: imageInputs.find((i) => /first|start/i.test(i.name)) || imageInputs[0] });
+      if (endItem) {
+        const endSlot = imageInputs.find((i) => /last|end/i.test(i.name));
+        if (endSlot) imageItemsTagged.push({ item: endItem, slot: endSlot });
+      }
+      for (const r of refItems) {
+        if (!r) continue;
+        const isImg = r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image");
+        const isVid = r.type === "video" || (r.type === "generation" && r.outputType === "video");
+        if (isImg && imageInputs[0] && !imageItemsTagged.some((x) => x.item.id === r.id)) {
+          imageItemsTagged.push({ item: r as BoardItem, slot: imageInputs[0] });
+        }
+        if (isVid && videoInputs[0]) {
+          imageItemsTagged.push({ item: r as BoardItem, slot: videoInputs[0] });
+        }
+      }
+      if (audioItem && audioInputs[0]) {
+        imageItemsTagged.push({ item: audioItem, slot: audioInputs[0] });
+      }
+      for (const { item: it, slot } of imageItemsTagged) {
+        if (!slot.maxMB || !it.sizeBytes) continue;
+        const capBytes = slot.maxMB * 1024 * 1024;
+        if (it.sizeBytes > capBytes) {
+          const actualMB = (it.sizeBytes / 1024 / 1024).toFixed(1);
+          const msg = `${selectedModel.name} caps "${slot.description || slot.name}" at ${slot.maxMB} MB — your file is ${actualMB} MB. Try a different file on this model, or use one that accepts larger inputs (Veo I2V, Wan Animate, etc).`;
+          showToast(msg, { kind: "error", durationMs: 8000 });
+          useAppStore.getState().removeItem(genItem.id);
+          return;
+        }
+      }
+
       // For v2v models like Wan Animate we need BOTH a character image and a
       // reference video. Pick the first image-ish ref for `inputImage` and the
       // first video ref for `inputVideo`.
