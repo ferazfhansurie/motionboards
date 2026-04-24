@@ -20,7 +20,15 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const accountId = process.env.R2_ACCOUNT_ID;
+    // Robust account-id parsing — users sometimes paste the full S3 endpoint
+    // URL into R2_ACCOUNT_ID by mistake. Strip https:// prefix and any
+    // .r2.cloudflarestorage.com suffix so the endpoint we build is correct
+    // regardless of how the env var was entered.
+    const rawAccountId = (process.env.R2_ACCOUNT_ID || "").trim();
+    const accountId = rawAccountId
+      .replace(/^https?:\/\//, "")
+      .replace(/\.r2\.cloudflarestorage\.com.*$/, "")
+      .replace(/\/.*$/, "");
     const accessKeyId = process.env.R2_ACCESS_KEY_ID;
     const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
     const bucket = process.env.R2_BUCKET;
