@@ -652,7 +652,9 @@ export function PromptBar() {
             handleUploadUrl: "/api/blob/handle-upload",
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onUploadProgress: (event: any) => {
-              const pct = event?.percentage ?? event?.loaded && event?.total ? Math.round((event.loaded / event.total) * 100) : null;
+              const pct = typeof event?.percentage === "number"
+                ? event.percentage
+                : (event?.loaded && event?.total ? Math.round((event.loaded / event.total) * 100) : null);
               if (pct != null) {
                 useAppStore.getState().updateItem(genItem.id, {
                   progressText: `Uploading ${sizeMB} MB — ${pct}%`,
