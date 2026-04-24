@@ -18,16 +18,20 @@ import { UILayer } from "@/components/ui/ui-layer";
 import { parsePsdBuffer } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
-// Upload a file and return a hosted URL. Routes through /api/upload → Neon.
-// Requires Vercel Fluid Compute enabled on the project to accept bodies
-// larger than the 4.5 MB default; see Settings → Compute in Vercel.
-// (The @vercel/blob client-upload path was removed because its multipart
-// coordinator endpoint fails CORS from our domain.)
+// Upload a file and return a hosted URL. Streams raw body → /api/upload →
+// Vercel Blob. No FormData: buffered body parsing is what caps serverless
+// requests at 4.5 MB. Streaming through the function under Fluid Compute
+// lifts that cap entirely.
 async function uploadFile(file: File): Promise<string> {
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "content-type": file.type || "application/octet-stream",
+        "x-filename": file.name || "upload.bin",
+      },
+      body: file,
+    });
     const data = await res.json();
     if (data.url) return data.url;
   } catch {}

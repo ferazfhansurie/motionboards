@@ -626,9 +626,16 @@ export function PromptBar() {
           useAppStore.getState().updateItem(genItem.id, {
             progressText: `Uploading ${sizeMB} MB...`,
           });
-          const form = new FormData();
-          form.append("file", file);
-          const upRes = await fetch("/api/upload", { method: "POST", body: form });
+          // Raw body, not FormData — buffered body parsing is what triggers
+          // Vercel's 4.5 MB cap. Streaming lets Blob receive the full file.
+          const upRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: {
+              "content-type": file.type || "application/octet-stream",
+              "x-filename": file.name || "upload.bin",
+            },
+            body: file,
+          });
           if (upRes.ok) {
             const upData = await upRes.json();
             if (upData.url && !isUnfinalized(upData.url)) {
@@ -638,10 +645,11 @@ export function PromptBar() {
           }
           if (upRes.status === 413) {
             throw new Error(
-              `Upload rejected at 4.5 MB cap (${sizeMB} MB). Enable Vercel Fluid Compute in project settings to lift this cap, or compress the file.`
+              `Upload still rejected as too large (${sizeMB} MB) even with the streamed-body path. Compress the file and try again.`
             );
           }
-          throw new Error(`Upload failed with status ${upRes.status}`);
+          const errText = await upRes.text().catch(() => "");
+          throw new Error(`Upload failed (${upRes.status}) ${errText.slice(0, 200)}`);
         } catch (uploadErr) {
           const msg = uploadErr instanceof Error ? uploadErr.message : "unknown";
           console.error("[resolveUrl] active upload failed for item", item.id, msg);
