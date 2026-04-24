@@ -1,6 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getUserFromToken, getUserAIInstruction } from "@/lib/db";
+import { models } from "@/lib/models";
+
+// Render the live model catalog as a compact reference the chat model can
+// quote from. Includes everything the user actually has on their picker —
+// id, type, what category, what each input slot expects, what options the
+// model accepts. Disabled models get marked so we don't recommend them.
+function buildModelCatalog(): string {
+  const lines: string[] = [];
+  for (const m of models) {
+    const inputs = m.inputs
+      .map((i) => `${i.name} (${i.type}${i.required ? ", required" : ""}): ${i.description}`)
+      .join(" | ");
+    const opts = m.options
+      ? Object.entries(m.options)
+          .map(([k, v]) => {
+            if ("values" in v) return `${k}=${v.values.join("/")} default ${v.default}`;
+            return `${k} toggle (default ${v.default})`;
+          })
+          .join(", ")
+      : "";
+    lines.push(
+      `- ${m.name} [id: ${m.id}] — ${m.category}/${m.type} via ${m.provider}, ${m.cost}, ~${m.speed}${m.disabled ? " (DISABLED — not available)" : ""}\n` +
+      `  Inputs: ${inputs}\n` +
+      (opts ? `  Options: ${opts}\n` : "") +
+      `  ${m.description}`
+    );
+  }
+  return lines.join("\n");
+}
+const MODEL_CATALOG = buildModelCatalog();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -30,7 +60,15 @@ Prompt-crafting mode (when the user is clearly asking for a generation prompt):
 - Default to hyper-realistic (real camera/lens refs, natural light, film grain) unless the user asks for stylized/animated.
 - If they say "shorter", "simpler", "more compact" — cut hard.
 
-Figure out which mode the user wants from context. Err toward conversational unless they're obviously requesting a prompt.`;
+Figure out which mode the user wants from context. Err toward conversational unless they're obviously requesting a prompt.
+
+## MODEL CATALOG (live — pulled from the user's picker)
+
+You know exactly which models are wired up on this MotionBoards instance and what each one needs. When a user picks a model, asks "what does X take?", or you're crafting a prompt for a specific model, use this list as your source of truth. Don't invent fields the model doesn't have. Don't recommend a DISABLED model.
+
+If the user asks "what should I tag for [model]?", answer using the input list — name the slot (e.g. "tag a still image as the character_image input") and what each slot expects. If they ask for a prompt, tailor the wording to the model's strengths and accepted options (aspect ratio, duration, resolution).
+
+${MODEL_CATALOG}`;
 
 // The client already sends OpenAI-shaped parts (text + image_url), so we just
 // pass them through to chat.completions after a shallow type cast.
