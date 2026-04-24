@@ -642,7 +642,7 @@ export function PromptBar() {
                 : blob.type.startsWith("audio/") ? "Audio"
                 : blob.type.startsWith("image/") ? "Image"
                 : "File";
-              throw new Error(`${kind} too large (${mb} MB). Upload cap is 4 MB — compress and try again.`);
+              throw new Error(`${kind} too large (${mb} MB). Upload cap is 50 MB — compress and try again.`);
             }
             throw new Error(`Upload failed: ${detail}`);
           }
@@ -1624,6 +1624,7 @@ function RequirementsRow({
     hint: string;
     ok: boolean;
     required: boolean;
+    maxMB?: number;
     // Interactive state: when a canvas item is selected, the pill becomes
     // clickable if its type matches this slot. `onClick` runs the binding.
     canClick: boolean;
@@ -1689,6 +1690,7 @@ function RequirementsRow({
           hint: "Select an image on the canvas, then click here",
           ok: hasImageRef,
           required: !!inp.required,
+          maxMB: inp.maxMB,
           canClick: selectedIsImage,
           clickMode: selAlreadyInRefs ? "clear" : selectedIsImage ? "set" : null,
           onClick: () => {
@@ -1706,6 +1708,7 @@ function RequirementsRow({
           hint: "Select a video on the canvas, then click here",
           ok: hasVideoRef,
           required: !!inp.required,
+          maxMB: inp.maxMB,
           canClick: selectedIsVideo,
           clickMode: selAlreadyInRefs ? "clear" : selectedIsVideo ? "set" : null,
           onClick: () => {
@@ -1721,6 +1724,7 @@ function RequirementsRow({
           hint: "Select an audio clip, then click here",
           ok: hasAudio,
           required: !!inp.required,
+          maxMB: inp.maxMB,
           canClick: selectedIsAudio,
           clickMode: selectedIsAudio && audioInputId === selectedItem?.id ? "clear" : selectedIsAudio ? "set" : null,
           onClick: () => {
@@ -1781,6 +1785,11 @@ function RequirementsRow({
               {r.ok ? "✓" : r.required ? "!" : "○"}
             </span>
             <span>{r.label}</span>
+            {r.maxMB ? (
+              <span className={`text-[9px] font-semibold tracking-tight ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                max {r.maxMB} MB
+              </span>
+            ) : null}
             <span className={`rounded-full px-1.5 py-[1px] text-[8.5px] font-black uppercase tracking-wider ${statusTone}`}>
               {armed && r.clickMode === "set" ? "click" : armed && r.clickMode === "clear" ? "unset" : status}
             </span>

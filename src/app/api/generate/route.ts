@@ -5,9 +5,9 @@ import { submitPrompt, uploadFromUrl } from "@/lib/comfy";
 import wanAnimatePoseWorkflow from "@/lib/comfy-workflows/wan-animate-pose.json";
 
 // Synchronous providers (Segmind, Gemini image, Fish TTS, OpenAI TTS) block the
-// route until the upstream returns. Nano Banana 2 at 4K can take 60–120s, so
-// the gateway-level cap needs to clear that with margin. 300s is the Vercel Pro
-// per-request limit; on Hobby this gets clamped down to 60.
+// route until the upstream returns. Nano Banana 2 at 4K runs 60–120s, and
+// Seedance at 1080p gets close. 300s is Vercel Pro's per-request ceiling —
+// which we're now on, so this takes effect.
 export const maxDuration = 300;
 
 // Persist a generated binary blob to Neon and return an absolute URL.

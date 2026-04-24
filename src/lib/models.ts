@@ -81,7 +81,7 @@ export const models: AIModel[] = [
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
-      resolution: { values: ["0.5K", "1K", "2K"], default: "1K", label: "Resolution" },
+      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
     },
   },
 
@@ -376,8 +376,8 @@ export const models: AIModel[] = [
     description: "Sync Labs' studio-grade lip-sync. Drop any video + an audio track and it re-renders the subject's lips to match the audio. Highest-quality tier.",
     cost: "~RM0.75/s", creditCost: 75, speed: "~2m", stable: true,
     inputs: [
-      { name: "video", type: "video", required: true, description: "Video to re-lip-sync", maxMB: 20 },
-      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 20 },
+      { name: "video", type: "video", required: true, description: "Video to re-lip-sync", maxMB: 50 },
+      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 50 },
     ],
     perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
   },
@@ -389,8 +389,8 @@ export const models: AIModel[] = [
     description: "Sync Labs' fast + cheap lip-sync. Same input shape as Pro — video + audio — tuned for speed over maximum fidelity.",
     cost: "~RM0.30/s", creditCost: 30, speed: "~1m", stable: true,
     inputs: [
-      { name: "video", type: "video", required: true, description: "Video to re-lip-sync", maxMB: 20 },
-      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 20 },
+      { name: "video", type: "video", required: true, description: "Video to re-lip-sync", maxMB: 50 },
+      { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 50 },
     ],
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
   },
