@@ -641,10 +641,29 @@ export function PromptBar() {
           // Large (or small-but-failed) file → direct-to-Blob upload.
           const { upload } = await import("@vercel/blob/client");
           const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const uploaded = await upload(`uploads/${Date.now()}_${safeName}`, file, {
+          const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+          useAppStore.getState().updateItem(genItem.id, {
+            progressText: `Uploading ${sizeMB} MB to storage...`,
+          });
+          // Race the upload against a 3-minute wall-clock ceiling. Without
+          // this the client can hang indefinitely if Blob silently stalls.
+          const uploadPromise = upload(`uploads/${Date.now()}_${safeName}`, file, {
             access: "public",
             handleUploadUrl: "/api/blob/handle-upload",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onUploadProgress: (event: any) => {
+              const pct = event?.percentage ?? event?.loaded && event?.total ? Math.round((event.loaded / event.total) * 100) : null;
+              if (pct != null) {
+                useAppStore.getState().updateItem(genItem.id, {
+                  progressText: `Uploading ${sizeMB} MB — ${pct}%`,
+                });
+              }
+            },
           });
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Upload timed out after 3 minutes (${sizeMB} MB). Check your connection, compress the file, or try again.`)), 3 * 60 * 1000)
+          );
+          const uploaded = await Promise.race([uploadPromise, timeoutPromise]);
           if (uploaded?.url) {
             useAppStore.getState().updateItem(item.id, { src: uploaded.url });
             return uploaded.url;
