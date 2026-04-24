@@ -636,7 +636,14 @@ export function PromptBar() {
             console.error("[resolveUrl] /api/upload failed:", detail, { url: url.slice(0, 80), size: blob.size, type: blob.type });
             // Special-case the common ones
             if (upRes.status === 401) throw new Error("Session expired — please refresh and try again.");
-            if (upRes.status === 413) throw new Error(`Image too large (${(blob.size / 1024 / 1024).toFixed(1)}MB). Use a smaller image.`);
+            if (upRes.status === 413) {
+              const mb = (blob.size / 1024 / 1024).toFixed(1);
+              const kind = blob.type.startsWith("video/") ? "Video"
+                : blob.type.startsWith("audio/") ? "Audio"
+                : blob.type.startsWith("image/") ? "Image"
+                : "File";
+              throw new Error(`${kind} too large (${mb} MB). Upload cap is 4 MB — compress and try again.`);
+            }
             throw new Error(`Upload failed: ${detail}`);
           }
           const upData = await upRes.json();
