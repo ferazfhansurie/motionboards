@@ -629,6 +629,11 @@ export function PromptBar() {
 
           // Try Cloudflare R2 presigned upload first — browser PUTs directly
           // to R2 so Vercel's 4.5 MB function-body cap is irrelevant.
+          // Two separate try-blocks so we can tell which leg failed:
+          //   leg 1: server-side presign request (would mean env vars missing)
+          //   leg 2: browser → R2 PUT (almost always a CORS issue on bucket)
+          let uploadUrl: string | null = null;
+          let publicUrl: string | null = null;
           try {
             const presign = await fetch("/api/upload-presign", {
               method: "POST",
@@ -639,7 +644,19 @@ export function PromptBar() {
               }),
             });
             if (presign.ok) {
-              const { uploadUrl, publicUrl } = await presign.json();
+              const data = await presign.json();
+              uploadUrl = data.uploadUrl;
+              publicUrl = data.publicUrl;
+            } else {
+              const pErr = await presign.text().catch(() => "");
+              console.warn(`[resolveUrl] R2 presign failed (${presign.status})`, pErr.slice(0, 300));
+            }
+          } catch (presignErr) {
+            console.warn("[resolveUrl] R2 presign request threw", presignErr);
+          }
+
+          if (uploadUrl && publicUrl) {
+            try {
               const putCtrl = new AbortController();
               const putTimeout = setTimeout(() => putCtrl.abort(), 300_000);
               const putRes = await fetch(uploadUrl, {
@@ -649,18 +666,26 @@ export function PromptBar() {
                 signal: putCtrl.signal,
               });
               clearTimeout(putTimeout);
-              if (putRes.ok && publicUrl) {
+              if (putRes.ok) {
                 useAppStore.getState().updateItem(item.id, { src: publicUrl });
-                return publicUrl as string;
+                return publicUrl;
               }
               const r2Err = await putRes.text().catch(() => "");
-              console.warn(`[resolveUrl] R2 PUT failed ${putRes.status}`, r2Err.slice(0, 300));
-            } else {
-              const pErr = await presign.text().catch(() => "");
-              console.warn(`[resolveUrl] presign failed ${presign.status}`, pErr.slice(0, 300));
+              console.warn(`[resolveUrl] R2 PUT failed ${putRes.status}`, r2Err.slice(0, 500));
+            } catch (putErr) {
+              // "TypeError: Failed to fetch" here = browser blocked the
+              // request, almost always because the R2 bucket's CORS doesn't
+              // allow PUT from this origin. Fix in Cloudflare → R2 → bucket
+              // → Settings → CORS Policy. AllowedOrigins must match exactly
+              // (https://motionboards.vercel.app — no trailing slash),
+              // AllowedMethods must include PUT, AllowedHeaders ["*"].
+              console.warn(
+                "[resolveUrl] R2 PUT threw — likely CORS. Verify bucket CORS allows PUT from",
+                window.location.origin,
+                "Underlying error:",
+                putErr
+              );
             }
-          } catch (r2Err) {
-            console.warn("[resolveUrl] R2 upload threw, falling back to /api/upload", r2Err);
           }
 
           // Fallback: legacy Neon upload (capped ~4.5 MB). Only useful for
