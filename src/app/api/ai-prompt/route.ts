@@ -116,12 +116,15 @@ export async function POST(req: NextRequest) {
     const chatModel = resolveChatModel(userModel);
 
     // GPT-5 family is more restrictive than GPT-4.x:
-    //   - max_tokens → max_completion_tokens
-    //   - temperature must be the default (1) — any custom value is rejected
-    // Build the params conditionally so the picker works for the whole roster.
+    //   - max_tokens → max_completion_tokens, and the budget is SHARED with
+    //     hidden reasoning tokens. 1500 wasn't enough — the model spent it
+    //     all on reasoning and emitted nothing ("Could not generate a
+    //     response"). Bumping to 4000 and setting reasoning_effort=minimal
+    //     so a chat reply actually reaches the wire.
+    //   - temperature must be the default (1) — any custom value is rejected.
     const isGpt5Family = chatModel.startsWith("gpt-5");
     const tunableParams: Record<string, unknown> = isGpt5Family
-      ? { max_completion_tokens: 1500 }
+      ? { max_completion_tokens: 4000, reasoning_effort: "minimal" }
       : { max_tokens: 1500, temperature: 0.8 };
 
     const stream = await openai.chat.completions.create({

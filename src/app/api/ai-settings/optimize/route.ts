@@ -62,11 +62,15 @@ ${capped.map((p: string, i: number) => `${i + 1}. ${p}`).join("\n")}
 
 Respond with ONLY the new instruction text — no preamble, no explanation, no markdown formatting. Start with a line like "Keep prompts…" or "Always produce…"`;
 
-    // GPT-5 family uses max_completion_tokens AND rejects custom temperature.
-    // GPT-4.x accepts both max_tokens and a tunable temperature.
+    // GPT-5: max_completion_tokens shares budget with hidden reasoning
+    // tokens. Optimize wants a short paragraph back so 2000 covers reasoning
+    // + output even with the catalog context. reasoning_effort=low keeps
+    // overhead modest while still letting the model do meaningful analysis
+    // (this is more analytical than chat, hence "low" not "minimal").
+    // GPT-4.x: tuned 0.4 temperature for consistent suggestion quality.
     const isGpt5Family = chatModel.startsWith("gpt-5");
     const tunableParams: Record<string, unknown> = isGpt5Family
-      ? { max_completion_tokens: 600 }
+      ? { max_completion_tokens: 2000, reasoning_effort: "low" }
       : { max_tokens: 600, temperature: 0.4 };
 
     const response = await openai.chat.completions.create({
