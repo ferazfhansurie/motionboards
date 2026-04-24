@@ -622,60 +622,26 @@ export function PromptBar() {
           const fileName = `${item.id}.${ext}`;
           const file = new File([blob], fileName, { type: blob.type || "application/octet-stream" });
 
-          const SMALL_FILE_BYTES = 4 * 1024 * 1024;
-          // Small file → legacy Neon /api/upload path.
-          if (blob.size <= SMALL_FILE_BYTES) {
-            const form = new FormData();
-            form.append("file", file);
-            const upRes = await fetch("/api/upload", { method: "POST", body: form });
-            if (upRes.ok) {
-              const upData = await upRes.json();
-              if (upData.url && !isUnfinalized(upData.url)) {
-                useAppStore.getState().updateItem(item.id, { src: upData.url });
-                return upData.url as string;
-              }
-            }
-            // Fall through to Blob on any failure.
-          }
-
-          // Large (or small-but-failed) file → direct-to-Blob upload.
-          const { upload } = await import("@vercel/blob/client");
-          const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
           const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
           useAppStore.getState().updateItem(genItem.id, {
-            progressText: `Uploading ${sizeMB} MB to storage...`,
+            progressText: `Uploading ${sizeMB} MB...`,
           });
-          // Race the upload against a 3-minute wall-clock ceiling. Without
-          // this the client can hang indefinitely if Blob silently stalls.
-          const uploadPromise = upload(`uploads/${Date.now()}_${safeName}`, file, {
-            access: "public",
-            handleUploadUrl: "/api/blob/handle-upload",
-            // Force single-part upload. The multipart coordinator at
-            // vercel.com/api/blob fails CORS preflight on this deployment;
-            // single-part is direct browser → blob store URL and just works.
-            // 50 MB is the single-part ceiling which covers our use cases.
-            multipart: false,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onUploadProgress: (event: any) => {
-              const pct = typeof event?.percentage === "number"
-                ? event.percentage
-                : (event?.loaded && event?.total ? Math.round((event.loaded / event.total) * 100) : null);
-              if (pct != null) {
-                useAppStore.getState().updateItem(genItem.id, {
-                  progressText: `Uploading ${sizeMB} MB — ${pct}%`,
-                });
-              }
-            },
-          });
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Upload timed out after 3 minutes (${sizeMB} MB). Check your connection, compress the file, or try again.`)), 3 * 60 * 1000)
-          );
-          const uploaded = await Promise.race([uploadPromise, timeoutPromise]);
-          if (uploaded?.url) {
-            useAppStore.getState().updateItem(item.id, { src: uploaded.url });
-            return uploaded.url;
+          const form = new FormData();
+          form.append("file", file);
+          const upRes = await fetch("/api/upload", { method: "POST", body: form });
+          if (upRes.ok) {
+            const upData = await upRes.json();
+            if (upData.url && !isUnfinalized(upData.url)) {
+              useAppStore.getState().updateItem(item.id, { src: upData.url });
+              return upData.url as string;
+            }
           }
-          throw new Error("Upload returned no URL");
+          if (upRes.status === 413) {
+            throw new Error(
+              `Upload rejected at 4.5 MB cap (${sizeMB} MB). Enable Vercel Fluid Compute in project settings to lift this cap, or compress the file.`
+            );
+          }
+          throw new Error(`Upload failed with status ${upRes.status}`);
         } catch (uploadErr) {
           const msg = uploadErr instanceof Error ? uploadErr.message : "unknown";
           console.error("[resolveUrl] active upload failed for item", item.id, msg);
