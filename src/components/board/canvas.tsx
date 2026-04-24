@@ -43,6 +43,7 @@ async function uploadFile(file: File): Promise<string> {
     const uploaded = await upload(`uploads/${Date.now()}_${safeName}`, file, {
       access: "public",
       handleUploadUrl: "/api/blob/handle-upload",
+      multipart: false, // single-part, skips the broken multipart coordinator
     });
     return uploaded.url;
   } catch (err) {

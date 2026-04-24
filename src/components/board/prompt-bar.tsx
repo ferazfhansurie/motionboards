@@ -650,6 +650,11 @@ export function PromptBar() {
           const uploadPromise = upload(`uploads/${Date.now()}_${safeName}`, file, {
             access: "public",
             handleUploadUrl: "/api/blob/handle-upload",
+            // Force single-part upload. The multipart coordinator at
+            // vercel.com/api/blob fails CORS preflight on this deployment;
+            // single-part is direct browser → blob store URL and just works.
+            // 50 MB is the single-part ceiling which covers our use cases.
+            multipart: false,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onUploadProgress: (event: any) => {
               const pct = typeof event?.percentage === "number"
