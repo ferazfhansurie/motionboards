@@ -9,6 +9,19 @@ import { getUserFromToken } from "@/lib/db";
 // send the file straight to Blob without passing through a Vercel function
 // (which has a ~4.5 MB body cap on all plans).
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // Fail fast with a message the user can actually fix if the Blob store
+  // hasn't been linked yet. Without this env var `handleUpload` throws an
+  // opaque "Failed to retrieve the client token" downstream.
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json(
+      {
+        error:
+          "Vercel Blob not configured. In your Vercel dashboard → Storage → Create Blob → Connect to this project. That injects BLOB_READ_WRITE_TOKEN automatically. Redeploy after connecting.",
+      },
+      { status: 500 }
+    );
+  }
+
   const body = (await req.json()) as HandleUploadBody;
   try {
     const jsonResponse = await handleUpload({
