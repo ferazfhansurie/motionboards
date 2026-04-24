@@ -221,6 +221,10 @@ export interface BoardItem {
   drawingPaths?: string; // SVG path data
   strokeColor?: string;
   strokeWidth?: number;
+  // Group membership — items sharing the same groupId move together when
+  // any one is dragged or arrow-key-moved, and are selected as a unit.
+  // Created via groupSelectedItems(); cleared via ungroupSelectedItems().
+  groupId?: string;
 }
 
 export interface Board {
@@ -344,6 +348,11 @@ export interface AppState {
   // canvas units. Used by the arrow-key handler outside organize mode for
   // Tetris-style step movement.
   moveSelectedItems: (dx: number, dy: number) => void;
+  // Group / ungroup. Group assigns a fresh shared groupId to every selected
+  // item; ungroup clears it. Selecting any item in a group via selectItem()
+  // expands the selection to the whole group automatically.
+  groupSelectedItems: () => void;
+  ungroupSelectedItems: () => void;
   setIsGenerating: (v: boolean) => void;
   setGenerationOptions: (opts: Record<string, unknown>) => void;
   setGenerationOption: (key: string, value: unknown) => void;
@@ -525,7 +534,18 @@ export const useAppStore = create<AppState>((set) => {
       inputRefs: s.inputRefs.filter((r) => r !== id),
       audioInputId: s.audioInputId === id ? null : s.audioInputId,
     })),
-  selectItem: (id) => set({ selectedItemId: id, selectedItemIds: id ? [id] : [] }),
+  selectItem: (id) =>
+    set((s) => {
+      if (!id) return { selectedItemId: null, selectedItemIds: [] };
+      const item = s.items.find((i) => i.id === id);
+      // No group → behave exactly as before (single-item select).
+      if (!item || !item.groupId) {
+        return { selectedItemId: id, selectedItemIds: [id] };
+      }
+      // Item has a groupId → select every member of that group as a unit.
+      const ids = s.items.filter((i) => i.groupId === item.groupId).map((i) => i.id);
+      return { selectedItemId: id, selectedItemIds: ids };
+    }),
   selectItems: (ids) => set({ selectedItemIds: ids, selectedItemId: ids[0] || null }),
   copySelectedItems: () =>
     set((s) => {
@@ -753,6 +773,45 @@ export const useAppStore = create<AppState>((set) => {
         items: s.items.map((it) =>
           idSet.has(it.id) ? { ...it, x: it.x + dx, y: it.y + dy } : it
         ),
+      };
+    }),
+
+  groupSelectedItems: () =>
+    set((s) => {
+      const ids = s.selectedItemIds.length > 0
+        ? s.selectedItemIds
+        : (s.selectedItemId ? [s.selectedItemId] : []);
+      if (ids.length < 2) return s;
+      const idSet = new Set(ids);
+      // Mint a new groupId every time so re-grouping after edits doesn't
+      // accidentally share state with an earlier group of the same items.
+      const groupId = `grp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      // Push undo so users can roll back a misclick on Ctrl+G
+      const newUndoStack = [...s.undoStack.slice(-49), s.items];
+      return {
+        undoStack: newUndoStack,
+        redoStack: [],
+        items: s.items.map((it) => (idSet.has(it.id) ? { ...it, groupId } : it)),
+      };
+    }),
+
+  ungroupSelectedItems: () =>
+    set((s) => {
+      const ids = s.selectedItemIds.length > 0
+        ? s.selectedItemIds
+        : (s.selectedItemId ? [s.selectedItemId] : []);
+      if (ids.length === 0) return s;
+      const idSet = new Set(ids);
+      const newUndoStack = [...s.undoStack.slice(-49), s.items];
+      return {
+        undoStack: newUndoStack,
+        redoStack: [],
+        items: s.items.map((it) => {
+          if (!idSet.has(it.id) || !it.groupId) return it;
+          const next = { ...it };
+          delete next.groupId;
+          return next;
+        }),
       };
     }),
   clearRefs: () => set({ startFrameId: null, endFrameId: null, inputRefs: [], audioInputId: null }),

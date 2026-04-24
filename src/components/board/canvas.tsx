@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useEffect, useState } from "react";
-import { Download, Copy, Trash2, X, LayoutGrid } from "lucide-react";
+import { Download, Copy, Trash2, X, LayoutGrid, Group, Ungroup } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { BoardItemCard } from "./board-item";
 import { PromptBar } from "./prompt-bar";
@@ -114,6 +114,10 @@ export function Canvas() {
   // Drag state for moving items
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  // Original positions of every item being dragged together — populated when
+  // the user starts dragging an item that's part of a multi-selection or a
+  // group. Empty / null = single-item drag (legacy fast path).
+  const [dragGroupStart, setDragGroupStart] = useState<Record<string, { x: number; y: number }> | null>(null);
 
   // Resize state
   const [resizeId, setResizeId] = useState<string | null>(null);
@@ -121,6 +125,14 @@ export function Canvas() {
 
   // Space held for pan mode
   const [spaceHeld, setSpaceHeld] = useState(false);
+
+  // Pick-item mode — Z toggles. While on, arrow keys CYCLE which item in
+  // the current multi-selection is "active" (the next individual move target)
+  // instead of moving the whole selection. Mostly useful when you want to
+  // tweak one item out of a packed group.
+  const [pickMode, setPickMode] = useState(false);
+  // The item currently focused when in pickMode. Null = use first selected.
+  const [pickActiveId, setPickActiveId] = useState<string | null>(null);
 
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -172,8 +184,6 @@ export function Canvas() {
       };
 
       if (st.organizeMode) {
-        if (e.key === "ArrowUp") { e.preventDefault(); st.cycleOrganizeActive("prev"); return; }
-        if (e.key === "ArrowDown") { e.preventDefault(); st.cycleOrganizeActive("next"); return; }
         if (e.key === "ArrowLeft") {
           e.preventDefault();
           const s = computeStep();
@@ -186,23 +196,75 @@ export function Canvas() {
           st.nudgeOrganizeActive(e.shiftKey ? 20 : s.x, 0);
           return;
         }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          const s = computeStep();
+          st.nudgeOrganizeActive(0, e.shiftKey ? -20 : -s.y);
+          return;
+        }
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          const s = computeStep();
+          st.nudgeOrganizeActive(0, e.shiftKey ? 20 : s.y);
+          return;
+        }
         if (e.key === "Enter") { e.preventDefault(); st.autoPackSelection(); return; }
         if (e.key === "Escape") { e.preventDefault(); st.toggleOrganizeMode(); return; }
+        // Z in organize mode = cycle which item is the active nudge target.
+        if (e.key === "z" || e.key === "Z") {
+          e.preventDefault();
+          st.cycleOrganizeActive(e.shiftKey ? "prev" : "next");
+          return;
+        }
       }
 
-      // Normal mode — arrow keys MOVE the selected item(s) by a Tetris-style
-      // chunk proportional to the current viewport. Hold Shift for a fine
-      // 20-unit nudge. Only fires when there's actually a selection so the
-      // browser keeps its arrow-key page-scroll behavior on empty canvas.
+      // Normal mode — arrow keys MOVE the selected item(s) in Tetris-style
+      // chunks proportional to the visible viewport. Up/Down work the same
+      // as Left/Right (vertical jumps). Hold Shift for a fine 20-unit nudge.
+      // Only fires when there's actually a selection so the browser keeps
+      // its arrow-key page-scroll behavior on empty canvas.
       const hasSel = st.selectedItemIds.length > 0 || !!st.selectedItemId;
+
+      // Z key toggles pick-item mode (when there's a multi-selection). In
+      // pick-item mode, arrows CYCLE through individual selected items
+      // instead of moving them — useful when packed tightly together.
+      if ((e.key === "z" || e.key === "Z") && hasSel && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (st.selectedItemIds.length >= 2) {
+          setPickMode((p) => !p);
+          if (!pickMode) setPickActiveId(st.selectedItemIds[0]);
+        }
+        return;
+      }
+
       if (hasSel && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
         const s = computeStep();
         const fine = e.shiftKey ? 20 : null;
+
+        // Pick-item mode → arrows cycle which selected item is active.
+        if (pickMode && st.selectedItemIds.length >= 2) {
+          const ids = st.selectedItemIds;
+          const cur = pickActiveId && ids.includes(pickActiveId) ? ids.indexOf(pickActiveId) : 0;
+          let next = cur;
+          if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (cur + 1) % ids.length;
+          else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (cur - 1 + ids.length) % ids.length;
+          setPickActiveId(ids[next]);
+          return;
+        }
+
         if (e.key === "ArrowLeft") st.moveSelectedItems(fine !== null ? -fine : -s.x, 0);
         else if (e.key === "ArrowRight") st.moveSelectedItems(fine !== null ? fine : s.x, 0);
         else if (e.key === "ArrowUp") st.moveSelectedItems(0, fine !== null ? -fine : -s.y);
         else if (e.key === "ArrowDown") st.moveSelectedItems(0, fine !== null ? fine : s.y);
+        return;
+      }
+
+      // Ctrl+G to group, Ctrl+Shift+G to ungroup (when 2+ items selected).
+      if ((e.ctrlKey || e.metaKey) && (e.key === "g" || e.key === "G")) {
+        e.preventDefault();
+        if (e.shiftKey) st.ungroupSelectedItems();
+        else st.groupSelectedItems();
         return;
       }
       if (e.key === "v" || e.key === "V") useAppStore.getState().setActiveCanvasTool("select");
@@ -380,17 +442,34 @@ export function Canvas() {
         return;
       }
       if (dragId) {
-        const x = (e.clientX - panX - dragOffset.x) / zoom;
-        const y = (e.clientY - panY - dragOffset.y) / zoom;
-        useAppStore.getState().moveItem(dragId, x, y);
+        const newX = (e.clientX - panX - dragOffset.x) / zoom;
+        const newY = (e.clientY - panY - dragOffset.y) / zoom;
+        // Multi-drag: compute delta from the primary item's start position
+        // and apply that same delta to every dragged sibling, so the group
+        // moves rigidly. Single-drag: just move the one item.
+        if (dragGroupStart) {
+          const primaryStart = dragGroupStart[dragId];
+          if (primaryStart) {
+            const dx = newX - primaryStart.x;
+            const dy = newY - primaryStart.y;
+            const st = useAppStore.getState();
+            for (const id of Object.keys(dragGroupStart)) {
+              const start = dragGroupStart[id];
+              st.moveItem(id, start.x + dx, start.y + dy);
+            }
+            return;
+          }
+        }
+        useAppStore.getState().moveItem(dragId, newX, newY);
       }
     },
-    [isPanning, panStart, dragId, dragOffset, resizeId, resizeStart, panX, panY, zoom, setPan, isDrawing, marquee]
+    [isPanning, panStart, dragId, dragOffset, dragGroupStart, resizeId, resizeStart, panX, panY, zoom, setPan, isDrawing, marquee]
   );
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     setDragId(null);
+    setDragGroupStart(null);
     setResizeId(null);
 
     // Finalize marquee selection — find all items whose bounding box intersects the marquee
@@ -496,7 +575,38 @@ export function Canvas() {
       e.stopPropagation();
       // Push undo before drag so undo restores pre-drag position
       useAppStore.getState().pushUndo();
-      selectItem(id);
+
+      const st = useAppStore.getState();
+      // What's "the group being dragged"? Three cases:
+      //   1. Item is part of a group (groupId set) → drag every group member.
+      //   2. Item is in the existing multi-selection → drag the whole selection.
+      //   3. Otherwise → single-item drag (selection collapses to this item).
+      let dragIds: string[];
+      if (item.groupId) {
+        dragIds = items.filter((i) => i.groupId === item.groupId).map((i) => i.id);
+        st.selectItems(dragIds);
+      } else if (st.selectedItemIds.length > 1 && st.selectedItemIds.includes(id)) {
+        dragIds = st.selectedItemIds;
+        // Don't reset selection — keep the multi-selection so the user
+        // can keep dragging the group around.
+      } else {
+        dragIds = [id];
+        selectItem(id);
+      }
+
+      // Snapshot every dragged item's start position for delta-based move.
+      // null when single — cheap fast path for the common case.
+      if (dragIds.length > 1) {
+        const start: Record<string, { x: number; y: number }> = {};
+        for (const did of dragIds) {
+          const it = items.find((i) => i.id === did);
+          if (it) start[did] = { x: it.x, y: it.y };
+        }
+        setDragGroupStart(start);
+      } else {
+        setDragGroupStart(null);
+      }
+
       setDragId(id);
       setDragOffset({
         x: e.clientX - panX - item.x * zoom,
@@ -789,6 +899,7 @@ export function Canvas() {
         onTouchEnd={(e) => {
           setIsPanning(false);
           setDragId(null);
+          setDragGroupStart(null);
           setResizeId(null);
           const el = canvasRef.current as HTMLElement & { _lastPinchDist?: number };
           if (el) el._lastPinchDist = undefined;
@@ -974,7 +1085,7 @@ export function Canvas() {
           </button>
           <button
             type="button"
-            title={organizeMode ? "Exit organize mode (Esc)" : "Organize — ↑↓ pick item · ←→ jump (Shift = fine) · Enter auto-pack tight grid"}
+            title={organizeMode ? "Exit organize mode (Esc)" : "Organize — ←→↑↓ jump (Shift = fine) · Z cycle item · Enter auto-pack"}
             onClick={() => useAppStore.getState().toggleOrganizeMode()}
             className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
               organizeMode
@@ -985,6 +1096,41 @@ export function Canvas() {
             <LayoutGrid className="h-3.5 w-3.5" />
             {organizeMode ? "Organizing" : "Organize"}
           </button>
+          {/* Group all selected items — they'll move/select as a unit. */}
+          {(() => {
+            // If every selected item already shares one groupId → show Ungroup
+            const selected = items.filter((it) => selectedItemIds.includes(it.id));
+            const groupIds = new Set(selected.map((it) => it.groupId).filter(Boolean));
+            const allSameGroup = groupIds.size === 1 && selected.every((it) => it.groupId);
+            if (allSameGroup) {
+              return (
+                <button
+                  type="button"
+                  title="Ungroup (Ctrl+Shift+G)"
+                  onClick={() => useAppStore.getState().ungroupSelectedItems()}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                    isDark ? "text-gray-300 hover:bg-white/10 hover:text-white" : "text-gray-600 hover:bg-gray-100 hover:text-[#0d1117]"
+                  }`}
+                >
+                  <Ungroup className="h-3.5 w-3.5" />
+                  Ungroup
+                </button>
+              );
+            }
+            return (
+              <button
+                type="button"
+                title="Group (Ctrl+G) — items move and select as one"
+                onClick={() => useAppStore.getState().groupSelectedItems()}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                  isDark ? "text-gray-300 hover:bg-white/10 hover:text-white" : "text-gray-600 hover:bg-gray-100 hover:text-[#0d1117]"
+                }`}
+              >
+                <Group className="h-3.5 w-3.5" />
+                Group
+              </button>
+            );
+          })()}
           <button
             type="button"
             title="Delete (Del)"
