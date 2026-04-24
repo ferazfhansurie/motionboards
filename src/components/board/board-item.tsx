@@ -129,6 +129,11 @@ function GeneratingProgress({ item, isDark }: { item: BoardItem; isDark: boolean
 
 function CopyablePrompt({ prompt, isDark }: { prompt: string; isDark: boolean }) {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  // Rough estimate — anything beyond ~4 lines (~280 chars) gets the toggle.
+  // Below the threshold we hide the toggle entirely so short prompts stay
+  // visually clean.
+  const isLong = prompt.length > 280;
   return (
     <div
       className={`mt-1 group/prompt relative cursor-pointer rounded px-1 -mx-1 transition-colors ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
@@ -140,9 +145,20 @@ function CopyablePrompt({ prompt, isDark }: { prompt: string; isDark: boolean })
         setTimeout(() => setCopied(false), 1500);
       }}
     >
-      <p className={`text-[11px] leading-relaxed line-clamp-2 pr-5 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+      <p
+        className={`text-[11px] leading-relaxed pr-5 whitespace-pre-wrap ${expanded ? "" : "line-clamp-4"} ${isDark ? "text-gray-400" : "text-gray-600"}`}
+      >
         {prompt}
       </p>
+      {isLong && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+          className={`mt-0.5 text-[10px] font-semibold transition-colors ${isDark ? "text-gray-500 hover:text-[#f26522]" : "text-gray-400 hover:text-[#f26522]"}`}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
       <div className={`absolute top-0.5 right-0.5 transition-opacity ${copied ? "opacity-100" : "opacity-0 group-hover/prompt:opacity-100"}`}>
         {copied ? (
           <Check className="h-3 w-3 text-green-500" />
