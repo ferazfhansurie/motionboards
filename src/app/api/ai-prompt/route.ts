@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { getUserFromToken, getUserAIInstruction } from "@/lib/db";
+import { getUserFromToken, getUserAIInstruction, getUserAIModel } from "@/lib/db";
 import { models } from "@/lib/models";
+import { resolveChatModel } from "@/lib/chat-models";
 
 // Render the live model catalog as a compact reference the chat model can
 // quote from. Includes everything the user actually has on their picker —
@@ -101,14 +102,21 @@ export async function POST(req: NextRequest) {
     // Keep last 10 messages for context.
     const history = (messages.slice(-10) as ChatMessage[]);
 
-    // Per-account instruction gets appended — user's preference overrides defaults.
-    const userInstruction = await getUserAIInstruction(user.id);
+    // Per-account instruction + model picker — user's preferences override defaults.
+    const [userInstruction, userModel] = await Promise.all([
+      getUserAIInstruction(user.id),
+      getUserAIModel(user.id),
+    ]);
     const systemPrompt = userInstruction
       ? `${BASE_SYSTEM_PROMPT}\n\n## USER PREFERENCES (follow these)\n${userInstruction}`
       : BASE_SYSTEM_PROMPT;
+    // resolveChatModel falls back to DEFAULT_CHAT_MODEL if user hasn't picked
+    // one, or if the stored value isn't in the allow-list (e.g. an old model
+    // we removed from the catalog).
+    const chatModel = resolveChatModel(userModel);
 
     const stream = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: chatModel,
       stream: true,
       temperature: 0.8,
       max_tokens: 1500,

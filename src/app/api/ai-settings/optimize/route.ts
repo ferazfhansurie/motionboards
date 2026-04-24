@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { getUserFromToken, getUserAIInstruction } from "@/lib/db";
+import { getUserFromToken, getUserAIInstruction, getUserAIModel } from "@/lib/db";
+import { resolveChatModel } from "@/lib/chat-models";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -33,7 +34,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const currentInstruction = await getUserAIInstruction(user.id);
+    const [currentInstruction, storedModel] = await Promise.all([
+      getUserAIInstruction(user.id),
+      getUserAIModel(user.id),
+    ]);
+    const chatModel = resolveChatModel(storedModel);
 
     // Trim total payload — keep newest N prompts, cap each at ~400 chars
     const capped = prompts.slice(-30).map((p: string) => p.slice(0, 400));
@@ -58,7 +63,7 @@ ${capped.map((p: string, i: number) => `${i + 1}. ${p}`).join("\n")}
 Respond with ONLY the new instruction text — no preamble, no explanation, no markdown formatting. Start with a line like "Keep prompts…" or "Always produce…"`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: chatModel,
       max_tokens: 600,
       temperature: 0.4,
       messages: [{ role: "user", content: analysisPrompt }],

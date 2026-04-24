@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { useAppStore } from "@/lib/store";
+import { CHAT_MODELS, DEFAULT_CHAT_MODEL } from "@/lib/chat-models";
 
 // Message content is either a plain string (simple turns) or an array of parts
 // when the user attaches images/videos. OpenAI-shaped — passes through to
@@ -195,6 +196,7 @@ export function AIPromptPanel() {
   const [instructionSaving, setInstructionSaving] = useState(false);
   const [instructionOptimizing, setInstructionOptimizing] = useState(false);
   const [instructionStatus, setInstructionStatus] = useState<string | null>(null);
+  const [chatModel, setChatModel] = useState<string>(DEFAULT_CHAT_MODEL);
   // Board selection for "Optimize from canvas" — default all boards selected
   const [includedBoardIds, setIncludedBoardIds] = useState<string[] | null>(null);
 
@@ -228,6 +230,7 @@ export function AIPromptPanel() {
       const res = await fetch("/api/ai-settings");
       const data = await res.json();
       if (typeof data.instruction === "string") setInstruction(data.instruction);
+      if (typeof data.model === "string") setChatModel(data.model);
     } catch {
       // noop
     }
@@ -240,7 +243,9 @@ export function AIPromptPanel() {
       const res = await fetch("/api/ai-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instruction }),
+        // Save instruction AND the currently picked model in one round-trip
+        // — keeps the Save button as the single point of confirmation.
+        body: JSON.stringify({ instruction, model: chatModel }),
       });
       if (res.ok) setInstructionStatus("Saved");
       else setInstructionStatus("Failed to save");
@@ -249,6 +254,29 @@ export function AIPromptPanel() {
     } finally {
       setInstructionSaving(false);
       setTimeout(() => setInstructionStatus(null), 2500);
+    }
+  };
+
+  // Model changes auto-save so users don't have to think about hitting Save
+  // just to swap chatbot. Failures revert the picker back to its prior value.
+  const handleModelChange = async (newModel: string) => {
+    const prev = chatModel;
+    setChatModel(newModel);
+    try {
+      const res = await fetch("/api/ai-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: newModel }),
+      });
+      if (!res.ok) {
+        setChatModel(prev);
+        setInstructionStatus("Couldn't switch model");
+        setTimeout(() => setInstructionStatus(null), 3000);
+      }
+    } catch {
+      setChatModel(prev);
+      setInstructionStatus("Couldn't switch model");
+      setTimeout(() => setInstructionStatus(null), 3000);
     }
   };
 
@@ -722,6 +750,35 @@ export function AIPromptPanel() {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-3">
+                {/* Chat model picker — auto-saves on change */}
+                <div className="mb-3">
+                  <label className={`block text-[10px] font-semibold uppercase tracking-wide mb-1.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    Chat model
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={chatModel}
+                      onChange={(e) => handleModelChange(e.target.value)}
+                      className={`w-full appearance-none border rounded-xl text-xs px-3 py-2.5 pr-8 focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
+                    >
+                      {CHAT_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}{m.recommended ? " — Recommended" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <svg className={`absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none ${isDark ? "text-gray-400" : "text-gray-500"}`} viewBox="0 0 12 12" fill="none">
+                      <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <p className={`mt-1 text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                    {CHAT_MODELS.find((m) => m.id === chatModel)?.description || ""}
+                  </p>
+                </div>
+
+                <label className={`block text-[10px] font-semibold uppercase tracking-wide mb-1.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  System instruction
+                </label>
                 <textarea
                   value={instruction}
                   onChange={(e) => setInstruction(e.target.value)}

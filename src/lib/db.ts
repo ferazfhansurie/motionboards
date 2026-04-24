@@ -775,8 +775,10 @@ let aiInstructionColumnInitialized = false;
 
 async function ensureAIInstructionColumn(): Promise<void> {
   if (aiInstructionColumnInitialized) return;
-  // Lazy migration — safe to run repeatedly
+  // Lazy migration — safe to run repeatedly. Both columns added together so
+  // the picker + the instruction share one ALTER round-trip.
   await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS ai_instruction TEXT`;
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS ai_model TEXT`;
   aiInstructionColumnInitialized = true;
 }
 
@@ -790,6 +792,18 @@ export async function getUserAIInstruction(userId: string): Promise<string> {
 export async function setUserAIInstruction(userId: string, instruction: string): Promise<void> {
   await ensureAIInstructionColumn();
   await sql`UPDATE mb_users SET ai_instruction = ${instruction} WHERE id = ${userId}`;
+}
+
+export async function getUserAIModel(userId: string): Promise<string | null> {
+  await ensureAIInstructionColumn();
+  const rows = await sql`SELECT ai_model FROM mb_users WHERE id = ${userId}`;
+  if (rows.length === 0) return null;
+  return (rows[0].ai_model as string | null) || null;
+}
+
+export async function setUserAIModel(userId: string, model: string): Promise<void> {
+  await ensureAIInstructionColumn();
+  await sql`UPDATE mb_users SET ai_model = ${model} WHERE id = ${userId}`;
 }
 
 // --- Board version history ---
