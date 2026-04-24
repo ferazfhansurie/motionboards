@@ -104,24 +104,44 @@ function saveToLocalStorage(state: AppState) {
   }
 }
 
+// Max body size to send to /api/boards. Vercel's serverless function body
+// limit is ~4.5 MB on every plan; we keep a ~500 KB safety margin.
+const BOARDS_SAVE_MAX_BYTES = 4 * 1024 * 1024;
+
+function stripUnfinalized(url: string | undefined): string {
+  if (!url) return "";
+  return url.startsWith("data:") || url.startsWith("blob:") ? "" : url;
+}
+
 function saveToDb(state: AppState) {
   const boards = getCurrentBoards(state).map((b) => ({
     ...b,
-    items: b.items.map((item) => {
-      const src = item.src || "";
-      if (src.startsWith("data:")) return { ...item, src: "" };
-      return item;
-    }),
+    items: b.items.map((item) => ({
+      ...item,
+      // Strip any field that could hold a huge data: URI. These belong in
+      // IndexedDB (via imgCache), not in the Neon-backed board JSON.
+      src: stripUnfinalized(item.src),
+      outputUrl: stripUnfinalized(item.outputUrl),
+    })),
   }));
+  const body = JSON.stringify({
+    boards,
+    activeBoardId: state.activeBoardId,
+    selectedModelId: state.selectedModelId,
+    savedAt: Date.now(),
+  });
+  // Guard against 413 on huge boards — better to skip this autosave than
+  // to have the browser console fill with errors every 300 ms.
+  if (body.length > BOARDS_SAVE_MAX_BYTES) {
+    console.warn(
+      `[saveToDb] Skipping autosave: ${(body.length / 1024 / 1024).toFixed(1)} MB exceeds the 4 MB body cap. Delete old items or clear the image cache.`
+    );
+    return;
+  }
   fetch("/api/boards", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      boards,
-      activeBoardId: state.activeBoardId,
-      selectedModelId: state.selectedModelId,
-      savedAt: Date.now(),
-    }),
+    body,
   }).catch(() => {});
 }
 
