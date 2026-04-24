@@ -18,16 +18,38 @@ import { UILayer } from "@/components/ui/ui-layer";
 import { parsePsdBuffer } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
-// Upload file to fal storage, returns URL. Falls back to data URI on failure.
+// Upload a file and return a hosted URL. Large files go straight to Vercel
+// Blob storage from the browser — bypasses the ~4.5 MB function body limit
+// that applies to every Vercel plan. Small files (<4 MB) fall back to the
+// legacy /api/upload → Neon path so we don't spin up Blob for tiny images.
 async function uploadFile(file: File): Promise<string> {
+  const SMALL_FILE_BYTES = 4 * 1024 * 1024;
+  // Small file → keep the existing Neon path (cheaper, unified serving).
+  if (file.size <= SMALL_FILE_BYTES) {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.url) return data.url;
+    } catch {}
+  }
+  // Large file → direct-to-Blob via @vercel/blob/client. The browser sends
+  // the file straight to Blob storage and we only round-trip a short token
+  // through our function.
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (data.url) return data.url;
-  } catch {}
-  // Fallback: data URI
+    const { upload } = await import("@vercel/blob/client");
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const uploaded = await upload(`uploads/${Date.now()}_${safeName}`, file, {
+      access: "public",
+      handleUploadUrl: "/api/blob/handle-upload",
+    });
+    return uploaded.url;
+  } catch (err) {
+    console.error("[uploadFile] Blob upload failed:", err);
+  }
+  // Last-ditch fallback: data URI (keeps the item visible locally even if
+  // both upload paths failed).
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target?.result as string);

@@ -619,37 +619,35 @@ export function PromptBar() {
           const blob = await blobRes.blob();
           if (blob.size === 0) throw new Error("Source is empty — paste/upload may have failed");
           const ext = (blob.type.split("/")[1] || "bin").split(";")[0];
-          const file = new File([blob], `${item.id}.${ext}`, { type: blob.type || "application/octet-stream" });
-          const form = new FormData();
-          form.append("file", file);
-          const upRes = await fetch("/api/upload", { method: "POST", body: form });
-          if (!upRes.ok) {
-            // Try to read the error message from the response
-            let detail = `HTTP ${upRes.status}`;
-            try {
-              const errData = await upRes.json();
-              if (errData?.error) detail = errData.error;
-            } catch {
-              const text = await upRes.text().catch(() => "");
-              if (text) detail = text.slice(0, 120);
+          const fileName = `${item.id}.${ext}`;
+          const file = new File([blob], fileName, { type: blob.type || "application/octet-stream" });
+
+          const SMALL_FILE_BYTES = 4 * 1024 * 1024;
+          // Small file → legacy Neon /api/upload path.
+          if (blob.size <= SMALL_FILE_BYTES) {
+            const form = new FormData();
+            form.append("file", file);
+            const upRes = await fetch("/api/upload", { method: "POST", body: form });
+            if (upRes.ok) {
+              const upData = await upRes.json();
+              if (upData.url && !isUnfinalized(upData.url)) {
+                useAppStore.getState().updateItem(item.id, { src: upData.url });
+                return upData.url as string;
+              }
             }
-            console.error("[resolveUrl] /api/upload failed:", detail, { url: url.slice(0, 80), size: blob.size, type: blob.type });
-            // Special-case the common ones
-            if (upRes.status === 401) throw new Error("Session expired — please refresh and try again.");
-            if (upRes.status === 413) {
-              const mb = (blob.size / 1024 / 1024).toFixed(1);
-              const kind = blob.type.startsWith("video/") ? "Video"
-                : blob.type.startsWith("audio/") ? "Audio"
-                : blob.type.startsWith("image/") ? "Image"
-                : "File";
-              throw new Error(`${kind} too large (${mb} MB). Upload cap is 50 MB — compress and try again.`);
-            }
-            throw new Error(`Upload failed: ${detail}`);
+            // Fall through to Blob on any failure.
           }
-          const upData = await upRes.json();
-          if (upData.url && !isUnfinalized(upData.url)) {
-            useAppStore.getState().updateItem(item.id, { src: upData.url });
-            return upData.url as string;
+
+          // Large (or small-but-failed) file → direct-to-Blob upload.
+          const { upload } = await import("@vercel/blob/client");
+          const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const uploaded = await upload(`uploads/${Date.now()}_${safeName}`, file, {
+            access: "public",
+            handleUploadUrl: "/api/blob/handle-upload",
+          });
+          if (uploaded?.url) {
+            useAppStore.getState().updateItem(item.id, { src: uploaded.url });
+            return uploaded.url;
           }
           throw new Error("Upload returned no URL");
         } catch (uploadErr) {
