@@ -131,9 +131,9 @@ function startPolling(params: {
       // Still running — refresh progress text and poll again.
       const msg = data.log || (data.position != null ? `Queued #${data.position}` : data.status === "queued" ? "Queued..." : "Processing...");
       useAppStore.getState().updateItem(params.itemId, { progressText: msg });
-      setTimeout(poll, 3000);
+      setTimeout(poll, 8000); // 8s between polls — 60% fewer status calls than the old 3s
     } catch {
-      setTimeout(poll, 5000);
+      setTimeout(poll, 15000); // back off further on network errors
     }
   };
 
@@ -837,7 +837,7 @@ export function PromptBar() {
           // Still processing — update progress text and poll again
           const progressMsg = statusData.log || (statusData.position != null ? `Queued #${statusData.position}` : statusData.status === "queued" ? "Queued..." : "Processing...");
           useAppStore.getState().updateItem(genItem.id, { progressText: progressMsg });
-          setTimeout(poll, 3000); // Poll every 3 seconds
+          setTimeout(poll, 8000); // Poll every 8 seconds — easier on Vercel origin transfer
         } catch {
           // Network error — retry
           setTimeout(poll, 5000);

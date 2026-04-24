@@ -189,7 +189,7 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
         muted
         loop
         playsInline
-        preload="auto"
+        preload="metadata"
         draggable={false}
         onContextMenu={(e) => e.preventDefault()}
         onLoadedData={() => setLoaded(true)}
@@ -256,6 +256,8 @@ function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClic
       <img
         src={retrySrc}
         alt="Generated"
+        loading="lazy"
+        decoding="async"
         className={`w-full block pointer-events-none ${imgState === "error" ? "hidden" : ""}`}
         draggable={false}
         onLoad={(e) => {
@@ -689,6 +691,8 @@ export function BoardItemCard({
             <img
               src={item.outputUrl || item.src}
               alt={item.fileName || item.psdLayerName || "Image"}
+              loading="lazy"
+              decoding="async"
               className="w-full pointer-events-none block"
               style={{ ...filterStyle, ...cropStyle }}
               draggable={false}
@@ -712,7 +716,7 @@ export function BoardItemCard({
               muted
               loop
               playsInline
-              preload="auto"
+              preload="metadata"
               draggable={false}
               onContextMenu={(e) => e.preventDefault()}
             />
