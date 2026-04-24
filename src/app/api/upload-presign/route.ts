@@ -41,10 +41,16 @@ export async function POST(req: NextRequest) {
     const safeName = rawName.replace(/[^\w.\-]+/g, "_").slice(-120) || "upload.bin";
     const key = `uploads/${user.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
 
+    // forcePathStyle is required for Cloudflare R2: their *.r2.cloudflarestorage.com
+    // SSL cert only covers the account subdomain, not virtual-hosted bucket
+    // subdomains (bucket.account.r2...). Path-style URLs put the bucket in
+    // the path — https://<account>.r2.cloudflarestorage.com/<bucket>/<key> —
+    // so the SSL cert matches and the request actually reaches R2.
     const s3 = new S3Client({
       region: "auto",
       endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
       credentials: { accessKeyId, secretAccessKey },
+      forcePathStyle: true,
     });
 
     const command = new PutObjectCommand({
