@@ -324,7 +324,10 @@ export function AIPromptPanel() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const PER_FILE_LIMIT = 4 * 1024 * 1024; // Vercel /api/upload body cap
+  // OpenAI's vision API caps inline images at 20 MB. Big files go directly
+  // to Cloudflare R2 via presigned PUT so Vercel's 4.5 MB function-body cap
+  // doesn't apply — see uploadAttachment() below.
+  const PER_FILE_LIMIT = 20 * 1024 * 1024;
 
   const handleFiles = useCallback(async (files: File[]) => {
     for (const file of files) {
@@ -350,7 +353,7 @@ export function AIPromptPanel() {
 
       const fileSize = uploadFile.size;
 
-      // Reject files that exceed the per-file upload cap
+      // Reject files that exceed the per-file upload cap (OpenAI vision API limit)
       if (fileSize > PER_FILE_LIMIT) {
         setAttachments((prev) => [
           ...prev,
@@ -360,7 +363,7 @@ export function AIPromptPanel() {
             label,
             size: fileSize,
             uploading: false,
-            error: `Too large (${(fileSize / 1024 / 1024).toFixed(1)}MB) — max 4MB per file`,
+            error: `Too large (${(fileSize / 1024 / 1024).toFixed(1)}MB) — max 20MB per image`,
           },
         ]);
         continue;
@@ -372,22 +375,46 @@ export function AIPromptPanel() {
         { id, url: previewDataUrl || "", label, size: fileSize, uploading: true },
       ]);
 
+      // Upload — try R2 presigned PUT first (bypasses the 4.5 MB function
+      // body cap), fall back to /api/upload → Neon for tiny files or if R2
+      // isn't configured.
       try {
-        const form = new FormData();
-        form.append("file", uploadFile);
-        const res = await fetch("/api/upload", { method: "POST", body: form });
-        const data = await res.json();
-        if (res.ok && data.url) {
-          setAttachments((prev) =>
-            prev.map((a) => (a.id === id ? { ...a, url: data.url as string, uploading: false } : a))
-          );
-        } else {
-          setAttachments((prev) =>
-            prev.map((a) =>
-              a.id === id ? { ...a, uploading: false, error: data.error || "Upload failed" } : a
-            )
-          );
+        let hostedUrl: string | null = null;
+
+        try {
+          const presign = await fetch("/api/upload-presign", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              filename: uploadFile.name || "attachment.bin",
+              contentType: uploadFile.type || "application/octet-stream",
+            }),
+          });
+          if (presign.ok) {
+            const { uploadUrl, publicUrl } = await presign.json();
+            const putRes = await fetch(uploadUrl, {
+              method: "PUT",
+              headers: { "content-type": uploadFile.type || "application/octet-stream" },
+              body: uploadFile,
+            });
+            if (putRes.ok && publicUrl) hostedUrl = publicUrl;
+          }
+        } catch {
+          // R2 path unavailable — fall through to legacy /api/upload
         }
+
+        if (!hostedUrl) {
+          const form = new FormData();
+          form.append("file", uploadFile);
+          const res = await fetch("/api/upload", { method: "POST", body: form });
+          const data = await res.json();
+          if (res.ok && data.url) hostedUrl = data.url as string;
+          else throw new Error(data.error || `Upload failed (${res.status})`);
+        }
+
+        setAttachments((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, url: hostedUrl!, uploading: false } : a))
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Upload failed";
         setAttachments((prev) =>
@@ -1090,7 +1117,7 @@ export function AIPromptPanel() {
             )}
             <div className="flex items-center justify-between mt-2">
               <p className={`text-[8px] ${isDark ? "text-gray-600" : "text-gray-300"}`}>
-                Powered by GPT-4.1 mini · Auto-saved for 14 days
+                Powered by {CHAT_MODELS.find((m) => m.id === chatModel)?.name || chatModel} · Auto-saved for 14 days
               </p>
               <a
                 href="https://wa.me/60112167672?text=Hi%2C%20I%20want%20to%20upgrade%20my%20AI%20on%20MotionBoards%20%F0%9F%9A%80"
