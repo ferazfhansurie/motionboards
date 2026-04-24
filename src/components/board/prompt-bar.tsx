@@ -626,16 +626,38 @@ export function PromptBar() {
           useAppStore.getState().updateItem(genItem.id, {
             progressText: `Uploading ${sizeMB} MB...`,
           });
-          // Raw body, not FormData — buffered body parsing is what triggers
-          // Vercel's 4.5 MB cap. Streaming lets Blob receive the full file.
-          const upRes = await fetch("/api/upload", {
-            method: "POST",
-            headers: {
-              "content-type": file.type || "application/octet-stream",
-              "x-filename": file.name || "upload.bin",
-            },
-            body: file,
-          });
+
+          // Hard 2-minute wall clock so the card never sits in "Uploading…"
+          // forever. Covers hung connections, Vercel gateway weirdness,
+          // Blob timeouts — any of them unstick cleanly with a real error.
+          const ctrl = new AbortController();
+          const timeoutId = setTimeout(() => ctrl.abort(), 120_000);
+          let upRes: Response;
+          try {
+            // Stream the file with duplex:"half" so the browser sends
+            // Transfer-Encoding: chunked (no Content-Length). Vercel's edge
+            // does not reject chunked bodies at the 4.5 MB cap — the cap is
+            // enforced off Content-Length for buffered requests.
+            upRes = await fetch("/api/upload", {
+              method: "POST",
+              headers: {
+                "content-type": file.type || "application/octet-stream",
+                "x-filename": file.name || "upload.bin",
+              },
+              body: file.stream(),
+              signal: ctrl.signal,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              duplex: "half",
+            } as RequestInit & { duplex?: "half" });
+          } catch (fetchErr) {
+            clearTimeout(timeoutId);
+            if ((fetchErr as Error)?.name === "AbortError") {
+              throw new Error(`Upload timed out after 2 minutes (${sizeMB} MB). Check your connection or compress the file.`);
+            }
+            throw fetchErr;
+          }
+          clearTimeout(timeoutId);
+
           if (upRes.ok) {
             const upData = await upRes.json();
             if (upData.url && !isUnfinalized(upData.url)) {
@@ -645,7 +667,7 @@ export function PromptBar() {
           }
           if (upRes.status === 413) {
             throw new Error(
-              `Upload still rejected as too large (${sizeMB} MB) even with the streamed-body path. Compress the file and try again.`
+              `Upload rejected (${sizeMB} MB) — this browser didn't use streamed transfer. Try Chrome/Edge, or compress the file under 4 MB.`
             );
           }
           const errText = await upRes.text().catch(() => "");

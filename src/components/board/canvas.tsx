@@ -18,20 +18,26 @@ import { UILayer } from "@/components/ui/ui-layer";
 import { parsePsdBuffer } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
-// Upload a file and return a hosted URL. Streams raw body → /api/upload →
-// Vercel Blob. No FormData: buffered body parsing is what caps serverless
-// requests at 4.5 MB. Streaming through the function under Fluid Compute
-// lifts that cap entirely.
+// Upload a file and return a hosted URL. Streams the file to /api/upload
+// with Transfer-Encoding: chunked (via file.stream() + duplex:"half") so
+// Vercel's edge doesn't pre-reject on Content-Length for large bodies.
+// Server pipes the stream into Vercel Blob and returns the public URL.
 async function uploadFile(file: File): Promise<string> {
   try {
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 120_000);
     const res = await fetch("/api/upload", {
       method: "POST",
       headers: {
         "content-type": file.type || "application/octet-stream",
         "x-filename": file.name || "upload.bin",
       },
-      body: file,
-    });
+      body: file.stream(),
+      signal: ctrl.signal,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      duplex: "half",
+    } as RequestInit & { duplex?: "half" });
+    clearTimeout(timeoutId);
     const data = await res.json();
     if (data.url) return data.url;
   } catch {}
