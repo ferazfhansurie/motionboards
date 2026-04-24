@@ -115,11 +115,19 @@ export async function POST(req: NextRequest) {
     // we removed from the catalog).
     const chatModel = resolveChatModel(userModel);
 
+    // GPT-5 family rejects max_tokens — they use max_completion_tokens.
+    // GPT-4.x still accepts both. Pick the right key per model so the
+    // picker keeps working across the whole roster.
+    const isGpt5Family = chatModel.startsWith("gpt-5");
+    const tokenLimitParam = isGpt5Family
+      ? { max_completion_tokens: 1500 }
+      : { max_tokens: 1500 };
+
     const stream = await openai.chat.completions.create({
       model: chatModel,
       stream: true,
       temperature: 0.8,
-      max_tokens: 1500,
+      ...tokenLimitParam,
       messages: [
         { role: "system", content: systemPrompt },
         ...history.map((m) => ({

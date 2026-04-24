@@ -62,10 +62,16 @@ ${capped.map((p: string, i: number) => `${i + 1}. ${p}`).join("\n")}
 
 Respond with ONLY the new instruction text — no preamble, no explanation, no markdown formatting. Start with a line like "Keep prompts…" or "Always produce…"`;
 
+    // GPT-5 family uses max_completion_tokens; older models use max_tokens.
+    const isGpt5Family = chatModel.startsWith("gpt-5");
+    const tokenLimitParam = isGpt5Family
+      ? { max_completion_tokens: 600 }
+      : { max_tokens: 600 };
+
     const response = await openai.chat.completions.create({
       model: chatModel,
-      max_tokens: 600,
       temperature: 0.4,
+      ...tokenLimitParam,
       messages: [{ role: "user", content: analysisPrompt }],
     });
 
