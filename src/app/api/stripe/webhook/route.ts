@@ -43,7 +43,36 @@ export async function POST(req: NextRequest) {
 
     const metadata = session.metadata || {};
 
-    // ── Subscription flow: first month charged successfully ───────────────
+    // ── Subscription SIGNUP flow: new user, first payment succeeded ───────
+    // Metadata carries signupName / signupEmail / signupPassword. Create the
+    // user (if they don't already exist), then activate the subscription on
+    // that freshly-minted userId.
+    if (metadata.type === "subscription-signup") {
+      const subscriptionId = (session.subscription as string) || "";
+      const { signupName, signupEmail, signupPassword } = metadata;
+      if (!signupName || !signupEmail || !signupPassword || !subscriptionId) {
+        console.error("Missing subscription-signup metadata:", session.id);
+        return NextResponse.json({ error: "Missing subscription-signup metadata" }, { status: 400 });
+      }
+      const sql = getSql();
+      const existing = await sql`SELECT id FROM mb_users WHERE LOWER(email) = LOWER(${signupEmail})`;
+      let userId: string;
+      if (existing.length > 0) {
+        userId = existing[0].id as string;
+      } else {
+        const u = await createUser(signupName, signupEmail, signupPassword);
+        if (!u) {
+          console.error(`Failed to create user during subscription signup: ${signupEmail}`);
+          return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+        }
+        userId = u.id;
+      }
+      await activateSubscription(userId, subscriptionId);
+      console.log(`Subscription signup: user=${userId} sub=${subscriptionId}`);
+      return NextResponse.json({ received: true });
+    }
+
+    // ── Subscription flow (existing user): first month charged ────────────
     if (session.mode === "subscription" || metadata.type === "subscription") {
       const userId = metadata.userId;
       const subscriptionId = (session.subscription as string) || "";
