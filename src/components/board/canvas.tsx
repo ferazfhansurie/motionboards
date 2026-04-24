@@ -18,30 +18,43 @@ import { UILayer } from "@/components/ui/ui-layer";
 import { parsePsdBuffer } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
-// Upload a file and return a hosted URL. Streams the file to /api/upload
-// with Transfer-Encoding: chunked (via file.stream() + duplex:"half") so
-// Vercel's edge doesn't pre-reject on Content-Length for large bodies.
-// Server pipes the stream into Vercel Blob and returns the public URL.
+// Upload a file and return a hosted URL. Tries Cloudflare R2 first via a
+// presigned PUT (browser → R2 directly, bypasses Vercel's 4.5 MB body cap
+// entirely). Falls back to the legacy /api/upload → Neon path if R2 isn't
+// configured on this deployment, and finally to a data URI so the item at
+// least stays visible on the canvas.
 async function uploadFile(file: File): Promise<string> {
+  // Try R2 presigned upload.
   try {
-    const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 120_000);
-    const res = await fetch("/api/upload", {
+    const presign = await fetch("/api/upload-presign", {
       method: "POST",
-      headers: {
-        "content-type": file.type || "application/octet-stream",
-        "x-filename": file.name || "upload.bin",
-      },
-      body: file.stream(),
-      signal: ctrl.signal,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      duplex: "half",
-    } as RequestInit & { duplex?: "half" });
-    clearTimeout(timeoutId);
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name || "upload.bin",
+        contentType: file.type || "application/octet-stream",
+      }),
+    });
+    if (presign.ok) {
+      const { uploadUrl, publicUrl } = await presign.json();
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (putRes.ok) return publicUrl;
+    }
+  } catch {}
+
+  // Fallback: legacy server-side upload through Neon (capped at ~4.5 MB).
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
     const data = await res.json();
     if (data.url) return data.url;
   } catch {}
-  // Fallback: data URI (keeps the item visible locally even on upload failure).
+
+  // Last resort: data URI (keeps the item visible locally even on failure).
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target?.result as string);

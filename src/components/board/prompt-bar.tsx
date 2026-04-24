@@ -627,28 +627,55 @@ export function PromptBar() {
             progressText: `Uploading ${sizeMB} MB...`,
           });
 
-          // Hard 2-minute wall clock so the card never sits in "Uploading…"
-          // forever. Covers hung connections, Vercel gateway weirdness,
-          // Blob timeouts — any of them unstick cleanly with a real error.
+          // Try Cloudflare R2 presigned upload first — browser PUTs directly
+          // to R2 so Vercel's 4.5 MB function-body cap is irrelevant.
+          try {
+            const presign = await fetch("/api/upload-presign", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                filename: file.name,
+                contentType: file.type || "application/octet-stream",
+              }),
+            });
+            if (presign.ok) {
+              const { uploadUrl, publicUrl } = await presign.json();
+              const putCtrl = new AbortController();
+              const putTimeout = setTimeout(() => putCtrl.abort(), 300_000);
+              const putRes = await fetch(uploadUrl, {
+                method: "PUT",
+                headers: { "content-type": file.type || "application/octet-stream" },
+                body: file,
+                signal: putCtrl.signal,
+              });
+              clearTimeout(putTimeout);
+              if (putRes.ok && publicUrl) {
+                useAppStore.getState().updateItem(item.id, { src: publicUrl });
+                return publicUrl as string;
+              }
+              const r2Err = await putRes.text().catch(() => "");
+              console.warn(`[resolveUrl] R2 PUT failed ${putRes.status}`, r2Err.slice(0, 300));
+            } else {
+              const pErr = await presign.text().catch(() => "");
+              console.warn(`[resolveUrl] presign failed ${presign.status}`, pErr.slice(0, 300));
+            }
+          } catch (r2Err) {
+            console.warn("[resolveUrl] R2 upload threw, falling back to /api/upload", r2Err);
+          }
+
+          // Fallback: legacy Neon upload (capped ~4.5 MB). Only useful for
+          // small files or as a safety net if R2 is temporarily broken.
           const ctrl = new AbortController();
           const timeoutId = setTimeout(() => ctrl.abort(), 120_000);
           let upRes: Response;
           try {
-            // Stream the file with duplex:"half" so the browser sends
-            // Transfer-Encoding: chunked (no Content-Length). Vercel's edge
-            // does not reject chunked bodies at the 4.5 MB cap — the cap is
-            // enforced off Content-Length for buffered requests.
+            const form = new FormData();
+            form.append("file", file);
             upRes = await fetch("/api/upload", {
               method: "POST",
-              headers: {
-                "content-type": file.type || "application/octet-stream",
-                "x-filename": file.name || "upload.bin",
-              },
-              body: file.stream(),
+              body: form,
               signal: ctrl.signal,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              duplex: "half",
-            } as RequestInit & { duplex?: "half" });
+            });
           } catch (fetchErr) {
             clearTimeout(timeoutId);
             if ((fetchErr as Error)?.name === "AbortError") {
@@ -667,7 +694,7 @@ export function PromptBar() {
           }
           if (upRes.status === 413) {
             throw new Error(
-              `Upload rejected (${sizeMB} MB) — this browser didn't use streamed transfer. Try Chrome/Edge, or compress the file under 4 MB.`
+              `Upload of ${sizeMB} MB failed. R2 storage isn't configured on this deployment — add R2_* env vars in Vercel settings, or compress the file under 4 MB.`
             );
           }
           const errText = await upRes.text().catch(() => "");
