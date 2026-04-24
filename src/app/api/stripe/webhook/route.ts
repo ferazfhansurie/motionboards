@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createUser, addCredits } from "@/lib/db";
+import {
+  createUser,
+  addCredits,
+  activateSubscription,
+  renewSubscriptionBySubscriptionId,
+  deactivateSubscriptionBySubscriptionId,
+} from "@/lib/db";
 import { neon } from "@neondatabase/serverless";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-02-25.clover" });
@@ -30,12 +36,26 @@ export async function POST(req: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    if (session.payment_status !== "paid") {
+    if (session.payment_status !== "paid" && session.mode !== "subscription") {
       console.log("Payment not completed:", session.id);
       return NextResponse.json({ received: true });
     }
 
     const metadata = session.metadata || {};
+
+    // ── Subscription flow: first month charged successfully ───────────────
+    if (session.mode === "subscription" || metadata.type === "subscription") {
+      const userId = metadata.userId;
+      const subscriptionId = (session.subscription as string) || "";
+      if (!userId || !subscriptionId) {
+        console.error("Missing subscription metadata in session:", session.id, { userId, subscriptionId });
+        return NextResponse.json({ error: "Missing subscription metadata" }, { status: 400 });
+      }
+      await activateSubscription(userId, subscriptionId);
+      console.log(`Subscription activated: user=${userId} sub=${subscriptionId}`);
+      return NextResponse.json({ received: true });
+    }
+
     const creditAmount = parseInt(metadata.credits || "0", 10);
 
     if (!creditAmount) {
@@ -77,6 +97,33 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+  }
+
+  // ── Subscription renewal: each month's invoice ──────────────────────────
+  if (event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as Stripe.Invoice;
+    // Skip the invoice that bills the initial subscription — activateSubscription
+    // already handled that one via checkout.session.completed. Renewals are
+    // flagged "subscription_cycle" (or similar non-"subscription_create").
+    if (invoice.billing_reason === "subscription_create") {
+      return NextResponse.json({ received: true });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscriptionId = (invoice as any).subscription as string | undefined;
+    if (!subscriptionId) return NextResponse.json({ received: true });
+    const ok = await renewSubscriptionBySubscriptionId(subscriptionId);
+    if (ok) {
+      console.log(`Subscription renewed: sub=${subscriptionId}`);
+    } else {
+      console.warn(`Renewal for unknown subscription id: ${subscriptionId}`);
+    }
+  }
+
+  // ── Subscription cancelled or expired ─────────────────────────────────
+  if (event.type === "customer.subscription.deleted") {
+    const sub = event.data.object as Stripe.Subscription;
+    const ok = await deactivateSubscriptionBySubscriptionId(sub.id);
+    if (ok) console.log(`Subscription deactivated: sub=${sub.id}`);
   }
 
   return NextResponse.json({ received: true });

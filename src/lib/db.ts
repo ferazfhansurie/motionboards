@@ -156,6 +156,97 @@ export async function getUserCredits(userId: string): Promise<number> {
   return rows.length > 0 ? (rows[0].credits as number) : 0;
 }
 
+// --- Monthly subscription (RM100/mo → 10000 credits added per billing cycle) ---
+//
+// The columns are added lazily the first time the feature runs. Credits stay
+// in the user's balance whether the subscription is active or not — cancellation
+// just stops new top-ups from being applied, it doesn't wipe what's already
+// sitting in the account.
+export const MONTHLY_SUBSCRIPTION_CREDITS = 10000; // RM100 in sen / 100 credits per RM
+export const MONTHLY_SUBSCRIPTION_PRICE_SEN = 10000; // RM100
+const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
+
+let subscriptionColumnsEnsured = false;
+async function ensureSubscriptionColumns() {
+  if (subscriptionColumnsEnsured) return;
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS subscription_id TEXT`;
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS subscription_active BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_mb_users_subscription_id ON mb_users(subscription_id)`;
+  subscriptionColumnsEnsured = true;
+}
+
+export interface SubscriptionStatus {
+  active: boolean;
+  expiresAt: string | null;
+  subscriptionId: string | null;
+}
+
+export async function getSubscription(userId: string): Promise<SubscriptionStatus> {
+  await ensureSubscriptionColumns();
+  const rows = await sql`
+    SELECT subscription_id, subscription_active, subscription_expires_at
+    FROM mb_users WHERE id = ${userId}
+  `;
+  if (rows.length === 0) return { active: false, expiresAt: null, subscriptionId: null };
+  const row = rows[0];
+  const expiresAt = row.subscription_expires_at ? (row.subscription_expires_at as Date).toISOString() : null;
+  // A user counts as active only if they haven't rolled past the billing cycle.
+  const active = !!row.subscription_active && !!expiresAt && new Date(expiresAt).getTime() > Date.now();
+  return {
+    active,
+    expiresAt,
+    subscriptionId: (row.subscription_id as string) || null,
+  };
+}
+
+// Called on the initial Stripe checkout.session.completed (mode=subscription).
+// Stores the Stripe subscription id, activates the flag, pushes expiry +30d,
+// and credits the first month's 10,000.
+export async function activateSubscription(userId: string, stripeSubscriptionId: string): Promise<void> {
+  await ensureSubscriptionColumns();
+  const expiresAt = new Date(Date.now() + DAYS_30_MS).toISOString();
+  await sql`
+    UPDATE mb_users SET
+      subscription_id = ${stripeSubscriptionId},
+      subscription_active = true,
+      subscription_expires_at = ${expiresAt},
+      credits = credits + ${MONTHLY_SUBSCRIPTION_CREDITS}
+    WHERE id = ${userId}
+  `;
+}
+
+// Called on each invoice.payment_succeeded for a recognized subscription id.
+// Tops up another month of credits and extends the expiry window forward.
+export async function renewSubscriptionBySubscriptionId(stripeSubscriptionId: string): Promise<boolean> {
+  await ensureSubscriptionColumns();
+  const rows = await sql`SELECT id FROM mb_users WHERE subscription_id = ${stripeSubscriptionId}`;
+  if (rows.length === 0) return false;
+  const userId = rows[0].id as string;
+  const expiresAt = new Date(Date.now() + DAYS_30_MS).toISOString();
+  await sql`
+    UPDATE mb_users SET
+      subscription_active = true,
+      subscription_expires_at = ${expiresAt},
+      credits = credits + ${MONTHLY_SUBSCRIPTION_CREDITS}
+    WHERE id = ${userId}
+  `;
+  return true;
+}
+
+// Stripe fires customer.subscription.deleted when a subscription is cancelled
+// or runs out of payment retries. Flip the flag — credits already in the
+// balance stay put.
+export async function deactivateSubscriptionBySubscriptionId(stripeSubscriptionId: string): Promise<boolean> {
+  await ensureSubscriptionColumns();
+  const rows = await sql`
+    UPDATE mb_users SET subscription_active = false
+    WHERE subscription_id = ${stripeSubscriptionId}
+    RETURNING id
+  `;
+  return rows.length > 0;
+}
+
 // --- Sessions ---
 
 export interface Session {

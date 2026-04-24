@@ -193,6 +193,25 @@ export function ProfilePanel() {
   const [topupAmount, setTopupAmount] = useState("10");
   const [cacheClearing, setCacheClearing] = useState(false);
   const [cacheCleared, setCacheCleared] = useState(false);
+  const [subscription, setSubscription] = useState<{ active: boolean; expiresAt: string | null } | null>(null);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+
+  const handleSubscribe = async () => {
+    setSubscribeLoading(true);
+    try {
+      const res = await fetch("/api/stripe/subscribe", { method: "POST" });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Couldn't start the subscription. Try again.");
+      }
+    } catch {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setSubscribeLoading(false);
+    }
+  };
 
   const handleClearCache = async () => {
     setCacheClearing(true);
@@ -217,7 +236,10 @@ export function ProfilePanel() {
     setLoading(true);
     fetch("/api/auth/me")
       .then((r) => r.json())
-      .then((data) => { if (data.user) setUser(data.user); })
+      .then((data) => {
+        if (data.user) setUser(data.user);
+        if (data.subscription) setSubscription(data.subscription);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isProfileOpen]);
@@ -300,6 +322,44 @@ export function ProfilePanel() {
                     <p className="text-2xl font-bold">RM{(user.credits / 100).toFixed(2)}</p>
                   </div>
                   <CreditCard className="h-6 w-6 text-white/30" />
+                </div>
+              </div>
+
+              {/* Monthly subscription — RM100/mo adds 10,000 credits each cycle */}
+              <div className={`rounded-xl border p-3 ${isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-200 bg-gray-50"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[11px] font-bold ${isDark ? "text-white" : "text-[#0d1117]"}`}>
+                      MotionBoards Monthly
+                    </p>
+                    <p className={`text-[10px] mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                      {subscription?.active ? (
+                        <>
+                          Active — renews{" "}
+                          {subscription.expiresAt
+                            ? new Date(subscription.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                            : "each month"}
+                          . RM100/mo adds 100 credits every cycle.
+                        </>
+                      ) : (
+                        <>RM100/mo. Adds 100 credits the moment it renews. Cancel anytime.</>
+                      )}
+                    </p>
+                  </div>
+                  {subscription?.active ? (
+                    <span className="shrink-0 px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded-md bg-emerald-500/15 text-emerald-500">
+                      Active
+                    </span>
+                  ) : (
+                    <button
+                      onClick={handleSubscribe}
+                      disabled={subscribeLoading}
+                      className="shrink-0 px-3 py-1.5 bg-[#f26522] text-white text-[11px] font-bold rounded-lg hover:bg-[#d9541a] transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {subscribeLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                      Subscribe
+                    </button>
+                  )}
                 </div>
               </div>
 
