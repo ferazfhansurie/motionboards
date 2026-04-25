@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Scissors, Loader2, Play, Pause } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 
@@ -8,6 +8,8 @@ interface TrimDialogProps {
   item: BoardItem;
   onClose: () => void;
 }
+
+type DragKind = "start" | "end" | "playhead" | null;
 
 // In-browser video trimming via ffmpeg.wasm.
 //
@@ -24,10 +26,15 @@ interface TrimDialogProps {
 export function TrimDialog({ item, onClose }: TrimDialogProps) {
   const updateItem = useAppStore((s) => s.updateItem);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [duration, setDuration] = useState(0);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
+  // Playhead is the *preview* time — separate from trimStart/trimEnd. Lets
+  // users scrub anywhere inside the trim window without changing the cut.
+  const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [dragging, setDragging] = useState<DragKind>(null);
   const [busy, setBusy] = useState(false);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +46,7 @@ export function TrimDialog({ item, onClose }: TrimDialogProps) {
     if (!v) return;
     setDuration(v.duration);
     setTrimEnd(v.duration);
+    setPlayhead(0);
   };
 
   // Loop within trim range while playing.
@@ -46,34 +54,117 @@ export function TrimDialog({ item, onClose }: TrimDialogProps) {
     const v = videoRef.current;
     if (!v) return;
     const onTimeUpdate = () => {
+      // Loop the trim region during playback.
       if (v.currentTime >= trimEnd) {
         v.currentTime = trimStart;
       }
+      // Mirror the playing video's time into the playhead state so the
+      // marker glides as the video plays.
+      if (!dragging) setPlayhead(v.currentTime);
     };
     v.addEventListener("timeupdate", onTimeUpdate);
     return () => v.removeEventListener("timeupdate", onTimeUpdate);
-  }, [trimStart, trimEnd]);
-
-  // Snap to start when handles move so preview reflects the new range.
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.currentTime < trimStart || v.currentTime > trimEnd) {
-      v.currentTime = trimStart;
-    }
-  }, [trimStart, trimEnd]);
+  }, [trimStart, trimEnd, dragging]);
 
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
       v.muted = false;
-      v.currentTime = Math.max(v.currentTime, trimStart);
+      // Resume from the playhead unless it's outside the trim window.
+      const start = Math.min(Math.max(playhead, trimStart), trimEnd - 0.05);
+      v.currentTime = start;
       v.play().catch(() => {});
     } else {
       v.pause();
     }
   };
+
+  // Convert a clientX into a 0..duration time using the track's bounds.
+  const xToTime = useCallback((clientX: number): number => {
+    const rect = trackRef.current?.getBoundingClientRect();
+    if (!rect || duration === 0) return 0;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return ratio * duration;
+  }, [duration]);
+
+  // Move the video element to `t` seconds and update the playhead state.
+  // Used by both manual drags and click-to-seek on the timeline track.
+  const seekTo = useCallback((t: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = t;
+    setPlayhead(t);
+  }, []);
+
+  const onPointerDownTrack = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!duration || busy) return;
+    // Don't hijack pointerdown that started on a handle — those have their
+    // own handlers below that set the right DragKind first.
+    const target = e.target as HTMLElement;
+    if (target.dataset.handle) return;
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    const t = xToTime(e.clientX);
+    // Click inside the trim window → move playhead. Outside → still seek
+    // playhead (lets user preview pre-trim / post-trim regions too).
+    setDragging("playhead");
+    seekTo(t);
+  };
+
+  const beginHandleDrag = (kind: "start" | "end") => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!duration || busy) return;
+    e.preventDefault();
+    e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    setDragging(kind);
+    const t = xToTime(e.clientX);
+    if (kind === "start") {
+      const next = Math.max(0, Math.min(t, trimEnd - 0.1));
+      setTrimStart(next);
+      seekTo(next);
+    } else {
+      const next = Math.min(duration, Math.max(t, trimStart + 0.1));
+      setTrimEnd(next);
+      seekTo(next);
+    }
+  };
+
+  // Single move/up handler reused by all three drags. The `dragging` state
+  // disambiguates which value to update.
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (ev: PointerEvent) => {
+      const t = xToTime(ev.clientX);
+      if (dragging === "start") {
+        const next = Math.max(0, Math.min(t, trimEnd - 0.1));
+        setTrimStart(next);
+        seekTo(next);
+      } else if (dragging === "end") {
+        const next = Math.min(duration, Math.max(t, trimStart + 0.1));
+        setTrimEnd(next);
+        seekTo(next);
+      } else if (dragging === "playhead") {
+        seekTo(Math.max(0, Math.min(t, duration)));
+      }
+    };
+    const onUp = () => setDragging(null);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [dragging, trimStart, trimEnd, duration, xToTime, seekTo]);
+
+  // Pause playback during any drag — the user is scrubbing, not watching.
+  useEffect(() => {
+    if (!dragging) return;
+    const v = videoRef.current;
+    if (v && !v.paused) v.pause();
+  }, [dragging]);
 
   const fmt = (s: number) => {
     const total = Math.max(0, s);
@@ -224,44 +315,90 @@ export function TrimDialog({ item, onClose }: TrimDialogProps) {
                 <span className="text-[#f26522] font-mono">{fmt(trimEnd)}</span>
                 <span className="text-gray-500"> ({fmt(trimEnd - trimStart)})</span>
               </div>
+              <div className="text-[10px] text-gray-500 font-mono">{fmt(playhead)}</div>
             </div>
 
-            {/* Two-handle slider — both range inputs stack on the same track */}
-            <div className="relative h-8 px-1">
-              <div className="absolute top-1/2 left-1 right-1 h-1 -translate-y-1/2 rounded-full bg-gray-700" />
+            {/*
+              iPhone-style trim timeline:
+                - Two yellow brackets = trim start / end. Drag to change cut.
+                - Grey vertical bar between them = playhead. Drag to scrub
+                  the preview frame anywhere in the video.
+                - Click anywhere on the track = jump playhead there.
+              All three handles seek the video element in real time so the
+              preview always shows the exact frame under the bar being dragged.
+            */}
+            <div
+              ref={trackRef}
+              onPointerDown={onPointerDownTrack}
+              className={`relative h-14 select-none ${busy ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}
+            >
+              {/* Track background — full video duration */}
+              <div className="absolute inset-y-1 left-0 right-0 rounded-md bg-white/5 border border-white/10" />
+
+              {/* Dimmed pre-trim region */}
               <div
-                className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#f26522]"
+                className="absolute inset-y-1 left-0 rounded-l-md bg-black/60 backdrop-blur-[1px]"
+                style={{ width: `${(trimStart / duration) * 100}%` }}
+              />
+              {/* Dimmed post-trim region */}
+              <div
+                className="absolute inset-y-1 right-0 rounded-r-md bg-black/60 backdrop-blur-[1px]"
+                style={{ width: `${((duration - trimEnd) / duration) * 100}%` }}
+              />
+
+              {/* Trim window outline (between brackets) */}
+              <div
+                className="absolute inset-y-1 border-y-2 border-[#f26522] pointer-events-none"
                 style={{
-                  left: `calc(${(trimStart / duration) * 100}% + 4px)`,
-                  right: `calc(${(1 - trimEnd / duration) * 100}% + 4px)`,
+                  left: `${(trimStart / duration) * 100}%`,
+                  right: `${((duration - trimEnd) / duration) * 100}%`,
                 }}
               />
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.05}
-                value={trimStart}
-                disabled={busy}
-                onChange={(e) => {
-                  const v = Math.min(parseFloat(e.target.value), trimEnd - 0.1);
-                  setTrimStart(Math.max(0, v));
+
+              {/* LEFT bracket = trim start */}
+              <div
+                data-handle="start"
+                onPointerDown={beginHandleDrag("start")}
+                className="absolute top-0 bottom-0 -translate-x-1/2 flex items-center justify-center cursor-ew-resize touch-none z-[2]"
+                style={{ left: `${(trimStart / duration) * 100}%`, width: 18 }}
+                title="Trim start"
+              >
+                <div className="h-full w-2.5 rounded-l-md bg-[#f26522] flex items-center justify-center pointer-events-none">
+                  <div className="h-5 w-[2px] rounded bg-white/90" />
+                </div>
+              </div>
+
+              {/* RIGHT bracket = trim end */}
+              <div
+                data-handle="end"
+                onPointerDown={beginHandleDrag("end")}
+                className="absolute top-0 bottom-0 -translate-x-1/2 flex items-center justify-center cursor-ew-resize touch-none z-[2]"
+                style={{ left: `${(trimEnd / duration) * 100}%`, width: 18 }}
+                title="Trim end"
+              >
+                <div className="h-full w-2.5 rounded-r-md bg-[#f26522] flex items-center justify-center pointer-events-none">
+                  <div className="h-5 w-[2px] rounded bg-white/90" />
+                </div>
+              </div>
+
+              {/* PLAYHEAD = grey vertical bar — scrubs preview without
+                  changing the trim window. */}
+              <div
+                data-handle="playhead"
+                onPointerDown={(e) => {
+                  if (busy) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+                  setDragging("playhead");
                 }}
-                className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-moz-range-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-              />
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.05}
-                value={trimEnd}
-                disabled={busy}
-                onChange={(e) => {
-                  const v = Math.max(parseFloat(e.target.value), trimStart + 0.1);
-                  setTrimEnd(Math.min(duration, v));
-                }}
-                className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-moz-range-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-              />
+                className="absolute top-0 bottom-0 -translate-x-1/2 cursor-ew-resize touch-none z-[3] flex items-center justify-center"
+                style={{ left: `${(playhead / duration) * 100}%`, width: 16 }}
+                title="Playhead"
+              >
+                <div className="h-full w-[3px] rounded bg-white shadow-[0_0_10px_rgba(255,255,255,0.4)] pointer-events-none" />
+                <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow pointer-events-none" />
+              </div>
             </div>
           </>
         )}
