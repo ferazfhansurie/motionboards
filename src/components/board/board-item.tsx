@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
+import { useInViewport } from "@/lib/use-in-viewport";
 import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
 import { askShareToCommunity, pickFolder, showToast, updateToast } from "@/lib/ui-store";
@@ -180,6 +181,8 @@ const loadedImageCache = new Set<string>();
 function UploadedVideoPreview({ src, height }: { src: string; height?: number }) {
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inView = useInViewport(containerRef, "400px");
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -194,24 +197,30 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
   };
 
   return (
-    <div className="relative" style={{ height }}>
-      <video
-        ref={videoRef}
-        src={src}
-        className="h-full w-full object-cover"
-        muted={!playing}
-        loop
-        playsInline
-        controls={playing}
-        preload="metadata"
-        draggable={false}
-        onContextMenu={(e) => e.preventDefault()}
-        onClick={togglePlay}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
-      />
-      {!playing && (
+    <div ref={containerRef} className="relative" style={{ height }}>
+      {inView ? (
+        <video
+          ref={videoRef}
+          src={src}
+          className="h-full w-full object-cover"
+          muted={!playing}
+          loop
+          playsInline
+          controls={playing}
+          preload="metadata"
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={togglePlay}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
+        />
+      ) : (
+        <div className="h-full w-full bg-gray-800/50 flex items-center justify-center">
+          <Play className="h-6 w-6 text-gray-600" fill="currentColor" />
+        </div>
+      )}
+      {inView && !playing && (
         <button
           type="button"
           onClick={togglePlay}
@@ -231,6 +240,12 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
   const [loaded, setLoaded] = useState(false);
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Mobile Safari OOM-kills tabs with too many decoded video elements.
+  // Mount the <video> only when the item is in/near the viewport. Once
+  // it's been seen we keep it mounted while it stays nearby — preventing
+  // remount-flicker on small scroll wobbles.
+  const inView = useInViewport(containerRef, "400px");
 
   // Click toggles play. While playing: native browser controls visible
   // and audio unmuted. Mousedown is swallowed during playback so the user
@@ -248,34 +263,48 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
   };
 
   return (
-    <div className="relative" style={{ minHeight: loaded ? undefined : item.height || 120 }}>
-      {!loaded && (
+    <div
+      ref={containerRef}
+      className="relative"
+      style={{ minHeight: loaded ? undefined : item.height || 120 }}
+    >
+      {!loaded && inView && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-[1]">
           <Loader2 className="h-5 w-5 text-[#f26522] animate-spin" />
           <p className="text-[10px] text-gray-400">Loading video...</p>
         </div>
       )}
-      <video
-        ref={videoRef}
-        src={item.outputUrl}
-        className={`w-full block ${loaded ? "" : "opacity-0"}`}
-        muted={!playing}
-        loop
-        playsInline
-        controls={playing}
-        preload="metadata"
-        draggable={false}
-        onContextMenu={(e) => e.preventDefault()}
-        onLoadedData={() => setLoaded(true)}
-        onClick={togglePlay}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        // Stop drag from firing only while the user is actively interacting
-        // with controls (playing). When paused, mousedown propagates so the
-        // user can drag the item by grabbing the video surface.
-        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
-      />
-      {loaded && !playing && (
+      {inView ? (
+        <video
+          ref={videoRef}
+          src={item.outputUrl}
+          className={`w-full block ${loaded ? "" : "opacity-0"}`}
+          muted={!playing}
+          loop
+          playsInline
+          controls={playing}
+          preload="metadata"
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+          onLoadedData={() => setLoaded(true)}
+          onClick={togglePlay}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          // Stop drag from firing only while the user is actively interacting
+          // with controls (playing). When paused, mousedown propagates so the
+          // user can drag the item by grabbing the video surface.
+          onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
+        />
+      ) : (
+        // Off-screen placeholder — keeps layout stable, costs zero memory.
+        <div
+          className="w-full bg-gray-800/50 flex items-center justify-center"
+          style={{ height: item.height || 120 }}
+        >
+          <Play className="h-6 w-6 text-gray-600" fill="currentColor" />
+        </div>
+      )}
+      {inView && loaded && !playing && (
         <button
           type="button"
           onClick={togglePlay}
