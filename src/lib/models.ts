@@ -61,6 +61,11 @@ export interface AIModel {
   // (e.g. Seedance Fast, which lives on ByteDance Ark not Replicate).
   disabled?: boolean;
   disabledReason?: string;
+  // Practical usage guide — markdown rendered in the model details dialog.
+  // Cover what works, what doesn't, common gotchas, and example prompts.
+  // Keep it actionable: "use 5–10s clips", "no cuts inside the source video",
+  // not generic marketing copy.
+  guide?: string;
 }
 
 // Rate: 1 USD = 3.7 RM. Margin: +RM0.03 photo/audio, +RM0.05 video
@@ -72,6 +77,25 @@ export const models: AIModel[] = [
   {
     id: "gemini-3.1-flash-image-preview",
     name: "Nano Banana 2",
+    guide: `**Google's image generator with reference-image blending.**
+
+**Modes:**
+- Pure text-to-image: just describe what you want.
+- With reference images (up to 4): the model blends style / subject / composition from each. Great for "this character in this setting" combos.
+
+**Prompt patterns that work:**
+- "Photorealistic portrait of [subject], shot on Sony A7IV, 85mm f/1.4, golden hour, shallow depth of field" → fast hyper-realistic look.
+- "[Subject] in the style of [reference image], cinematic lighting, film grain" → style transfer.
+- For multi-character scenes: name each person in the prompt and reference images by description.
+
+**Resolution:** 0.5K is fast/cheap for iteration. Bump to 1K/2K/4K only when locked. 4K takes ~3× longer than 1K.
+
+**Common gotchas:**
+- Text inside images often comes out garbled. Prompt explicit text only when essential, otherwise add it in post.
+- Hands and small details improve dramatically when you say "detailed anatomy, accurate hands".
+- Reference images: avoid using too many (4 max) and avoid contradictory references.
+
+**Use it as the start of a chain:** generate keyframes here → tag into Veo I2V or Seedance I2V to animate.`,
     provider: "gemini", type: "t2i", category: "Image",
     description: "Google's Gemini 3.1 Flash Image. Fast, photoreal, and the current price/quality leader.",
     cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true,
@@ -188,6 +212,20 @@ export const models: AIModel[] = [
       generate_audio: { default: true, label: "Audio" },
     },
     perSecond: { noAudio720p: 0.42, withAudio720p: 0.42, noAudio4k: 1.16, withAudio4k: 1.16 },
+    guide: `**One continuous 8s shot — no cuts.** Veo I2V animates a single image into a single take. To stitch a multi-shot sequence: generate each shot separately and edit them together externally, or use S2E (start-to-end) with linking frames.
+
+**Prompt template:** describe MOTION, not the scene (the scene is already the image). Be specific:
+- Bad: "make this cinematic"
+- Good: "slow dolly-in toward the subject's face, gentle wind on hair, shallow depth of field, golden-hour key light"
+
+**Audio toggle**: leave on for ambient sound + voice if relevant. Turn off if you'll add MMAudio or Lipsync later.
+
+**Resolution:** start 720p for iteration. 4K is 2.7× the cost — use only when you've locked the prompt.
+
+**Common gotchas:**
+- Faces drift if the prompt doesn't anchor identity ("the same young woman in the image, holding her pose").
+- Camera moves you describe ("orbit", "dolly") usually feel slower than expected — be bold ("aggressive orbit", "fast push-in").
+- Text in the source image often morphs. If you need text, add it in post.`,
   },
 
   {
@@ -208,6 +246,24 @@ export const models: AIModel[] = [
       generate_audio: { default: true, label: "Audio" },
     },
     perSecond: { noAudio720p: 0.42, withAudio720p: 0.42, noAudio4k: 1.16, withAudio4k: 1.16 },
+    guide: `**S2E = Start to End. Veo interpolates an 8-second motion path between two images you provide.** This is the canonical multi-shot building block — chain N S2E generations to produce a coherent N-cut sequence.
+
+**Multi-shot workflow:**
+1. Generate keyframe images (Nano Banana 2 / FLUX) for each "moment" of your sequence: Frame A, Frame B, Frame C…
+2. Run S2E with frames A→B, then B→C, then C→D…
+3. Each S2E clip naturally cuts to the next because the END frame of clip 1 is the START frame of clip 2.
+4. Stitch externally (CapCut, Premiere) for the final.
+
+**Frame rules:**
+- Same character / scene continuity between start and end. Wildly different framings → the model invents a chaotic transition.
+- Match aspect ratio across all keyframes (16:9 throughout, or 9:16 throughout).
+- For "camera-only" cuts: use the same subject in both frames at different angles. For "subject-action" cuts: same camera, subject in different positions.
+
+**Prompt template:** describe the TRANSITION, not just the end state.
+- "the woman turns her head from looking left to looking right, soft natural motion"
+- "the camera pulls back slowly while the subject stays centered"
+
+**Limit:** 8s only — that's the model's max output. For longer sequences, chain S2E clips.`,
   },
 
   // Seedance 2.0 runs on Replicate (bytedance/seedance-2.0). The internal
@@ -347,6 +403,25 @@ export const models: AIModel[] = [
       resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
     },
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
+    guide: `**One continuous shot only — no cuts.** Wan tracks a single person across the clip; if the source video cuts to another angle or a different subject, the model loses the track and the output garbles or drops the character. Trim the source down to a single uninterrupted take before you tag it (use the Scissors icon in the zoom view).
+
+**Sweet spot is 5–15 seconds.** Output matches the source video's duration. Anything past ~30s gets expensive and may hit Replicate's 10-minute prediction timeout.
+
+**Character image rules:**
+- Full body visible if the source video is a full-body shot. Half-body image + full-body source = legs invented and usually wrong.
+- Clean background. Plain studio lighting beats a busy scene.
+- Same orientation as the source subject (front-on character image for a front-on source video).
+- Avoid sunglasses, masks, or anything covering identifying features — character ID drifts more.
+
+**Source video rules:**
+- ONE person in frame. Multiple people = the model picks one and the others ghost.
+- Subject mostly facing the camera works best. Profile / back-of-head shots are weaker.
+- Stable framing — handheld is fine, but no rapid camera shake or aggressive zoom.
+- Audio is preserved in the output (\`merge_audio: true\`).
+
+**Resolution:** start at 480 to iterate cheaply, switch to 720 once the framing is right.
+
+**Why your earlier attempts failed**: most likely a cut in the source video, multiple people, or a character image that doesn't match the source's framing.`,
   },
 
   {
@@ -364,6 +439,19 @@ export const models: AIModel[] = [
       resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
     },
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
+    guide: `**Pose-to-Character vs Character-Animation — pick correctly:**
+- Use **Pose to Character** when you want your character INSIDE the source scene (same background, same camera move).
+- Use **Character Animation** (this one) when you only want the MOTION copied — the output is a fresh clip with your character on a generated background, not the source environment.
+
+**Same constraints as Pose to Character apply:**
+- One continuous shot, no cuts in the reference video.
+- 5–15s is the sweet spot.
+- Full-body character image if the motion is full-body.
+- One person in the reference video.
+
+**Best motion sources**: dance clips, walking, simple gestures, sports moves with clear body posture. Bad sources: rapid martial arts (limbs blur), occluded body (props/furniture in front), camera doing fast pans.
+
+**Audio**: not preserved here (it's a new clip). Add audio separately with MMAudio or chain into Lipsync 2 Pro.`,
   },
 
   // Sync Labs lip-sync — drop a video + audio track, get back the video
@@ -380,6 +468,22 @@ export const models: AIModel[] = [
       { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 50 },
     ],
     perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
+    guide: `**Video rules:**
+- Subject's mouth fully visible the whole time. Heavy beards, masks, hands over mouth → poor sync.
+- One face in frame at a time. Multiple faces = the model picks one, others get distorted.
+- Cuts are tolerated, but each cut briefly resets the model — the first frame after a cut may have a single off mouth shape. Best results on continuous shots.
+- Output duration = video duration. Trim with Scissors first if you only want part of it lip-synced.
+
+**Audio rules:**
+- **Clean isolated vocals work much better than music with vocals.** Run any music through **Vocal Extractor (Demucs)** first to strip drums + instruments → cleaner sync.
+- Match the speaker's gender / pitch range — Lipsync doesn't change voice, only lips. A bass voice on a child's face still looks weird.
+- Trim silence at the start of the audio (use Scissors). The model lip-syncs silence as closed mouth which can look like a "delay".
+
+**Tier choice:**
+- **Lipsync 2 Pro** (~RM0.75/s): use for client work, music videos, anything that ends up on a feed.
+- **Lipsync 2** (~RM0.30/s): use for quick tests / iteration before paying for Pro on the final.
+
+**File limits:** 50 MB each. Use the trim tool if your raw clips are bigger.`,
   },
 
   {
@@ -388,6 +492,11 @@ export const models: AIModel[] = [
     provider: "replicate", type: "v2v", category: "Video",
     description: "Sync Labs' fast + cheap lip-sync. Same input shape as Pro — video + audio — tuned for speed over maximum fidelity.",
     cost: "~RM0.30/s", creditCost: 30, speed: "~1m", stable: true,
+    guide: `Same rules as **Lipsync 2 Pro** — see that model's guide. Differences:
+
+- **Faster + cheaper** (~1 min vs ~2 min, RM0.30/s vs RM0.75/s)
+- Slightly looser lip shapes — fine for short social cuts, less convincing for tight close-ups
+- Use this for iteration; switch to Pro for the final.`,
     inputs: [
       { name: "video", type: "video", required: true, description: "Video to re-lip-sync", maxMB: 50 },
       { name: "audio", type: "audio", required: true, description: "Audio track the lips should match", maxMB: 50 },
@@ -488,6 +597,25 @@ export const models: AIModel[] = [
     inputs: [
       { name: "audio", type: "audio", required: true, description: "Music file to extract vocals from", maxMB: 100 },
     ],
+    guide: `**What it does:** strips drums, bass, and instruments from a music track and gives you back the **isolated vocals** as a WAV file.
+
+**The killer workflow — music video lip-sync:**
+1. Drop the music file → tag into Vocal Extractor → run.
+2. The output is a vocals.wav item on your canvas.
+3. Tag that vocals item into **Lipsync 2 Pro**'s audio slot (NOT the original music — Lipsync chokes on backing instruments).
+4. Tag your talking-head video into Lipsync's video slot.
+5. Result: tight mouth sync because the model sees clean vocals.
+
+**Skip this step if:**
+- Your audio is already a clean voice recording (TTS, voice memo, podcast clip).
+- The track is mostly a cappella / spoken word.
+
+**Quality tips:**
+- Use the original master if you have it. Lossy MP3 → vocal artifacts → fuzzy lipsync.
+- Heavy autotune / vocoder on the original = harder for Demucs. Result still works but the vocal stem may have residual instrument bleed.
+- Run time scales with track length. 3-min song = ~30s. 7-min song = ~70s.
+
+**File limit:** 100 MB. A 7-minute uncompressed WAV is roughly 70 MB — well within range.`,
   },
 ];
 
