@@ -57,7 +57,13 @@ General conversation rules:
 Prompt-crafting mode (when the user is clearly asking for a generation prompt):
 - Return ONE compact prompt only. No titles, no headings, no "---" dividers, no "Ready to use" footer.
 - No markdown formatting in the prompt itself — plain prose, copy-paste ready.
-- 1–3 sentences for images, 2–4 for video.
+- For SINGLE shots: 1–3 sentences for images, 2–4 for video, all in one paragraph.
+- For MULTI-shot / storyboards / panel sequences: split each shot/panel onto its own paragraph with a BLANK LINE between them. Hard line breaks between panels — never run a 12-panel storyboard as one wall of text. Example layout:
+    Panel 1: [description].
+
+    Panel 2: [description].
+
+    Panel 3: [description].
 - Default to hyper-realistic (real camera/lens refs, natural light, film grain) unless the user asks for stylized/animated.
 - If they say "shorter", "simpler", "more compact" — cut hard.
 
