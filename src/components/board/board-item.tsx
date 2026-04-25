@@ -210,7 +210,6 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
           preload="metadata"
           draggable={false}
           onContextMenu={(e) => e.preventDefault()}
-          onClick={togglePlay}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
@@ -221,15 +220,17 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
         </div>
       )}
       {inView && !playing && (
+        // Small corner play button only — leaves the rest of the video
+        // surface free for drag/select.
         <button
           type="button"
           onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center group"
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute bottom-2 right-2 rounded-full bg-black/70 hover:bg-black/90 transition-colors p-1.5 z-[2]"
           aria-label="Play video"
+          title="Play"
         >
-          <span className="rounded-full bg-black/60 group-hover:bg-black/80 transition-colors p-3">
-            <Play className="h-5 w-5 text-white" fill="white" />
-          </span>
+          <Play className="h-3 w-3 text-white" fill="white" />
         </button>
       )}
     </div>
@@ -287,7 +288,6 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
           draggable={false}
           onContextMenu={(e) => e.preventDefault()}
           onLoadedData={() => setLoaded(true)}
-          onClick={togglePlay}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           // Stop drag from firing only while the user is actively interacting
@@ -305,15 +305,18 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
         </div>
       )}
       {inView && loaded && !playing && (
+        // Small corner play button only — leaves the rest of the video
+        // surface free for drag/select. Stops propagation so clicking
+        // the button itself doesn't also kick off a drag.
         <button
           type="button"
           onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center group"
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute bottom-2 right-2 rounded-full bg-black/70 hover:bg-black/90 transition-colors p-1.5 z-[2]"
           aria-label="Play video"
+          title="Play"
         >
-          <span className="rounded-full bg-black/60 group-hover:bg-black/80 transition-colors p-3">
-            <Play className="h-5 w-5 text-white" fill="white" />
-          </span>
+          <Play className="h-3 w-3 text-white" fill="white" />
         </button>
       )}
     </div>
