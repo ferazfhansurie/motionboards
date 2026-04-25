@@ -142,6 +142,18 @@ export function Canvas() {
   // Marquee selection state (right-click drag). Coords are in screen space.
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
+  // Track viewport size so we can cull off-screen items. Without this,
+  // mobile Safari OOM-crashes on big boards because every BoardItem (with
+  // hover panels, badges, edit overlays, etc.) stays mounted in the React
+  // tree even when scrolled far out of frame.
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
   // Space key tracking + keyboard shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -978,17 +990,38 @@ export function Canvas() {
             </svg>
           )}
 
-          {items.map((item) => (
-            <BoardItemCard
-              key={item.id}
-              item={item}
-              isSelected={item.id === selectedItemId || selectedItemIds.includes(item.id)}
-              isConnecting={activeCanvasTool === "connect" && connectingFromId === item.id}
-              onMouseDown={(e) => handleItemDragStart(item.id, e)}
-              onDoubleClick={() => handleItemDoubleClick(item.id)}
-              onResizeStart={(e, edge) => handleResizeStart(item.id, e, edge)}
-            />
-          ))}
+          {(() => {
+            // Viewport culling — only render items whose bounding box
+            // intersects the visible canvas area (with a 600 canvas-unit
+            // cushion so panning doesn't show pop-in). Without this, mobile
+            // Safari hits the per-tab memory cap on boards with ~30+ items
+            // because every BoardItem keeps overlays + hover panels +
+            // images mounted even when far off-screen.
+            const margin = 600;
+            const z = zoom || 1;
+            const minX = -panX / z - margin;
+            const maxX = (viewport.w - panX) / z + margin;
+            const minY = -panY / z - margin;
+            const maxY = (viewport.h - panY) / z + margin;
+            const visibleItems = viewport.w === 0
+              ? items // first paint before resize listener fires — render all
+              : items.filter((it) => {
+                  const w = it.width || 0;
+                  const h = it.height || 0;
+                  return it.x + w >= minX && it.x <= maxX && it.y + h >= minY && it.y <= maxY;
+                });
+            return visibleItems.map((item) => (
+              <BoardItemCard
+                key={item.id}
+                item={item}
+                isSelected={item.id === selectedItemId || selectedItemIds.includes(item.id)}
+                isConnecting={activeCanvasTool === "connect" && connectingFromId === item.id}
+                onMouseDown={(e) => handleItemDragStart(item.id, e)}
+                onDoubleClick={() => handleItemDoubleClick(item.id)}
+                onResizeStart={(e, edge) => handleResizeStart(item.id, e, edge)}
+              />
+            ));
+          })()}
         </div>
       </div>
 
