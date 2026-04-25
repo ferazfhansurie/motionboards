@@ -173,8 +173,80 @@ function CopyablePrompt({ prompt, isDark }: { prompt: string; isDark: boolean })
 // Global cache of loaded image URLs — survives component remounts
 const loadedImageCache = new Set<string>();
 
+// Inline player for uploaded / dropped video items on the canvas. Same UX
+// as GeneratedVideo: click to play with native controls + audio; click again
+// to pause. Mousedown is swallowed during playback so timeline scrub doesn't
+// trigger the canvas item drag.
+function UploadedVideoPreview({ src, height }: { src: string; height?: number }) {
+  const [playing, setPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.muted = false;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  };
+
+  return (
+    <div className="relative" style={{ height }}>
+      <video
+        ref={videoRef}
+        src={src}
+        className="h-full w-full object-cover"
+        muted={!playing}
+        loop
+        playsInline
+        controls={playing}
+        preload="metadata"
+        draggable={false}
+        onContextMenu={(e) => e.preventDefault()}
+        onClick={togglePlay}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
+      />
+      {!playing && (
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="absolute inset-0 flex items-center justify-center group"
+          aria-label="Play video"
+        >
+          <span className="rounded-full bg-black/60 group-hover:bg-black/80 transition-colors p-3">
+            <Play className="h-5 w-5 text-white" fill="white" />
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function GeneratedVideo({ item }: { item: BoardItem }) {
   const [loaded, setLoaded] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Click toggles play. While playing: native browser controls visible
+  // and audio unmuted. Mousedown is swallowed during playback so the user
+  // can scrub the timeline without the canvas treating it as a drag.
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.muted = false;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  };
+
   return (
     <div className="relative" style={{ minHeight: loaded ? undefined : item.height || 120 }}>
       {!loaded && (
@@ -184,20 +256,36 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
         </div>
       )}
       <video
+        ref={videoRef}
         src={item.outputUrl}
         className={`w-full block ${loaded ? "" : "opacity-0"}`}
-        muted
+        muted={!playing}
         loop
         playsInline
+        controls={playing}
         preload="metadata"
         draggable={false}
         onContextMenu={(e) => e.preventDefault()}
         onLoadedData={() => setLoaded(true)}
+        onClick={togglePlay}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        // Stop drag from firing only while the user is actively interacting
+        // with controls (playing). When paused, mousedown propagates so the
+        // user can drag the item by grabbing the video surface.
+        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
       />
-      {loaded && (
-        <div className="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5">
-          <Play className="h-3 w-3 text-white" fill="white" />
-        </div>
+      {loaded && !playing && (
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="absolute inset-0 flex items-center justify-center group"
+          aria-label="Play video"
+        >
+          <span className="rounded-full bg-black/60 group-hover:bg-black/80 transition-colors p-3">
+            <Play className="h-5 w-5 text-white" fill="white" />
+          </span>
+        </button>
       )}
     </div>
   );
@@ -709,21 +797,7 @@ export function BoardItemCard({
         )}
 
         {item.type === "video" && (
-          <div className="relative" style={{ height: item.height }}>
-            <video
-              src={item.outputUrl || item.src}
-              className="h-full w-full object-cover"
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              draggable={false}
-              onContextMenu={(e) => e.preventDefault()}
-            />
-            <div className="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5">
-              <Play className="h-3 w-3 text-white" fill="white" />
-            </div>
-          </div>
+          <UploadedVideoPreview src={item.outputUrl || item.src} height={item.height} />
         )}
 
         {item.type === "audio" && (
