@@ -146,7 +146,13 @@ export function Canvas() {
   // mobile Safari OOM-crashes on big boards because every BoardItem (with
   // hover panels, badges, edit overlays, etc.) stays mounted in the React
   // tree even when scrolled far out of frame.
-  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  // Initialize SYNCHRONOUSLY from window — earlier version fell back to
+  // {0,0} until the resize listener fired, which caused the very first
+  // render to skip culling and mount every item (the OOM trigger).
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1024,
+    h: typeof window !== "undefined" ? window.innerHeight : 768,
+  }));
   useEffect(() => {
     const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
     update();
@@ -992,24 +998,60 @@ export function Canvas() {
 
           {(() => {
             // Viewport culling — only render items whose bounding box
-            // intersects the visible canvas area (with a 600 canvas-unit
-            // cushion so panning doesn't show pop-in). Without this, mobile
-            // Safari hits the per-tab memory cap on boards with ~30+ items
-            // because every BoardItem keeps overlays + hover panels +
-            // images mounted even when far off-screen.
-            const margin = 600;
+            // intersects the visible canvas area. Mobile uses a tighter
+            // margin AND a hard cap on rendered count so big boards never
+            // mount enough DOM to OOM the tab.
+            const isMobile = viewport.w > 0 && viewport.w < 768;
+            const margin = isMobile ? 100 : 500;
+            const HARD_CAP = isMobile ? 25 : 200;
             const z = zoom || 1;
             const minX = -panX / z - margin;
             const maxX = (viewport.w - panX) / z + margin;
             const minY = -panY / z - margin;
             const maxY = (viewport.h - panY) / z + margin;
-            const visibleItems = viewport.w === 0
-              ? items // first paint before resize listener fires — render all
-              : items.filter((it) => {
-                  const w = it.width || 0;
-                  const h = it.height || 0;
-                  return it.x + w >= minX && it.x <= maxX && it.y + h >= minY && it.y <= maxY;
-                });
+            // Center of viewport in canvas coords — used for distance sort
+            // when we have to cap the rendered set.
+            const centerX = (viewport.w / 2 - panX) / z;
+            const centerY = (viewport.h / 2 - panY) / z;
+
+            let visibleItems = items.filter((it) => {
+              const w = it.width || 0;
+              const h = it.height || 0;
+              return it.x + w >= minX && it.x <= maxX && it.y + h >= minY && it.y <= maxY;
+            });
+
+            // Always include the actively selected / dragged items even
+            // if they've drifted offscreen, so they remain controllable.
+            const forceIds = new Set<string>([
+              ...(selectedItemId ? [selectedItemId] : []),
+              ...selectedItemIds,
+            ]);
+            if (forceIds.size > 0) {
+              const visibleIds = new Set(visibleItems.map((it) => it.id));
+              for (const id of forceIds) {
+                if (!visibleIds.has(id)) {
+                  const it = items.find((x) => x.id === id);
+                  if (it) visibleItems.push(it);
+                }
+              }
+            }
+
+            // Hard cap — if still too many, sort by distance from viewport
+            // center and keep the closest N.
+            if (visibleItems.length > HARD_CAP) {
+              visibleItems = [...visibleItems]
+                .map((it) => {
+                  const cx = it.x + (it.width || 0) / 2;
+                  const cy = it.y + (it.height || 0) / 2;
+                  const dx = cx - centerX;
+                  const dy = cy - centerY;
+                  return { it, d: dx * dx + dy * dy };
+                })
+                .sort((a, b) => a.d - b.d)
+                .slice(0, HARD_CAP)
+                .map((x) => x.it);
+            }
+
             return visibleItems.map((item) => (
               <BoardItemCard
                 key={item.id}
