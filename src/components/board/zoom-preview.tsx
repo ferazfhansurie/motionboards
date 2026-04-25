@@ -141,9 +141,8 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
             <video
               src={mediaSrc}
               controls
-              autoPlay
               loop
-              preload="auto"
+              preload="metadata"
               className="max-h-[85vh] max-w-[90vw] rounded-xl"
               onClick={(e) => e.stopPropagation()}
             />
@@ -152,7 +151,7 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
             <div className="flex flex-col items-center gap-4 rounded-xl bg-[#0d1f30] p-8" onClick={(e) => e.stopPropagation()}>
               <Music className="h-12 w-12 text-[#f26522]" />
               <p className="text-sm text-white">{item.fileName || "Audio"}</p>
-              <audio src={mediaSrc} controls autoPlay className="w-80" />
+              <audio src={mediaSrc} controls className="w-80" />
             </div>
           )}
         </div>

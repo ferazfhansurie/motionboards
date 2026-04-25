@@ -378,12 +378,7 @@ export function FoldersPanel() {
                             loop
                             playsInline
                             preload="metadata"
-                            onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
-                            onMouseLeave={(e) => {
-                              const v = e.currentTarget as HTMLVideoElement;
-                              v.pause();
-                              v.currentTime = 0;
-                            }}
+                            controls
                             className="h-full w-full object-cover"
                           />
                         ) : it.mediaType === "image" ? (
