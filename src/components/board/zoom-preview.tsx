@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { X, Download, Music, ZoomIn, ZoomOut, RotateCcw, Info, Copy, Check } from "lucide-react";
+import { X, Download, Music, ZoomIn, ZoomOut, RotateCcw, Info, Copy, Check, Scissors } from "lucide-react";
 import type { BoardItem } from "@/lib/store";
+import { TrimDialog } from "./trim-dialog";
 
 interface ZoomPreviewProps {
   item: BoardItem;
@@ -17,6 +18,7 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showInfo, setShowInfo] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showTrim, setShowTrim] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -98,6 +100,16 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
           >
             <Info className="h-4 w-4" />
           </button>
+          {/* Trim — video only */}
+          {isVideo && mediaSrc && (
+            <button
+              onClick={() => setShowTrim(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors text-xs"
+              title="Trim video"
+            >
+              <Scissors className="h-3.5 w-3.5" />
+            </button>
+          )}
           {mediaSrc && (
             <a href={mediaSrc} download target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors text-xs">
               <Download className="h-3.5 w-3.5" />
@@ -108,6 +120,8 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
           </button>
         </div>
       </div>
+
+      {showTrim && <TrimDialog item={item} onClose={() => setShowTrim(false)} />}
 
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">
