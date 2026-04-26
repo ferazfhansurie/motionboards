@@ -22,9 +22,10 @@ export function CropOverlay({ item }: CropOverlayProps) {
 
   if (!isCropMode) return null;
 
-  const handleMouseDown = (handle: Handle) => (e: React.MouseEvent) => {
+  const handlePointerDown = (handle: Handle) => (e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
     setDragging(handle);
     setDragStart({
       x: e.clientX,
@@ -36,8 +37,8 @@ export function CropOverlay({ item }: CropOverlayProps) {
     });
   };
 
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
+  const handlePointerMove = useCallback(
+    (e: PointerEvent) => {
       if (!dragging || !containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
@@ -75,20 +76,20 @@ export function CropOverlay({ item }: CropOverlayProps) {
     [dragging, dragStart, item.id, updateEditState]
   );
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setDragging(null);
   }, []);
 
   useEffect(() => {
     if (dragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", handlePointerUp);
       return () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", handlePointerUp);
       };
     }
-  }, [dragging, handleMouseMove, handleMouseUp]);
+  }, [dragging, handlePointerMove, handlePointerUp]);
 
   const handleSize = 8;
 
@@ -139,7 +140,7 @@ export function CropOverlay({ item }: CropOverlayProps) {
           width: `${cropW * 100}%`,
           height: `${cropH * 100}%`,
         }}
-        onMouseDown={handleMouseDown("move")}
+        onPointerDown={handlePointerDown("move")}
       >
         {/* Rule of thirds grid */}
         <div className="absolute inset-0">
@@ -166,7 +167,7 @@ export function CropOverlay({ item }: CropOverlayProps) {
               cursor:
                 handle === "tl" || handle === "br" ? "nwse-resize" : "nesw-resize",
             }}
-            onMouseDown={handleMouseDown(handle)}
+            onPointerDown={handlePointerDown(handle)}
           />
         );
       })}

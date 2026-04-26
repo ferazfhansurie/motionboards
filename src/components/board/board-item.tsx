@@ -602,6 +602,7 @@ export function BoardItemCard({
         width: item.width,
         ...(item.type === "text" ? { height: item.height } : {}),
         zIndex: isSelected ? 50 : 1,
+        WebkitTouchCallout: "none", // suppress iOS native long-press callout
       }}
       onPointerDown={handleItemPointerDown}
       onPointerMove={handleItemPointerMove}
