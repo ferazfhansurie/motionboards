@@ -372,11 +372,13 @@ function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClic
         </div>
       )}
 
-      {/* The actual image — always in DOM so it can load, hidden only on error */}
+      {/* The actual image — always in DOM so it can load, hidden only on error.
+          No native loading="lazy": parent canvas already culls offscreen items,
+          and inside a CSS-transformed container mobile Safari misjudges
+          visibility and never fires onLoad. */}
       <img
         src={retrySrc}
         alt="Generated"
-        loading="lazy"
         decoding="async"
         className={`w-full block pointer-events-none ${imgState === "error" ? "hidden" : ""}`}
         draggable={false}
