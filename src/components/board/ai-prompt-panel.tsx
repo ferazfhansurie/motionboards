@@ -523,7 +523,7 @@ export function AIPromptPanel() {
   const pasteTargetRef = useRef<HTMLDivElement>(null);
 
   const handlePasteTargetPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
-    e.preventDefault();
+    // Try clipboardData.items first (works on Android / desktop)
     const items = Array.from(e.clipboardData?.items || []);
     const files: File[] = [];
     for (const it of items) {
@@ -533,11 +533,49 @@ export function AIPromptPanel() {
       }
     }
     if (files.length > 0) {
+      e.preventDefault();
       handleFiles(files);
       setShowPasteTarget(false);
+      return;
     }
-    // If nothing pasted — leave target open so user can try again
+    // No files in clipboardData (typical on iOS) — do NOT preventDefault.
+    // iOS will insert an <img> element directly into the contenteditable DOM.
+    // The MutationObserver below catches it.
   }, [handleFiles]);
+
+  // Watch for <img> elements iOS inserts into the paste target after a native paste
+  useEffect(() => {
+    if (!showPasteTarget) return;
+    const el = pasteTargetRef.current;
+    if (!el) return;
+
+    const processImg = async (img: HTMLImageElement) => {
+      const src = img.src;
+      img.remove();
+      try {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        if (blob.size > 0) {
+          const type = blob.type || "image/png";
+          const ext = type.split("/")[1] || "png";
+          handleFiles([new File([blob], `paste.${ext}`, { type })]);
+          setShowPasteTarget(false);
+        }
+      } catch { /* cross-origin or invalid src — ignore */ }
+    };
+
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node instanceof HTMLImageElement) processImg(node);
+          else if (node instanceof HTMLElement) node.querySelectorAll("img").forEach(img => processImg(img as HTMLImageElement));
+        }
+      }
+    });
+
+    observer.observe(el, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [showPasteTarget, handleFiles]);
 
   const loadChats = useCallback(async () => {
     setListLoading(true);
@@ -1158,7 +1196,6 @@ export function AIPromptPanel() {
                       contentEditable
                       suppressContentEditableWarning
                       onPaste={handlePasteTargetPaste}
-                      onBlur={() => setShowPasteTarget(false)}
                       className={`w-full min-h-[56px] border-2 border-dashed border-[#f26522] rounded-xl px-4 py-3 text-xs focus:outline-none ${isDark ? "bg-[#0d1117] text-white" : "bg-gray-50 text-[#0d1117]"}`}
                     />
                     <p className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 pointer-events-none select-none">
