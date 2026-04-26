@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip, Settings as SettingsIcon, Wand2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip, Settings as SettingsIcon, Wand2, PanelLeftClose, PanelLeftOpen, Clipboard } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -513,6 +513,44 @@ export function AIPromptPanel() {
       } catch {
         // Permission denied or API not available — let native text paste proceed
       }
+    }
+  }, [handleFiles]);
+
+  // Explicit clipboard-read button for mobile — iOS won't expose image blobs
+  // via the textarea paste event, but will grant access when called from a tap.
+  const [clipboardPasting, setClipboardPasting] = useState(false);
+  const [clipboardError, setClipboardError] = useState<string | null>(null);
+  const handleClipboardPaste = useCallback(async () => {
+    if (!navigator?.clipboard?.read) {
+      setClipboardError("Clipboard access not supported on this browser.");
+      setTimeout(() => setClipboardError(null), 3000);
+      return;
+    }
+    setClipboardPasting(true);
+    setClipboardError(null);
+    try {
+      const clipItems = await navigator.clipboard.read();
+      const files: File[] = [];
+      for (const ci of clipItems) {
+        for (const type of ci.types) {
+          if (type.startsWith("image/")) {
+            const blob = await ci.getType(type);
+            const ext = type.split("/")[1] || "png";
+            files.push(new File([blob], `paste.${ext}`, { type }));
+          }
+        }
+      }
+      if (files.length > 0) {
+        handleFiles(files);
+      } else {
+        setClipboardError("No image found in clipboard.");
+        setTimeout(() => setClipboardError(null), 3000);
+      }
+    } catch {
+      setClipboardError("Allow clipboard access when prompted, then try again.");
+      setTimeout(() => setClipboardError(null), 4000);
+    } finally {
+      setClipboardPasting(false);
     }
   }, [handleFiles]);
 
@@ -1121,6 +1159,31 @@ export function AIPromptPanel() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Mobile: explicit paste-image button since iOS won't expose
+                image blobs from textarea paste events */}
+            {isMobile && (
+              <div className="mb-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClipboardPaste}
+                  disabled={clipboardPasting}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors active:opacity-70 ${
+                    isDark
+                      ? "border-gray-600 text-gray-300 bg-[#0d1117] active:bg-white/10"
+                      : "border-gray-300 text-gray-600 bg-gray-50 active:bg-gray-100"
+                  }`}
+                >
+                  {clipboardPasting
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <Clipboard className="h-3.5 w-3.5" />}
+                  Paste image
+                </button>
+                {clipboardError && (
+                  <p className="text-[10px] text-red-400 flex-1">{clipboardError}</p>
+                )}
               </div>
             )}
 
