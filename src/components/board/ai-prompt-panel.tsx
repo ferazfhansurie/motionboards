@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { X, Send, Loader2, Sparkles, Copy, Check, Plus, Trash2, MessageSquare, Paperclip, Settings as SettingsIcon, Wand2, PanelLeftClose, PanelLeftOpen, Clipboard } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -516,94 +517,26 @@ export function AIPromptPanel() {
     }
   }, [handleFiles]);
 
-  // Explicit clipboard-read button for mobile — iOS won't expose image blobs
-  // via the textarea paste event, but will grant access when called from a tap.
-  const [clipboardPasting, setClipboardPasting] = useState(false);
-  const [clipboardError, setClipboardError] = useState<string | null>(null);
-  const handleClipboardPaste = useCallback(async () => {
-    setClipboardPasting(true);
-    setClipboardError(null);
+  // Mobile paste target — a contenteditable div iOS WILL deliver image data to
+  // via its native paste gesture (unlike clipboard.read() which often returns empty).
+  const [showPasteTarget, setShowPasteTarget] = useState(false);
+  const pasteTargetRef = useRef<HTMLDivElement>(null);
 
-    // Helper: fetch a URL and return it as a File if it looks like an image
-    const fetchImageUrl = async (url: string): Promise<File | null> => {
-      try {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        if (blob.type.startsWith("image/")) {
-          const ext = blob.type.split("/")[1] || "png";
-          return new File([blob], `paste.${ext}`, { type: blob.type });
-        }
-      } catch { /* ignore */ }
-      return null;
-    };
-
-    try {
-      // Try the modern Clipboard API first (iOS 16.4+, requires permission)
-      if (navigator?.clipboard?.read) {
-        const clipItems = await navigator.clipboard.read();
-        const files: File[] = [];
-
-        for (const ci of clipItems) {
-          for (const type of ci.types) {
-            if (type.startsWith("image/")) {
-              // Direct image blob (e.g. copy from Photos)
-              const blob = await ci.getType(type);
-              const ext = type.split("/")[1] || "png";
-              files.push(new File([blob], `paste.${ext}`, { type }));
-            } else if (type === "text/html") {
-              // Web image copy: browser puts <img src="…"> in HTML clipboard
-              const blob = await ci.getType(type);
-              const html = await blob.text();
-              const match = html.match(/src=["']([^"']+)["']/);
-              if (match?.[1]) {
-                const f = await fetchImageUrl(match[1]);
-                if (f) files.push(f);
-              }
-            } else if (type === "text/plain" || type === "text/uri-list") {
-              // URL copied — fetch it if it looks like an image URL
-              const blob = await ci.getType(type);
-              const text = (await blob.text()).trim();
-              if (/^https?:\/\/.+\.(png|jpe?g|gif|webp|avif|svg)(\?.*)?$/i.test(text)) {
-                const f = await fetchImageUrl(text);
-                if (f) files.push(f);
-              }
-            }
-          }
-        }
-
-        if (files.length > 0) {
-          handleFiles(files);
-          return;
-        }
-
-        // Nothing found — show the actual types for diagnostics
-        const allTypes = clipItems.flatMap((ci) => [...ci.types]);
-        setClipboardError(
-          allTypes.length
-            ? `No image in clipboard (found: ${allTypes.join(", ")})`
-            : "Clipboard is empty — copy an image first."
-        );
-        setTimeout(() => setClipboardError(null), 5000);
-        return;
+  const handlePasteTargetPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const items = Array.from(e.clipboardData?.items || []);
+    const files: File[] = [];
+    for (const it of items) {
+      if (it.kind === "file") {
+        const f = it.getAsFile();
+        if (f) files.push(f);
       }
-
-      // Fallback: read plain text and see if it's an image URL
-      if (navigator?.clipboard?.readText) {
-        const text = (await navigator.clipboard.readText()).trim();
-        if (/^https?:\/\/.+\.(png|jpe?g|gif|webp|avif)(\?.*)?$/i.test(text)) {
-          const f = await fetchImageUrl(text);
-          if (f) { handleFiles([f]); return; }
-        }
-      }
-
-      setClipboardError("Clipboard API not available — use the 📎 button to attach a file.");
-      setTimeout(() => setClipboardError(null), 4000);
-    } catch {
-      setClipboardError("Tap 'Allow' when iOS asks for clipboard permission, then try again.");
-      setTimeout(() => setClipboardError(null), 5000);
-    } finally {
-      setClipboardPasting(false);
     }
+    if (files.length > 0) {
+      handleFiles(files);
+      setShowPasteTarget(false);
+    }
+    // If nothing pasted — leave target open so user can try again
   }, [handleFiles]);
 
   const loadChats = useCallback(async () => {
@@ -1214,27 +1147,48 @@ export function AIPromptPanel() {
               </div>
             )}
 
-            {/* Mobile: explicit paste-image button since iOS won't expose
-                image blobs from textarea paste events */}
+            {/* Mobile paste target — iOS delivers clipboard data to contenteditable
+                elements via its native paste gesture, bypassing clipboard API limits */}
             {isMobile && (
-              <div className="mb-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleClipboardPaste}
-                  disabled={clipboardPasting}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors active:opacity-70 ${
-                    isDark
-                      ? "border-gray-600 text-gray-300 bg-[#0d1117] active:bg-white/10"
-                      : "border-gray-300 text-gray-600 bg-gray-50 active:bg-gray-100"
-                  }`}
-                >
-                  {clipboardPasting
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <Clipboard className="h-3.5 w-3.5" />}
-                  Paste image
-                </button>
-                {clipboardError && (
-                  <p className="text-[10px] text-red-400 flex-1">{clipboardError}</p>
+              <div className="mb-2">
+                {showPasteTarget ? (
+                  <div className="relative">
+                    <div
+                      ref={pasteTargetRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onPaste={handlePasteTargetPaste}
+                      onBlur={() => setShowPasteTarget(false)}
+                      className={`w-full min-h-[56px] border-2 border-dashed border-[#f26522] rounded-xl px-4 py-3 text-xs focus:outline-none ${isDark ? "bg-[#0d1117] text-white" : "bg-gray-50 text-[#0d1117]"}`}
+                    />
+                    <p className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 pointer-events-none select-none">
+                      Tap &amp; hold here → Paste
+                    </p>
+                    <button
+                      type="button"
+                      onPointerDown={(e) => { e.preventDefault(); setShowPasteTarget(false); }}
+                      className="absolute top-1.5 right-2 text-[10px] text-gray-400 active:opacity-50"
+                    >
+                      cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      flushSync(() => setShowPasteTarget(true));
+                      pasteTargetRef.current?.focus();
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors active:opacity-70 ${
+                      isDark
+                        ? "border-gray-600 text-gray-300 bg-[#0d1117]"
+                        : "border-gray-300 text-gray-600 bg-gray-50"
+                    }`}
+                  >
+                    <Clipboard className="h-3.5 w-3.5" />
+                    Paste
+                  </button>
                 )}
               </div>
             )}
