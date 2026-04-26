@@ -451,10 +451,12 @@ export function AIPromptPanel() {
     if (isAIPromptOpen && inputRef.current) inputRef.current.focus();
   }, [isAIPromptOpen, currentChatId]);
 
-  // Paste images from OS clipboard while panel is open
+  // Paste images from OS clipboard while panel is open (desktop global listener)
   useEffect(() => {
     if (!isAIPromptOpen) return;
     const onPaste = (e: ClipboardEvent) => {
+      // Skip if the event came from the textarea itself — handled by onPaste prop
+      if (e.target instanceof HTMLTextAreaElement) return;
       const items = Array.from(e.clipboardData?.items || []);
       const files: File[] = [];
       for (const it of items) {
@@ -471,6 +473,48 @@ export function AIPromptPanel() {
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
   }, [isAIPromptOpen, handleFiles]);
+
+  // Mobile paste: iOS Safari doesn't expose image blobs via clipboardData.items,
+  // so we try navigator.clipboard.read() as a fallback when the textarea fires paste.
+  const handleTextareaPaste = useCallback(async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const files: File[] = [];
+    for (const it of items) {
+      if (it.type.startsWith("image/") || it.type.startsWith("video/")) {
+        const f = it.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      handleFiles(files);
+      return;
+    }
+    // clipboardData had no image (typical on iOS) — try the async Clipboard API.
+    // This is inside a user-gesture (paste event) so permission is granted silently
+    // on iOS 16+ without a separate prompt.
+    if (typeof navigator?.clipboard?.read === "function") {
+      try {
+        const clipItems = await navigator.clipboard.read();
+        const fallback: File[] = [];
+        for (const ci of clipItems) {
+          for (const type of ci.types) {
+            if (type.startsWith("image/")) {
+              const blob = await ci.getType(type);
+              const ext = type.split("/")[1] || "png";
+              fallback.push(new File([blob], `paste.${ext}`, { type }));
+            }
+          }
+        }
+        if (fallback.length > 0) {
+          e.preventDefault();
+          handleFiles(fallback);
+        }
+      } catch {
+        // Permission denied or API not available — let native text paste proceed
+      }
+    }
+  }, [handleFiles]);
 
   const loadChats = useCallback(async () => {
     setListLoading(true);
@@ -1091,6 +1135,7 @@ export function AIPromptPanel() {
                     handleSend();
                   }
                 }}
+                onPaste={handleTextareaPaste}
                 placeholder="Message ADletic AI… drop or paste images"
                 className={`w-full border rounded-xl text-xs placeholder-gray-400 pl-10 pr-12 py-3 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
                 rows={2}
