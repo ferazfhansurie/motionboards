@@ -323,21 +323,29 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
   );
 }
 
+const IMG_RETRY_DELAYS = [2000, 4000, 8000, 16000, 30000, 60000, 60000, 60000];
+
 function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClick: () => void }) {
   const url = item.outputUrl || "";
   const alreadyCached = loadedImageCache.has(url);
   const [imgState, setImgState] = useState<"loading" | "loaded" | "error">(alreadyCached ? "loaded" : "loading");
   const [retrySrc, setRetrySrc] = useState(url);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset state only when outputUrl changes to a genuinely different URL
   const prevUrlRef = useRef(url);
   useEffect(() => {
     if (url !== prevUrlRef.current) {
       prevUrlRef.current = url;
+      retryCountRef.current = 0;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       setRetrySrc(url);
       setImgState(loadedImageCache.has(url) ? "loaded" : "loading");
     }
   }, [url]);
+
+  useEffect(() => () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current); }, []);
 
   return (
     <div className="relative" style={{ minHeight: imgState === "loaded" ? undefined : item.height || 120 }}>
@@ -356,7 +364,7 @@ function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClic
           <p className="text-[10px] text-gray-400 text-center">Image failed to display</p>
           <button
             className="text-[10px] text-[#f26522] hover:underline"
-            onClick={(e) => { e.stopPropagation(); setImgState("loading"); setRetrySrc(item.outputUrl + "?t=" + Date.now()); }}
+            onClick={(e) => { e.stopPropagation(); retryCountRef.current = 0; setImgState("loading"); setRetrySrc(item.outputUrl + "?t=" + Date.now()); }}
           >
             Retry
           </button>
@@ -396,9 +404,13 @@ function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClic
           }
         }}
         onError={() => {
-          if (!retrySrc?.includes("?t=")) {
-            // Retry once with cache-busting
-            setTimeout(() => setRetrySrc(item.outputUrl + "?t=" + Date.now()), 2000);
+          const attempt = retryCountRef.current;
+          if (attempt < IMG_RETRY_DELAYS.length) {
+            retryCountRef.current = attempt + 1;
+            retryTimerRef.current = setTimeout(
+              () => setRetrySrc(item.outputUrl + "?t=" + Date.now()),
+              IMG_RETRY_DELAYS[attempt]
+            );
           } else {
             setImgState("error");
           }
