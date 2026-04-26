@@ -126,13 +126,23 @@ export function AIPromptPanel() {
   // Collapse the chat-list column for a focused conversation view.
   const [chatListCollapsed, setChatListCollapsed] = useState(false);
 
+  // Mobile: full-width overlay, no resize handle, chat list auto-collapsed
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   useEffect(() => {
     const saved = localStorage.getItem(WIDTH_STORAGE_KEY);
     if (saved) {
       const n = parseInt(saved, 10);
       if (!isNaN(n) && n >= MIN_WIDTH && n <= MAX_WIDTH) setPanelWidth(n);
     }
-    setChatListCollapsed(localStorage.getItem("motionboards_ai_chatlist_collapsed") === "true");
+    const savedCollapsed = localStorage.getItem("motionboards_ai_chatlist_collapsed");
+    // Always collapse chat list on mobile regardless of saved preference
+    setChatListCollapsed(window.innerWidth < 768 ? true : savedCollapsed === "true");
   }, []);
 
   const toggleChatList = useCallback(() => {
@@ -143,12 +153,13 @@ export function AIPromptPanel() {
     });
   }, []);
 
-  // Persist width so the canvas knows how much space to reserve
+  // Persist width so the canvas knows how much space to reserve.
+  // On mobile, dispatch 0 so the canvas stays full-width (panel overlays instead of pushing).
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("ai-panel-width", { detail: panelWidth }));
+      window.dispatchEvent(new CustomEvent("ai-panel-width", { detail: isMobile ? 0 : panelWidth }));
     }
-  }, [panelWidth]);
+  }, [panelWidth, isMobile]);
 
   // Drag-to-resize — pointer events so touch (iPad / phone) works.
   useEffect(() => {
@@ -652,23 +663,24 @@ export function AIPromptPanel() {
     <div
       data-ai-panel="true"
       className={`fixed right-0 top-0 z-[55] h-screen flex flex-col border-l shadow-2xl ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}
-      style={{ width: panelWidth }}
+      style={{ width: isMobile ? "100vw" : panelWidth }}
     >
-      {/* Drag-to-resize handle on the LEFT edge — wider on touch (12px)
-          so it's hittable, slim on desktop hover. */}
+      {/* Drag-to-resize handle — desktop only, hidden on mobile */}
+      {!isMobile && (
       <div
         onPointerDown={(e) => {
           e.preventDefault();
           (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
           setIsResizing(true);
         }}
-        className={`absolute left-0 top-0 bottom-0 w-3 sm:w-1.5 cursor-col-resize z-[10] transition-colors touch-none ${
+        className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-[10] transition-colors touch-none ${
           isResizing
             ? "bg-[#f26522]"
             : isDark ? "bg-transparent hover:bg-white/20" : "bg-transparent hover:bg-[#f26522]/40"
         }`}
         title="Drag to resize"
       />
+      )}
 
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${isDark ? "border-gray-700 bg-gradient-to-r from-[#161b22] to-[#1c2128]" : "border-gray-100 bg-gradient-to-r from-white to-gray-50"}`}>
