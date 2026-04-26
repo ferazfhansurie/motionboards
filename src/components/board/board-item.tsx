@@ -378,9 +378,9 @@ function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClic
           visibility and never fires onLoad. */}
       <img
         src={retrySrc}
-        alt="Generated"
+        alt=""
         decoding="async"
-        className={`w-full block pointer-events-none ${imgState === "error" ? "hidden" : ""}`}
+        className={`w-full block pointer-events-none ${imgState === "error" ? "hidden" : imgState === "loaded" ? "" : "opacity-0"}`}
         draggable={false}
         onLoad={(e) => {
           setImgState("loaded");
