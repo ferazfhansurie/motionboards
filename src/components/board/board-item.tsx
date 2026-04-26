@@ -505,26 +505,57 @@ export function BoardItemCard({
   const isMediaType = isImageType || item.type === "video" || (item.type === "generation" && item.outputUrl);
   const isResizable = item.type === "image" || item.type === "video" || item.type === "generation" || item.type === "psd-layer" || item.type === "text" || item.type === "drawing";
 
-  // Right-click context menu
+  // Right-click / long-press context menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressPosRef = useRef({ clientX: 0, clientY: 0 });
+  const longPressFiredRef = useRef(false);
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+  };
+  useEffect(() => cancelLongPress, []);
+
+  const openContextMenuAt = (clientX: number, clientY: number, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    selectItem(item.id);
+    setContextMenu({ x: clientX - rect.left, y: clientY - rect.top });
+  };
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    selectItem(item.id);
-    const rect = e.currentTarget.getBoundingClientRect();
-    setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    if (longPressFiredRef.current) return; // already shown via long-press
+    openContextMenuAt(e.clientX, e.clientY, e.currentTarget as HTMLElement);
   };
 
   const closeContextMenu = () => setContextMenu(null);
 
-  // Close context menu on any mousedown anywhere (catches clicks on other items too)
+  // Close context menu on any pointer down anywhere (covers mouse + touch)
   useEffect(() => {
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
   }, [contextMenu]);
+
+  const handleItemPointerDown = (e: React.PointerEvent) => {
+    longPressFiredRef.current = false;
+    longPressPosRef.current = { clientX: e.clientX, clientY: e.clientY };
+    cancelLongPress();
+    const el = e.currentTarget as HTMLElement;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      openContextMenuAt(longPressPosRef.current.clientX, longPressPosRef.current.clientY, el);
+    }, 500);
+    onPointerDown(e);
+  };
+
+  const handleItemPointerMove = (e: React.PointerEvent) => {
+    const dx = e.clientX - longPressPosRef.current.clientX;
+    const dy = e.clientY - longPressPosRef.current.clientY;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) cancelLongPress();
+  };
 
   const handleDownload = async () => {
     closeContextMenu();
@@ -572,7 +603,10 @@ export function BoardItemCard({
         ...(item.type === "text" ? { height: item.height } : {}),
         zIndex: isSelected ? 50 : 1,
       }}
-      onPointerDown={onPointerDown}
+      onPointerDown={handleItemPointerDown}
+      onPointerMove={handleItemPointerMove}
+      onPointerUp={cancelLongPress}
+      onPointerCancel={cancelLongPress}
       onDoubleClick={handleDoubleClick}
     >
       {/* Text formatting toolbar — shown when text item is selected */}
