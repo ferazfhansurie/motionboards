@@ -336,6 +336,7 @@ export function AIPromptPanel() {
   };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mobileInputRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // OpenAI's vision API caps inline images at 20 MB. Big files go directly
@@ -517,65 +518,62 @@ export function AIPromptPanel() {
     }
   }, [handleFiles]);
 
-  // Mobile paste target — a contenteditable div iOS WILL deliver image data to
-  // via its native paste gesture (unlike clipboard.read() which often returns empty).
-  const [showPasteTarget, setShowPasteTarget] = useState(false);
-  const pasteTargetRef = useRef<HTMLDivElement>(null);
+  // Mobile: sync contenteditable div back to `input` state when cleared after send
+  useEffect(() => {
+    if (isMobile && mobileInputRef.current && input === "") {
+      mobileInputRef.current.innerHTML = "";
+    }
+  }, [input, isMobile]);
 
-  const handlePasteTargetPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
-    // Try clipboardData.items first (works on Android / desktop)
+  // Extract images pasted into the mobile contenteditable div via canvas
+  // (avoids fetch on potentially-ephemeral blob URLs iOS creates)
+  const imgToFile = useCallback((img: HTMLImageElement): Promise<File | null> =>
+    new Promise((resolve) => {
+      const convert = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth || 300;
+          canvas.height = img.naturalHeight || 300;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { resolve(null); return; }
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            resolve(blob ? new File([blob], "paste.png", { type: "image/png" }) : null);
+          }, "image/png");
+        } catch { resolve(null); }
+      };
+      if (img.complete && img.naturalWidth > 0) convert();
+      else { img.onload = convert; img.onerror = () => resolve(null); }
+    }), []);
+
+  const handleMobileInputPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    // Android / desktop path: files in clipboardData.items
     const items = Array.from(e.clipboardData?.items || []);
     const files: File[] = [];
     for (const it of items) {
-      if (it.kind === "file") {
-        const f = it.getAsFile();
-        if (f) files.push(f);
-      }
+      if (it.kind === "file") { const f = it.getAsFile(); if (f) files.push(f); }
     }
     if (files.length > 0) {
       e.preventDefault();
       handleFiles(files);
-      setShowPasteTarget(false);
       return;
     }
-    // No files in clipboardData (typical on iOS) — do NOT preventDefault.
-    // iOS will insert an <img> element directly into the contenteditable DOM.
-    // The MutationObserver below catches it.
-  }, [handleFiles]);
-
-  // Watch for <img> elements iOS inserts into the paste target after a native paste
-  useEffect(() => {
-    if (!showPasteTarget) return;
-    const el = pasteTargetRef.current;
-    if (!el) return;
-
-    const processImg = async (img: HTMLImageElement) => {
-      const src = img.src;
-      img.remove();
-      try {
-        const res = await fetch(src);
-        const blob = await res.blob();
-        if (blob.size > 0) {
-          const type = blob.type || "image/png";
-          const ext = type.split("/")[1] || "png";
-          handleFiles([new File([blob], `paste.${ext}`, { type })]);
-          setShowPasteTarget(false);
-        }
-      } catch { /* cross-origin or invalid src — ignore */ }
-    };
-
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (node instanceof HTMLImageElement) processImg(node);
-          else if (node instanceof HTMLElement) node.querySelectorAll("img").forEach(img => processImg(img as HTMLImageElement));
-        }
+    // iOS path: do NOT preventDefault — let Safari insert the <img> into the div,
+    // then extract it via canvas after a short delay.
+    setTimeout(async () => {
+      const el = mobileInputRef.current;
+      if (!el) return;
+      const imgs = Array.from(el.querySelectorAll("img")) as HTMLImageElement[];
+      if (imgs.length === 0) return;
+      const converted: File[] = [];
+      for (const img of imgs) {
+        img.remove();
+        const f = await imgToFile(img);
+        if (f) converted.push(f);
       }
-    });
-
-    observer.observe(el, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [showPasteTarget, handleFiles]);
+      if (converted.length > 0) handleFiles(converted);
+    }, 150);
+  }, [handleFiles, imgToFile]);
 
   const loadChats = useCallback(async () => {
     setListLoading(true);
@@ -1185,52 +1183,21 @@ export function AIPromptPanel() {
               </div>
             )}
 
-            {/* Mobile paste target — iOS delivers clipboard data to contenteditable
-                elements via its native paste gesture, bypassing clipboard API limits */}
-            {isMobile && (
-              <div className="mb-2">
-                {showPasteTarget ? (
-                  <div className="relative">
-                    <div
-                      ref={pasteTargetRef}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onPaste={handlePasteTargetPaste}
-                      className={`w-full min-h-[56px] border-2 border-dashed border-[#f26522] rounded-xl px-4 py-3 text-xs focus:outline-none ${isDark ? "bg-[#0d1117] text-white" : "bg-gray-50 text-[#0d1117]"}`}
-                    />
-                    <p className="absolute inset-0 flex items-center justify-center text-xs text-gray-400 pointer-events-none select-none">
-                      Tap &amp; hold here → Paste
-                    </p>
-                    <button
-                      type="button"
-                      onPointerDown={(e) => { e.preventDefault(); setShowPasteTarget(false); }}
-                      className="absolute top-1.5 right-2 text-[10px] text-gray-400 active:opacity-50"
-                    >
-                      cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      flushSync(() => setShowPasteTarget(true));
-                      pasteTargetRef.current?.focus();
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors active:opacity-70 ${
-                      isDark
-                        ? "border-gray-600 text-gray-300 bg-[#0d1117]"
-                        : "border-gray-300 text-gray-600 bg-gray-50"
-                    }`}
-                  >
-                    <Clipboard className="h-3.5 w-3.5" />
-                    Paste
-                  </button>
-                )}
-              </div>
-            )}
-
             <div className="relative">
+              {isMobile ? (
+                <div
+                  ref={mobileInputRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={(e) => setInput(e.currentTarget.innerText || "")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                  }}
+                  onPaste={handleMobileInputPaste}
+                  data-placeholder="Message ADletic AI… tap to type or paste"
+                  className={`w-full border rounded-xl text-xs pl-10 pr-12 py-3 min-h-[60px] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:pointer-events-none ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
+                />
+              ) : (
               <textarea
                 ref={inputRef}
                 value={input}
@@ -1246,6 +1213,7 @@ export function AIPromptPanel() {
                 className={`w-full border rounded-xl text-xs placeholder-gray-400 pl-10 pr-12 py-3 resize-none focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/10 transition-all ${isDark ? "bg-[#0d1117] border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-[#0d1117]"}`}
                 rows={2}
               />
+              )}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
