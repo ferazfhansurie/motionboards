@@ -17,6 +17,7 @@ import {
   Music,
   Download,
   Upload,
+  ImagePlus,
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { importBoardFromFile, ImportCancelled } from "@/lib/board-io";
@@ -1033,6 +1034,74 @@ export function PromptBar() {
     }
   }, [isCanvasEmpty]);
 
+  // Hero "Add image" button — drops the chosen file onto the canvas at the
+  // current viewport center, then uploads to R2 in the background. Mobile-
+  // friendly equivalent of dragging or pasting a file.
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
+  const handleHeroFilePick = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      showToast(`Only images supported here — got ${file.type || "unknown"}`, { kind: "error" });
+      return;
+    }
+    const dataUri = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.readAsDataURL(file);
+    });
+    const tempImg = new Image();
+    tempImg.onload = async () => {
+      const maxW = 400;
+      const w = Math.min(tempImg.naturalWidth, maxW);
+      const h = (tempImg.naturalHeight / tempImg.naturalWidth) * w;
+      const placeholderId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const cx = (-panX + window.innerWidth / 2 - w / 2) / zoom;
+      const cy = (-panY + window.innerHeight / 2 - h / 2) / zoom;
+      addItem({
+        id: placeholderId,
+        type: "image",
+        x: cx,
+        y: cy,
+        width: w,
+        height: h,
+        src: dataUri,
+        fileName: file.name,
+        sizeBytes: file.size,
+        createdAt: new Date().toISOString(),
+      });
+      // Background upload — try R2 first, fall back to legacy /api/upload.
+      try {
+        const presign = await fetch("/api/upload-presign", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ filename: file.name || "upload.bin", contentType: file.type }),
+        });
+        if (presign.ok) {
+          const { uploadUrl, publicUrl } = await presign.json();
+          const putRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "content-type": file.type },
+            body: file,
+          });
+          if (putRes.ok && publicUrl) {
+            useAppStore.getState().updateItem(placeholderId, { src: publicUrl });
+            return;
+          }
+        }
+      } catch {}
+      // Fallback: /api/upload
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: form });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          useAppStore.getState().updateItem(placeholderId, { src: data.url });
+        }
+      } catch {}
+    };
+    tempImg.src = dataUri;
+  };
+
   // Floating hero images for empty canvas
   const heroImages = [
     { src: "/hero/h1.jpg", x: "8%", y: "12%", w: 120, delay: 0, rotate: -6 },
@@ -1107,10 +1176,36 @@ export function PromptBar() {
                 style={{ height: 120 }}
               />
               {/* Bottom row inside textarea */}
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {/* Add image — tap-friendly upload (mobile gets a real
+                      button instead of having to drag/paste). */}
+                  <input
+                    ref={heroFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleHeroFilePick(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => heroFileInputRef.current?.click()}
+                    title="Add image to canvas"
+                    className={`flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-medium transition-colors ${
+                      isDark
+                        ? "text-gray-300 hover:text-[#f26522] hover:bg-white/5"
+                        : "text-gray-500 hover:text-[#f26522] hover:bg-gray-100"
+                    }`}
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Image</span>
+                  </button>
                   {selectedModel && (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full truncate ${isDark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
                       {selectedModel.name} &middot; {getEstimatedCost(selectedModel, generationOptions)}
                     </span>
                   )}
@@ -1119,7 +1214,7 @@ export function PromptBar() {
                   type="button"
                   disabled={!selectedModel}
                   onClick={handleGenerate}
-                  className={`flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-semibold transition-all ${
+                  className={`shrink-0 flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-semibold transition-all ${
                     !selectedModel
                       ? "bg-gray-300 text-gray-400 cursor-not-allowed"
                       : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer hover:scale-105"

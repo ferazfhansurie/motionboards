@@ -639,9 +639,10 @@ export function Canvas() {
     [zoom, panX, panY, setZoom, setPan]
   );
 
-  // Item drag start (or connect)
+  // Item drag start (or connect). Pointer event so it fires on touch
+  // (iOS / Android) AND mouse — same handler covers both.
   const handleItemDragStart = useCallback(
-    (id: string, e: React.MouseEvent) => {
+    (id: string, e: React.PointerEvent) => {
       // If space is held, pan instead of drag
       if (spaceHeld) return;
 
@@ -1131,7 +1132,7 @@ export function Canvas() {
                 item={item}
                 isSelected={item.id === selectedItemId || selectedItemIds.includes(item.id)}
                 isConnecting={activeCanvasTool === "connect" && connectingFromId === item.id}
-                onMouseDown={(e) => handleItemDragStart(item.id, e)}
+                onPointerDown={(e) => handleItemDragStart(item.id, e)}
                 onDoubleClick={() => handleItemDoubleClick(item.id)}
                 onResizeStart={(e, edge) => handleResizeStart(item.id, e, edge)}
               />

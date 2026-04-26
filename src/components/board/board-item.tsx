@@ -421,7 +421,7 @@ interface BoardItemCardProps {
   item: BoardItem;
   isSelected: boolean;
   isConnecting?: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onPointerDown: (e: React.PointerEvent) => void;
   onDoubleClick: () => void;
   onResizeStart: (e: React.PointerEvent, edge: string) => void;
 }
@@ -430,7 +430,7 @@ export function BoardItemCard({
   item,
   isSelected,
   isConnecting,
-  onMouseDown,
+  onPointerDown,
   onDoubleClick,
   onResizeStart,
 }: BoardItemCardProps) {
@@ -558,7 +558,7 @@ export function BoardItemCard({
         ...(item.type === "text" ? { height: item.height } : {}),
         zIndex: isSelected ? 50 : 1,
       }}
-      onMouseDown={onMouseDown}
+      onPointerDown={onPointerDown}
       onDoubleClick={handleDoubleClick}
     >
       {/* Text formatting toolbar — shown when text item is selected */}
