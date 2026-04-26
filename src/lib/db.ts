@@ -455,8 +455,13 @@ async function ensureFilesTable(): Promise<void> {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `;
-  // Index for fast TTL sweeps
+  // Index for fast TTL sweeps (covers WHERE created_at < cutoff queries).
   await sql`CREATE INDEX IF NOT EXISTS mb_files_created_at_idx ON mb_files (created_at)`;
+  // Composite index for the per-user newest-first library queries
+  // (WHERE user_id = ? ORDER BY created_at DESC LIMIT N). Without this the
+  // /media page hangs on accounts with hundreds of files because Postgres
+  // has to filter then sort the whole slice.
+  await sql`CREATE INDEX IF NOT EXISTS mb_files_user_created_idx ON mb_files (user_id, created_at DESC)`;
   filesTableInitialized = true;
 }
 

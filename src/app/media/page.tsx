@@ -342,12 +342,6 @@ function MediaTile({
           loop
           playsInline
           preload="metadata"
-          onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
-          onMouseLeave={(e) => {
-            const v = e.currentTarget as HTMLVideoElement;
-            v.pause();
-            v.currentTime = 0;
-          }}
           className="h-full w-full object-cover"
         />
       ) : kind === "audio" ? (
@@ -446,7 +440,7 @@ function PreviewModal({
         </div>
         <div className="flex items-center justify-center bg-black" style={{ maxHeight: "80vh" }}>
           {kind === "video" ? (
-            <video src={src} controls autoPlay className="max-h-[80vh] w-full" />
+            <video src={src} controls preload="metadata" className="max-h-[80vh] w-full" />
           ) : kind === "audio" ? (
             <audio src={src} controls className="w-full p-8" />
           ) : kind === "image" ? (
