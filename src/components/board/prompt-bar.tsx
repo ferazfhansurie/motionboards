@@ -1135,6 +1135,42 @@ export function PromptBar() {
             <div className="flex justify-center">
               {renderOptionPills()}
             </div>
+
+            {/* Other boards — quick switcher when canvas is empty. Skips the
+                current (empty) board, hides the row entirely if the user
+                only has one board total. */}
+            {boards.filter((b) => b.id !== activeBoardId).length > 0 && (
+              <div className="mt-5 mb-1">
+                <p className={`text-center text-[10px] uppercase tracking-wider mb-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Or jump to another board
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {boards
+                    .filter((b) => b.id !== activeBoardId)
+                    .slice(0, 8)
+                    .map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => switchBoard(b.id)}
+                        className={`flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full border transition-all hover:-translate-y-0.5 ${
+                          isDark
+                            ? "text-gray-300 border-gray-700 bg-[#161b22] hover:border-[#f26522] hover:text-[#f26522]"
+                            : "text-gray-600 border-gray-200 bg-white hover:border-[#f26522] hover:text-[#f26522]"
+                        }`}
+                        title={`Switch to ${b.name}`}
+                      >
+                        <LayoutGrid className="h-3 w-3" />
+                        <span className="font-medium truncate max-w-[120px]">{b.name}</span>
+                        <span className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                          {b.items.length}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+
             {/* Quick suggestions */}
             <div className="flex flex-wrap gap-2 mt-3 justify-center">
               {[
