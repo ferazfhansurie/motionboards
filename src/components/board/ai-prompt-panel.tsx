@@ -521,34 +521,86 @@ export function AIPromptPanel() {
   const [clipboardPasting, setClipboardPasting] = useState(false);
   const [clipboardError, setClipboardError] = useState<string | null>(null);
   const handleClipboardPaste = useCallback(async () => {
-    if (!navigator?.clipboard?.read) {
-      setClipboardError("Clipboard access not supported on this browser.");
-      setTimeout(() => setClipboardError(null), 3000);
-      return;
-    }
     setClipboardPasting(true);
     setClipboardError(null);
+
+    // Helper: fetch a URL and return it as a File if it looks like an image
+    const fetchImageUrl = async (url: string): Promise<File | null> => {
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        if (blob.type.startsWith("image/")) {
+          const ext = blob.type.split("/")[1] || "png";
+          return new File([blob], `paste.${ext}`, { type: blob.type });
+        }
+      } catch { /* ignore */ }
+      return null;
+    };
+
     try {
-      const clipItems = await navigator.clipboard.read();
-      const files: File[] = [];
-      for (const ci of clipItems) {
-        for (const type of ci.types) {
-          if (type.startsWith("image/")) {
-            const blob = await ci.getType(type);
-            const ext = type.split("/")[1] || "png";
-            files.push(new File([blob], `paste.${ext}`, { type }));
+      // Try the modern Clipboard API first (iOS 16.4+, requires permission)
+      if (navigator?.clipboard?.read) {
+        const clipItems = await navigator.clipboard.read();
+        const files: File[] = [];
+
+        for (const ci of clipItems) {
+          for (const type of ci.types) {
+            if (type.startsWith("image/")) {
+              // Direct image blob (e.g. copy from Photos)
+              const blob = await ci.getType(type);
+              const ext = type.split("/")[1] || "png";
+              files.push(new File([blob], `paste.${ext}`, { type }));
+            } else if (type === "text/html") {
+              // Web image copy: browser puts <img src="…"> in HTML clipboard
+              const blob = await ci.getType(type);
+              const html = await blob.text();
+              const match = html.match(/src=["']([^"']+)["']/);
+              if (match?.[1]) {
+                const f = await fetchImageUrl(match[1]);
+                if (f) files.push(f);
+              }
+            } else if (type === "text/plain" || type === "text/uri-list") {
+              // URL copied — fetch it if it looks like an image URL
+              const blob = await ci.getType(type);
+              const text = (await blob.text()).trim();
+              if (/^https?:\/\/.+\.(png|jpe?g|gif|webp|avif|svg)(\?.*)?$/i.test(text)) {
+                const f = await fetchImageUrl(text);
+                if (f) files.push(f);
+              }
+            }
           }
         }
+
+        if (files.length > 0) {
+          handleFiles(files);
+          return;
+        }
+
+        // Nothing found — show the actual types for diagnostics
+        const allTypes = clipItems.flatMap((ci) => [...ci.types]);
+        setClipboardError(
+          allTypes.length
+            ? `No image in clipboard (found: ${allTypes.join(", ")})`
+            : "Clipboard is empty — copy an image first."
+        );
+        setTimeout(() => setClipboardError(null), 5000);
+        return;
       }
-      if (files.length > 0) {
-        handleFiles(files);
-      } else {
-        setClipboardError("No image found in clipboard.");
-        setTimeout(() => setClipboardError(null), 3000);
+
+      // Fallback: read plain text and see if it's an image URL
+      if (navigator?.clipboard?.readText) {
+        const text = (await navigator.clipboard.readText()).trim();
+        if (/^https?:\/\/.+\.(png|jpe?g|gif|webp|avif)(\?.*)?$/i.test(text)) {
+          const f = await fetchImageUrl(text);
+          if (f) { handleFiles([f]); return; }
+        }
       }
-    } catch {
-      setClipboardError("Allow clipboard access when prompted, then try again.");
+
+      setClipboardError("Clipboard API not available — use the 📎 button to attach a file.");
       setTimeout(() => setClipboardError(null), 4000);
+    } catch {
+      setClipboardError("Tap 'Allow' when iOS asks for clipboard permission, then try again.");
+      setTimeout(() => setClipboardError(null), 5000);
     } finally {
       setClipboardPasting(false);
     }
