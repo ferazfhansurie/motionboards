@@ -167,6 +167,10 @@ export function PromptBar() {
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  // Which model-option dropdown (AR / Duration / Resolution) is currently open.
+  // Hover-only dropdowns never opened on iOS/Android — this drives a click-toggle.
+  const [openOptKey, setOpenOptKey] = useState<string | null>(null);
+  const optionPillsRef = useRef<HTMLDivElement>(null);
   const {
     selectedModelId,
     setModelPanelOpen,
@@ -302,7 +306,7 @@ export function PromptBar() {
     if (keys.length === 0) return null;
 
     return (
-      <div className="flex flex-wrap items-center gap-2 mb-2">
+      <div ref={optionPillsRef} className="flex flex-wrap items-center gap-2 mb-2">
         {keys.map((key) => {
           const opt = opts[key];
           if (!opt) return null;
@@ -332,48 +336,67 @@ export function PromptBar() {
           // Select option (aspect_ratio, duration, resolution)
           const selectOpt = opt as { values: string[]; default: string; label: string };
           const currentVal = (generationOptions[key] as string) || selectOpt.default;
+          const isOpen = openOptKey === key;
 
           return (
-            <div key={key} className="relative group/opt">
+            <div key={key} className="relative">
               <button
+                type="button"
                 className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                   isDark
                     ? "bg-[#161b22] text-gray-200 border border-gray-700 hover:border-[#f26522] shadow-sm"
                     : "bg-white text-gray-700 border border-gray-200 hover:border-[#f26522] shadow-sm"
                 }`}
                 title={selectOpt.label}
+                onClick={() => setOpenOptKey(isOpen ? null : (key as string))}
               >
                 <span className={`${isDark ? "text-gray-500" : "text-gray-400"}`}>{selectOpt.label.replace("Aspect Ratio", "AR").replace("Duration", "Dur").replace("Resolution", "Res")}</span>
                 <span className="text-[#f26522]">{currentVal}</span>
                 <ChevronDown className="w-2.5 h-2.5 text-gray-400" />
               </button>
-              <div className={`absolute bottom-full left-0 pb-1 z-50 opacity-0 pointer-events-none group-hover/opt:opacity-100 group-hover/opt:pointer-events-auto transition-all`}>
-                <div className={`rounded-xl border shadow-2xl overflow-hidden ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-white border-gray-200"}`}>
-                <div className="p-1.5 flex flex-col gap-0.5 min-w-[90px]">
-                  {selectOpt.values.map((v) => (
-                    <button
-                      key={v}
-                      className={`text-[10px] px-3 py-1.5 rounded-lg text-left transition-all whitespace-nowrap font-medium ${
-                        currentVal === v
-                          ? "bg-[#f26522] text-white"
-                          : isDark
-                          ? "text-gray-300 hover:bg-white/10"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
-                      onClick={() => setGenerationOption(key, v)}
-                    >
-                      {v}
-                    </button>
-                  ))}
+              {isOpen && (
+                <div className="absolute bottom-full left-0 pb-1 z-50">
+                  <div className={`rounded-xl border shadow-2xl overflow-hidden ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-white border-gray-200"}`}>
+                    <div className="p-1.5 flex flex-col gap-0.5 min-w-[90px]">
+                      {selectOpt.values.map((v) => (
+                        <button
+                          key={v}
+                          className={`text-[10px] px-3 py-1.5 rounded-lg text-left transition-all whitespace-nowrap font-medium ${
+                            currentVal === v
+                              ? "bg-[#f26522] text-white"
+                              : isDark
+                              ? "text-gray-300 hover:bg-white/10"
+                              : "text-gray-600 hover:bg-gray-50"
+                          }`}
+                          onClick={() => { setGenerationOption(key, v); setOpenOptKey(null); }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                </div>
-              </div>
+              )}
             </div>
           );
         })}
       </div>
     );
   };
+
+  // Close any open option dropdown on outside tap. Pointerdown so it fires
+  // before the synthesized click on iOS, matching the board menu pattern.
+  useEffect(() => {
+    if (!openOptKey) return;
+    const onDown = (e: PointerEvent) => {
+      const root = optionPillsRef.current;
+      if (root && !root.contains(e.target as Node)) setOpenOptKey(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [openOptKey]);
+
+  useEffect(() => { setOpenOptKey(null); }, [selectedModelId]);
 
   // Consume pending prompt from templates panel
   useEffect(() => {
