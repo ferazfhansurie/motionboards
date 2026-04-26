@@ -150,11 +150,11 @@ export function AIPromptPanel() {
     }
   }, [panelWidth]);
 
-  // Drag-to-resize — track mouse globally while resizing
+  // Drag-to-resize — pointer events so touch (iPad / phone) works.
   useEffect(() => {
     if (!isResizing) return;
-    const move = (e: MouseEvent) => {
-      // Panel is anchored right, so its width = viewportWidth - mouseX
+    const move = (e: PointerEvent) => {
+      // Panel is anchored right, so its width = viewportWidth - pointerX
       const w = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, window.innerWidth - e.clientX));
       setPanelWidth(w);
     };
@@ -162,11 +162,13 @@ export function AIPromptPanel() {
       setIsResizing(false);
       localStorage.setItem(WIDTH_STORAGE_KEY, String(panelWidth));
     };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
     return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
     };
   }, [isResizing, panelWidth]);
 
@@ -652,10 +654,15 @@ export function AIPromptPanel() {
       className={`fixed right-0 top-0 z-[55] h-screen flex flex-col border-l shadow-2xl ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}
       style={{ width: panelWidth }}
     >
-      {/* Drag-to-resize handle on the LEFT edge */}
+      {/* Drag-to-resize handle on the LEFT edge — wider on touch (12px)
+          so it's hittable, slim on desktop hover. */}
       <div
-        onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
-        className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-[10] transition-colors ${
+        onPointerDown={(e) => {
+          e.preventDefault();
+          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+          setIsResizing(true);
+        }}
+        className={`absolute left-0 top-0 bottom-0 w-3 sm:w-1.5 cursor-col-resize z-[10] transition-colors touch-none ${
           isResizing
             ? "bg-[#f26522]"
             : isDark ? "bg-transparent hover:bg-white/20" : "bg-transparent hover:bg-[#f26522]/40"

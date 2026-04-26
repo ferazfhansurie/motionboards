@@ -423,7 +423,7 @@ interface BoardItemCardProps {
   isConnecting?: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
-  onResizeStart: (e: React.MouseEvent, edge: string) => void;
+  onResizeStart: (e: React.PointerEvent, edge: string) => void;
 }
 
 export function BoardItemCard({
@@ -963,53 +963,59 @@ export function BoardItemCard({
           <CropOverlay item={item} />
         )}
 
-        {/* Resize handles — edges and corners, visible on hover or selected */}
+        {/* Resize handles — edges and corners. Pointer events fire on
+            both touch (iPad / phone) and mouse. On touch screens the
+            handles are always shown (no hover state) and the corner
+            handles are larger (h-7 w-7) to be finger-hittable.
+            touch-none disables the browser's native pan gesture so
+            the resize drag actually works. */}
         {isResizable && (
           <>
             {/* Right edge */}
             <div
-              className={`absolute top-2 bottom-2 right-0 w-2 cursor-ew-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "e")}
+              className={`absolute top-2 bottom-2 right-0 w-3 sm:w-2 cursor-ew-resize touch-none transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "e")}
             />
             {/* Bottom edge */}
             <div
-              className={`absolute left-2 right-2 bottom-0 h-2 cursor-ns-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "s")}
+              className={`absolute left-2 right-2 bottom-0 h-3 sm:h-2 cursor-ns-resize touch-none transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "s")}
             />
             {/* Left edge */}
             <div
-              className={`absolute top-2 bottom-2 left-0 w-2 cursor-ew-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "w")}
+              className={`absolute top-2 bottom-2 left-0 w-3 sm:w-2 cursor-ew-resize touch-none transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "w")}
             />
             {/* Top edge */}
             <div
-              className={`absolute left-2 right-2 top-0 h-2 cursor-ns-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "n")}
+              className={`absolute left-2 right-2 top-0 h-3 sm:h-2 cursor-ns-resize touch-none transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "n")}
             />
-            {/* Bottom-right corner */}
+            {/* Bottom-right corner — larger and always visible when
+                selected so it's an obvious touch target on phones. */}
             <div
-              className={`absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "se")}
+              className={`absolute bottom-0 right-0 h-7 w-7 sm:h-4 sm:w-4 cursor-nwse-resize touch-none flex items-end justify-end p-0.5 transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "se")}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" className="text-gray-400">
+              <svg width="14" height="14" viewBox="0 0 16 16" className="text-gray-400">
                 <path d="M14 14L6 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 <path d="M14 14L14 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </div>
             {/* Bottom-left corner */}
             <div
-              className={`absolute bottom-0 left-0 h-4 w-4 cursor-nesw-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "sw")}
+              className={`absolute bottom-0 left-0 h-7 w-7 sm:h-4 sm:w-4 cursor-nesw-resize touch-none transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "sw")}
             />
             {/* Top-right corner */}
             <div
-              className={`absolute top-0 right-0 h-4 w-4 cursor-nesw-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "ne")}
+              className={`absolute top-0 right-0 h-7 w-7 sm:h-4 sm:w-4 cursor-nesw-resize touch-none transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "ne")}
             />
             {/* Top-left corner */}
             <div
-              className={`absolute top-0 left-0 h-4 w-4 cursor-nwse-resize transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              onMouseDown={(e) => onResizeStart(e, "nw")}
+              className={`absolute top-0 left-0 h-7 w-7 sm:h-4 sm:w-4 cursor-nwse-resize touch-none transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 sm:opacity-0"}`}
+              onPointerDown={(e) => onResizeStart(e, "nw")}
             />
           </>
         )}

@@ -122,6 +122,8 @@ export function Canvas() {
   // Resize state
   const [resizeId, setResizeId] = useState<string | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, w: 0, h: 0 });
+  const [resizeEdge, setResizeEdge] = useState("se");
+  const [resizeItemStart, setResizeItemStart] = useState({ x: 0, y: 0 });
 
   // Space held for pan mode
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -403,6 +405,77 @@ export function Canvas() {
     [panX, panY, selectItem, spaceHeld, activeCanvasTool, zoom, connectingFromId, isDark]
   );
 
+  // Touch / pointer-event mirror of the resize + drag move logic. The
+  // canvas's onMouseMove only fires on mouse — on iPhone / iPad we need
+  // a separate window-level pointermove listener that runs while a resize
+  // or drag is active. Same math, just different event source.
+  useEffect(() => {
+    if (!resizeId && !dragId) return;
+    const onMove = (e: PointerEvent) => {
+      if (resizeId) {
+        const dx = (e.clientX - resizeStart.x) / zoom;
+        const dy = (e.clientY - resizeStart.y) / zoom;
+        const ratio = resizeStart.h / resizeStart.w;
+        const updates: Partial<BoardItem> = {};
+        if (resizeEdge.includes("e")) updates.width = Math.max(50, Math.round(resizeStart.w + dx));
+        if (resizeEdge.includes("s")) updates.height = Math.max(50, Math.round(resizeStart.h + dy));
+        if (resizeEdge.includes("w")) {
+          const newW = Math.max(50, Math.round(resizeStart.w - dx));
+          updates.width = newW;
+          updates.x = resizeItemStart.x + (resizeStart.w - newW);
+        }
+        if (resizeEdge.includes("n")) {
+          const newH = Math.max(50, Math.round(resizeStart.h - dy));
+          updates.height = newH;
+          updates.y = resizeItemStart.y + (resizeStart.h - newH);
+        }
+        if (resizeEdge.length === 2) {
+          const w = updates.width || resizeStart.w;
+          updates.height = Math.round(w * ratio);
+          if (resizeEdge.includes("n")) {
+            updates.y = resizeItemStart.y + resizeStart.h - updates.height;
+          }
+        }
+        useAppStore.getState().updateItem(resizeId, updates);
+        if (updates.x !== undefined || updates.y !== undefined) {
+          useAppStore.getState().moveItem(resizeId, updates.x ?? resizeItemStart.x, updates.y ?? resizeItemStart.y);
+        }
+        return;
+      }
+      if (dragId) {
+        const newX = (e.clientX - panX - dragOffset.x) / zoom;
+        const newY = (e.clientY - panY - dragOffset.y) / zoom;
+        if (dragGroupStart) {
+          const primaryStart = dragGroupStart[dragId];
+          if (primaryStart) {
+            const dx = newX - primaryStart.x;
+            const dy = newY - primaryStart.y;
+            const st = useAppStore.getState();
+            for (const id of Object.keys(dragGroupStart)) {
+              const start = dragGroupStart[id];
+              st.moveItem(id, start.x + dx, start.y + dy);
+            }
+            return;
+          }
+        }
+        useAppStore.getState().moveItem(dragId, newX, newY);
+      }
+    };
+    const onUp = () => {
+      setResizeId(null);
+      setDragId(null);
+      setDragGroupStart(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [resizeId, dragId, resizeStart, resizeEdge, resizeItemStart, dragOffset, dragGroupStart, panX, panY, zoom]);
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       // Update marquee box while dragging
@@ -634,15 +707,15 @@ export function Canvas() {
     [items, panX, panY, zoom, selectItem, spaceHeld, activeCanvasTool]
   );
 
-  // Item resize start
-  const [resizeEdge, setResizeEdge] = useState("se");
-  const [resizeItemStart, setResizeItemStart] = useState({ x: 0, y: 0 });
+  // Item resize start (state moved up to live next to dragId/resizeId so
+  // the touch-pointer useEffect can reference it without forward-declaration).
   const handleResizeStart = useCallback(
-    (id: string, e: React.MouseEvent, edge: string) => {
+    (id: string, e: React.PointerEvent, edge: string) => {
       e.stopPropagation();
       e.preventDefault();
       const item = items.find((i) => i.id === id);
       if (!item) return;
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       // Push undo before resize
       useAppStore.getState().pushUndo();
       setResizeId(id);

@@ -263,10 +263,11 @@ export function PromptBar() {
     }
   }, []);
 
-  // Drag resize — attaches to document so it works even over canvas
+  // Drag resize — pointer events so it works on touch (iPhone / iPad) as
+  // well as mouse / trackpad. Mouse-only events never fire on iOS Safari.
   useEffect(() => {
     if (!isDragging) return;
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const d = dragRef.current;
       if (!d) return;
       e.preventDefault();
@@ -274,14 +275,20 @@ export function PromptBar() {
       setBoxMinH(Math.max(40, Math.min(500, d.startH - (e.clientY - d.startY))));
     };
     const onUp = () => { setIsDragging(false); dragRef.current = null; };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
+    return () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
+    };
   }, [isDragging]);
 
-  const onDragStart = (e: React.MouseEvent) => {
+  const onDragStart = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     dragRef.current = { startX: e.clientX, startY: e.clientY, startW: boxW, startH: boxMinH };
     setIsDragging(true);
   };
@@ -1303,10 +1310,12 @@ export function PromptBar() {
 
           {/* The chatbox */}
           <div className={`w-full rounded-2xl border shadow-lg flex flex-col ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}>
-            {/* Top resize bar — drag left/up to resize */}
+            {/* Top resize bar — drag left/up to resize. Taller on touch
+                so it's hittable with a finger; pointer events fire for both
+                mouse + touch. */}
             <div
-              className={`flex items-center justify-center h-5 cursor-nw-resize select-none shrink-0 rounded-t-2xl transition-colors ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
-              onMouseDown={onDragStart}
+              className={`flex items-center justify-center h-7 sm:h-5 cursor-nw-resize select-none shrink-0 rounded-t-2xl transition-colors touch-none ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
+              onPointerDown={onDragStart}
             >
               <div className={`flex gap-[3px] ${isDark ? "text-gray-600" : "text-gray-300"}`}>
                 <svg width="16" height="4" viewBox="0 0 16 4" fill="currentColor">
