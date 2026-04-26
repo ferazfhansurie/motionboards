@@ -1238,7 +1238,59 @@ export function BoardItemCard({
             <button
               type="button"
               className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
-              onClick={() => { closeContextMenu(); selectItem(item.id); useAppStore.getState().copySelectedItems(); }}
+              onClick={() => {
+                closeContextMenu();
+                selectItem(item.id);
+                useAppStore.getState().copySelectedItems();
+
+                // Also write the actual image bytes to the OS clipboard so it
+                // can be pasted into the chat (or any other app).
+                const url = item.outputUrl || item.src;
+                const isImage = item.type === "image" || item.type === "psd-layer" ||
+                  (item.type === "generation" && item.outputType !== "video" && item.outputType !== "audio");
+                if (!url || !isImage) {
+                  showToast(`Copied ${item.type} (no image to clipboard)`, { kind: "info" });
+                  return;
+                }
+                if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+                  showToast("Clipboard API not supported on this browser", { kind: "error" });
+                  return;
+                }
+                showToast(`Copying… url=${url.slice(0, 40)}`, { kind: "loading", durationMs: 2000 });
+                try {
+                  // Safari needs ClipboardItem created synchronously with a Promise<Blob>
+                  const ci = new ClipboardItem({
+                    "image/png": fetch(url).then(async (res) => {
+                      const blob = await res.blob();
+                      if (blob.type === "image/png") return blob;
+                      // Convert to PNG via canvas
+                      const objectUrl = URL.createObjectURL(blob);
+                      const img = new Image();
+                      img.crossOrigin = "anonymous";
+                      await new Promise<void>((resolve, reject) => {
+                        img.onload = () => resolve();
+                        img.onerror = () => reject(new Error("img load failed"));
+                        img.src = objectUrl;
+                      });
+                      const canvas = document.createElement("canvas");
+                      canvas.width = img.naturalWidth;
+                      canvas.height = img.naturalHeight;
+                      const ctx = canvas.getContext("2d");
+                      if (!ctx) throw new Error("no canvas ctx");
+                      ctx.drawImage(img, 0, 0);
+                      URL.revokeObjectURL(objectUrl);
+                      return new Promise<Blob>((resolve, reject) =>
+                        canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob null")), "image/png")
+                      );
+                    }),
+                  });
+                  navigator.clipboard.write([ci])
+                    .then(() => showToast("Image in clipboard ✓ now paste in chat", { kind: "success" }))
+                    .catch((err) => showToast(`Clipboard write failed: ${err.message || err}`, { kind: "error" }));
+                } catch (err) {
+                  showToast(`ClipboardItem failed: ${err instanceof Error ? err.message : err}`, { kind: "error" });
+                }
+              }}
             >
               <Copy className="h-3.5 w-3.5 text-gray-400" />
               Copy

@@ -525,55 +525,68 @@ export function AIPromptPanel() {
     }
   }, [input, isMobile]);
 
-  // Extract images pasted into the mobile contenteditable div via canvas
-  // (avoids fetch on potentially-ephemeral blob URLs iOS creates)
+  // On-screen debug log — shows what iOS delivers on paste so we can diagnose
+  const [pasteLog, setPasteLog] = useState<string[]>([]);
+  const log = useCallback((msg: string) => {
+    setPasteLog(prev => [...prev.slice(-6), msg]);
+  }, []);
+
   const imgToFile = useCallback((img: HTMLImageElement): Promise<File | null> =>
     new Promise((resolve) => {
       const convert = () => {
         try {
           const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth || 300;
-          canvas.height = img.naturalHeight || 300;
+          canvas.width = img.naturalWidth || img.width || 300;
+          canvas.height = img.naturalHeight || img.height || 300;
+          log(`canvas ${canvas.width}x${canvas.height}`);
           const ctx = canvas.getContext("2d");
-          if (!ctx) { resolve(null); return; }
+          if (!ctx) { log("no ctx"); resolve(null); return; }
           ctx.drawImage(img, 0, 0);
           canvas.toBlob((blob) => {
+            log(blob ? `blob ${blob.size}b` : "toBlob null");
             resolve(blob ? new File([blob], "paste.png", { type: "image/png" }) : null);
           }, "image/png");
-        } catch { resolve(null); }
+        } catch (err) { log(`canvas err: ${err}`); resolve(null); }
       };
+      log(`img complete=${img.complete} w=${img.naturalWidth} src=${img.src.slice(0,30)}`);
       if (img.complete && img.naturalWidth > 0) convert();
-      else { img.onload = convert; img.onerror = () => resolve(null); }
-    }), []);
+      else { img.onload = convert; img.onerror = () => { log("img err"); resolve(null); }; }
+    }), [log]);
 
   const handleMobileInputPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
-    // Android / desktop path: files in clipboardData.items
     const items = Array.from(e.clipboardData?.items || []);
+    log(`paste fired — ${items.length} items: ${items.map(i => `${i.kind}/${i.type}`).join(", ") || "none"}`);
+
     const files: File[] = [];
     for (const it of items) {
       if (it.kind === "file") { const f = it.getAsFile(); if (f) files.push(f); }
     }
     if (files.length > 0) {
+      log(`${files.length} file(s) via clipboardData`);
       e.preventDefault();
       handleFiles(files);
       return;
     }
-    // iOS path: do NOT preventDefault — let Safari insert the <img> into the div,
-    // then extract it via canvas after a short delay.
+
+    // iOS: let native paste insert <img> into the div, check after delay
+    log("no files — letting iOS insert, checking in 300ms");
     setTimeout(async () => {
       const el = mobileInputRef.current;
-      if (!el) return;
+      if (!el) { log("no el"); return; }
       const imgs = Array.from(el.querySelectorAll("img")) as HTMLImageElement[];
+      log(`found ${imgs.length} img(s) after delay — innerHTML length ${el.innerHTML.length}`);
       if (imgs.length === 0) return;
       const converted: File[] = [];
       for (const img of imgs) {
-        img.remove();
+        img.style.visibility = "hidden"; // hide but keep in DOM for canvas
         const f = await imgToFile(img);
+        img.remove();
         if (f) converted.push(f);
       }
+      log(`converted ${converted.length} file(s)`);
       if (converted.length > 0) handleFiles(converted);
-    }, 150);
-  }, [handleFiles, imgToFile]);
+    }, 300);
+  }, [handleFiles, imgToFile, log]);
 
   const loadChats = useCallback(async () => {
     setListLoading(true);
@@ -1180,6 +1193,17 @@ export function AIPromptPanel() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Mobile debug log — temporarily visible to diagnose paste behaviour */}
+            {isMobile && pasteLog.length > 0 && (
+              <div className="mb-2 rounded-lg bg-black/80 border border-yellow-500/40 p-2 text-[9px] font-mono text-yellow-200 leading-tight max-h-28 overflow-y-auto">
+                <div className="flex justify-between mb-1">
+                  <span className="text-yellow-400 font-bold">paste debug</span>
+                  <button onClick={() => setPasteLog([])} className="text-yellow-400 active:opacity-50">clear</button>
+                </div>
+                {pasteLog.map((m, i) => <div key={i}>{m}</div>)}
               </div>
             )}
 
