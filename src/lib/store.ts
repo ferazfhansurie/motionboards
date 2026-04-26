@@ -113,7 +113,7 @@ function stripUnfinalized(url: string | undefined): string {
   return url.startsWith("data:") || url.startsWith("blob:") ? "" : url;
 }
 
-function saveToDb(state: AppState) {
+async function saveToDb(state: AppState) {
   const boards = getCurrentBoards(state).map((b) => ({
     ...b,
     items: b.items.map((item) => ({
@@ -124,25 +124,41 @@ function saveToDb(state: AppState) {
       outputUrl: stripUnfinalized(item.outputUrl),
     })),
   }));
-  const body = JSON.stringify({
+  const json = JSON.stringify({
     boards,
     activeBoardId: state.activeBoardId,
     selectedModelId: state.selectedModelId,
     savedAt: Date.now(),
   });
-  // Guard against 413 on huge boards — better to skip this autosave than
-  // to have the browser console fill with errors every 300 ms.
-  if (body.length > BOARDS_SAVE_MAX_BYTES) {
+
+  // Gzip in the browser before sending — JSON typically compresses ~85%, so
+  // a 5 MB raw board fits comfortably under Vercel's 4 MB request cap.
+  // Without this, big boards silently skipped the autosave and mobile/other
+  // devices loaded stale DB state on login.
+  let bodyInit: BodyInit = json;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (typeof CompressionStream !== "undefined") {
+    try {
+      const encoded = new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"));
+      const buffer = await new Response(encoded).arrayBuffer();
+      bodyInit = buffer;
+      headers["Content-Encoding"] = "gzip";
+    } catch {
+      // Fall through with the uncompressed body — caught by the size guard below.
+    }
+  }
+
+  // Last-resort guard: if even gzip can't get under the cap (unusual), skip
+  // the save instead of producing a 413 every 2s.
+  const finalSize = bodyInit instanceof ArrayBuffer ? bodyInit.byteLength : json.length;
+  if (finalSize > BOARDS_SAVE_MAX_BYTES) {
     console.warn(
-      `[saveToDb] Skipping autosave: ${(body.length / 1024 / 1024).toFixed(1)} MB exceeds the 4 MB body cap. Delete old items or clear the image cache.`
+      `[saveToDb] Skipping autosave: ${(finalSize / 1024 / 1024).toFixed(1)} MB exceeds the 4 MB body cap even after gzip. Delete old items.`
     );
     return;
   }
-  fetch("/api/boards", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  }).catch(() => {});
+
+  fetch("/api/boards", { method: "POST", headers, body: bodyInit }).catch(() => {});
 }
 
 export interface ImageEditState {
@@ -1181,10 +1197,12 @@ if (typeof window !== "undefined") {
       const userId = authData?.user?.id;
       if (!userId) { dbLoadedOnce = true; return; }
 
-      // Check if localStorage belongs to this user
+      // Check if localStorage belongs to this user. If not, this is a fresh
+      // device / browser / account-switch — wipe local state so we don't
+      // preserve someone else's boards.
       const storedUser = localStorage.getItem("motionboards_user");
-      if (storedUser !== userId) {
-        // Different user — clear localStorage and reset store
+      const isFreshDevice = storedUser !== userId;
+      if (isFreshDevice) {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.setItem("motionboards_user", userId);
         useAppStore.setState({
@@ -1206,8 +1224,12 @@ if (typeof window !== "undefined") {
             const localSavedAt = localState?.savedAt || 0;
             const dbSavedAt = data.savedAt || 0;
 
-            // If localStorage has newer data for this user, keep it and sync to DB
-            if (localSavedAt > dbSavedAt && localState?.boards?.length) {
+            // If we just reset for a fresh device, ALWAYS take the DB state —
+            // otherwise the store subscriber would have already written a
+            // fresh local `savedAt` while this fetch was in flight, and the
+            // timestamp comparison below would incorrectly favor local.
+            // For continuing-device loads, prefer whichever side is newer.
+            if (!isFreshDevice && localSavedAt > dbSavedAt && localState?.boards?.length) {
               dbLoadedOnce = true;
               saveToDb(useAppStore.getState());
               return;

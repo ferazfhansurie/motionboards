@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST — save boards for authenticated user
+// POST — save boards for authenticated user. Accepts both raw JSON and
+// gzip-encoded JSON (Content-Encoding: gzip). Gzip is what the client sends
+// for big boards so they fit under Vercel's 4 MB request body cap.
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("session")?.value;
@@ -34,7 +36,20 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const data = await req.json();
+    let data: unknown;
+    if (req.headers.get("content-encoding") === "gzip") {
+      try {
+        const compressed = await req.arrayBuffer();
+        const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+        const text = await new Response(stream).text();
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error("Failed to decompress boards body:", err);
+        return NextResponse.json({ error: "Bad gzip body" }, { status: 400 });
+      }
+    } else {
+      data = await req.json();
+    }
 
     await getSql()`
       INSERT INTO mb_boards (user_id, data, updated_at)
