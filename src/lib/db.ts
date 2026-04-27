@@ -208,6 +208,136 @@ export async function getUserCredits(userId: string): Promise<number> {
   return rows.length > 0 ? (rows[0].credits as number) : 0;
 }
 
+// --- Registration funnel metrics ---
+//
+// All data is derived from existing tables (mb_users / mb_sessions /
+// mb_generations) — no new event log needed. Each stage is a strict subset
+// of the previous one, so conversion rates come straight from the counts.
+export interface FunnelMetrics {
+  rangeDays: number | null; // null = all time
+  signedUp: number;
+  loggedIn: number;
+  subscriptionActive: number;
+  madeGeneration: number;
+  completedGeneration: number;
+  stillSubscribed: number;
+  // Useful side metrics
+  medianMinutesToFirstGen: number | null;
+  avgGenerationsPerActive: number | null;
+  totalGenerations: number;
+  totalCompletedGenerations: number;
+  totalFailedGenerations: number;
+}
+
+export async function getRegistrationFunnel(rangeDays: number | null): Promise<FunnelMetrics> {
+  // SQL bound parameter: a Date for the lower bound, or null = no bound.
+  const since = rangeDays === null
+    ? new Date("1970-01-01")
+    : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+
+  // Signed up in range
+  const r1 = await sql`SELECT COUNT(*)::int AS n FROM mb_users WHERE created_at >= ${since}`;
+  const signedUp = (r1[0]?.n as number) || 0;
+
+  // Logged in: any session row tied to a user who signed up in range.
+  const r2 = await sql`
+    SELECT COUNT(DISTINCT u.id)::int AS n
+    FROM mb_users u
+    INNER JOIN mb_sessions s ON s.user_id = u.id
+    WHERE u.created_at >= ${since}
+  `;
+  const loggedIn = (r2[0]?.n as number) || 0;
+
+  // Activated a paid subscription at any point (subscription_id set).
+  // Wrap in try since the subscription columns are added lazily on first use.
+  let subscriptionActive = 0;
+  let stillSubscribed = 0;
+  try {
+    const r3 = await sql`
+      SELECT COUNT(*)::int AS n FROM mb_users
+      WHERE created_at >= ${since} AND subscription_id IS NOT NULL
+    `;
+    subscriptionActive = (r3[0]?.n as number) || 0;
+
+    const r3b = await sql`
+      SELECT COUNT(*)::int AS n FROM mb_users
+      WHERE created_at >= ${since}
+        AND subscription_active = true
+        AND subscription_expires_at > NOW()
+    `;
+    stillSubscribed = (r3b[0]?.n as number) || 0;
+  } catch { /* columns not yet created — treat as 0 */ }
+
+  // Made any generation
+  const r4 = await sql`
+    SELECT COUNT(DISTINCT u.id)::int AS n
+    FROM mb_users u
+    INNER JOIN mb_generations g ON g.user_id = u.id
+    WHERE u.created_at >= ${since}
+  `;
+  const madeGeneration = (r4[0]?.n as number) || 0;
+
+  // Completed at least one generation
+  const r5 = await sql`
+    SELECT COUNT(DISTINCT u.id)::int AS n
+    FROM mb_users u
+    INNER JOIN mb_generations g ON g.user_id = u.id
+    WHERE u.created_at >= ${since} AND g.status = 'completed'
+  `;
+  const completedGeneration = (r5[0]?.n as number) || 0;
+
+  // Median minutes from signup → first generation (signup-cohort scoped)
+  let medianMinutesToFirstGen: number | null = null;
+  try {
+    const r6 = await sql`
+      SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (
+        ORDER BY EXTRACT(EPOCH FROM (g.first_gen - u.created_at)) / 60.0
+      ) AS p50
+      FROM mb_users u
+      INNER JOIN (
+        SELECT user_id, MIN(created_at) AS first_gen FROM mb_generations GROUP BY user_id
+      ) g ON g.user_id = u.id
+      WHERE u.created_at >= ${since}
+    `;
+    const p50 = r6[0]?.p50;
+    if (typeof p50 === "string") medianMinutesToFirstGen = Math.round(parseFloat(p50));
+    else if (typeof p50 === "number") medianMinutesToFirstGen = Math.round(p50);
+  } catch { /* ignore */ }
+
+  // Generations breakdown across the same cohort
+  const r7 = await sql`
+    SELECT
+      COUNT(*)::int AS total,
+      SUM(CASE WHEN g.status = 'completed' THEN 1 ELSE 0 END)::int AS completed,
+      SUM(CASE WHEN g.status = 'failed' THEN 1 ELSE 0 END)::int AS failed
+    FROM mb_generations g
+    INNER JOIN mb_users u ON g.user_id = u.id
+    WHERE u.created_at >= ${since}
+  `;
+  const totalGenerations = (r7[0]?.total as number) || 0;
+  const totalCompletedGenerations = (r7[0]?.completed as number) || 0;
+  const totalFailedGenerations = (r7[0]?.failed as number) || 0;
+
+  const avgGenerationsPerActive = madeGeneration > 0
+    ? Math.round((totalGenerations / madeGeneration) * 10) / 10
+    : null;
+
+  return {
+    rangeDays,
+    signedUp,
+    loggedIn,
+    subscriptionActive,
+    madeGeneration,
+    completedGeneration,
+    stillSubscribed,
+    medianMinutesToFirstGen,
+    avgGenerationsPerActive,
+    totalGenerations,
+    totalCompletedGenerations,
+    totalFailedGenerations,
+  };
+}
+
 // --- Monthly subscription (RM100/mo → 10000 credits added per billing cycle) ---
 //
 // The columns are added lazily the first time the feature runs. Credits stay

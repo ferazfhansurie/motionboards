@@ -11,6 +11,7 @@ import {
   RefreshCw,
   ExternalLink,
   AlertTriangle,
+  TrendingDown,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -38,7 +39,23 @@ interface UserRow {
   createdAt: string;
 }
 
-type Tab = "generations" | "users";
+interface FunnelMetrics {
+  rangeDays: number | null;
+  signedUp: number;
+  loggedIn: number;
+  subscriptionActive: number;
+  madeGeneration: number;
+  completedGeneration: number;
+  stillSubscribed: number;
+  medianMinutesToFirstGen: number | null;
+  avgGenerationsPerActive: number | null;
+  totalGenerations: number;
+  totalCompletedGenerations: number;
+  totalFailedGenerations: number;
+}
+
+type Tab = "generations" | "users" | "funnel";
+type FunnelRange = "1" | "7" | "30" | "all";
 
 export default function LogsClient() {
   const router = useRouter();
@@ -48,6 +65,9 @@ export default function LogsClient() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [funnel, setFunnel] = useState<FunnelMetrics | null>(null);
+  const [funnelLoading, setFunnelLoading] = useState(false);
+  const [funnelRange, setFunnelRange] = useState<FunnelRange>("30");
 
   const fetchGenerations = async () => {
     setLoading(true);
@@ -75,10 +95,31 @@ export default function LogsClient() {
     }
   };
 
+  const fetchFunnel = async (range: FunnelRange) => {
+    setFunnelLoading(true);
+    try {
+      const res = await fetch(`/api/admin/funnel?days=${range}`);
+      const data = await res.json();
+      if (data && typeof data.signedUp === "number") setFunnel(data);
+    } catch (err) {
+      console.error("Failed to fetch funnel:", err);
+    } finally {
+      setFunnelLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchGenerations();
     fetchUsers();
+    fetchFunnel(funnelRange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-fetch funnel when range changes
+  useEffect(() => {
+    fetchFunnel(funnelRange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funnelRange]);
 
   const handleDelete = async (id: string) => {
     setDeleting(id);
@@ -153,29 +194,35 @@ export default function LogsClient() {
                     <span className="text-green-400">{completedCount} completed</span> &middot;{" "}
                     <span className="text-red-400">{failedCount} failed</span>
                   </>
-                ) : (
+                ) : tab === "users" ? (
                   <>{users.length} registered user{users.length === 1 ? "" : "s"}</>
+                ) : (
+                  <>Registration funnel — {funnelRange === "all" ? "all time" : `last ${funnelRange}d`}</>
                 )}
               </p>
             </div>
           </div>
           <button
-            onClick={tab === "generations" ? fetchGenerations : fetchUsers}
+            onClick={() => {
+              if (tab === "generations") fetchGenerations();
+              else if (tab === "users") fetchUsers();
+              else fetchFunnel(funnelRange);
+            }}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors"
           >
-            <RefreshCw className={`h-3 w-3 ${(tab === "generations" ? loading : usersLoading) ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3 w-3 ${(tab === "generations" ? loading : tab === "users" ? usersLoading : funnelLoading) ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
         {/* Tabs */}
         <div className="mx-auto max-w-5xl flex items-center gap-1 px-6 pb-2">
-          {(["generations", "users"] as const).map((t) => (
+          {(["generations", "users", "funnel"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`rounded-md px-3 py-1 text-xs transition-colors ${tab === t ? "bg-[#f26522]/15 text-[#f26522]" : "text-neutral-400 hover:bg-neutral-800 hover:text-white"}`}
             >
-              {t === "generations" ? "Generations" : "Users"}
+              {t === "generations" ? "Generations" : t === "users" ? "Users" : "Funnel"}
             </button>
           ))}
         </div>
@@ -293,7 +340,7 @@ export default function LogsClient() {
             ))}
           </div>
         )
-        ) : (
+        ) : tab === "users" ? (
           // Users tab
           usersLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -333,8 +380,195 @@ export default function LogsClient() {
               </table>
             </div>
           )
+        ) : (
+          // Funnel tab
+          <FunnelView
+            funnel={funnel}
+            loading={funnelLoading}
+            range={funnelRange}
+            onRangeChange={setFunnelRange}
+          />
         )}
       </div>
+    </div>
+  );
+}
+
+// ---- Funnel view ----------------------------------------------------------
+
+interface FunnelStage {
+  key: string;
+  label: string;
+  description: string;
+  value: number;
+}
+
+function FunnelView({
+  funnel,
+  loading,
+  range,
+  onRangeChange,
+}: {
+  funnel: FunnelMetrics | null;
+  loading: boolean;
+  range: FunnelRange;
+  onRangeChange: (r: FunnelRange) => void;
+}) {
+  if (loading && !funnel) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neutral-500" />
+      </div>
+    );
+  }
+  if (!funnel) {
+    return <p className="text-center py-20 text-sm text-neutral-500">No funnel data.</p>;
+  }
+
+  const stages: FunnelStage[] = [
+    { key: "signedUp", label: "Signed up", description: "Created an account", value: funnel.signedUp },
+    { key: "loggedIn", label: "Logged in at least once", description: "Has an active or expired session", value: funnel.loggedIn },
+    { key: "subscriptionActive", label: "Started a subscription", description: "Stripe subscription created (paid)", value: funnel.subscriptionActive },
+    { key: "madeGeneration", label: "Made a generation", description: "Submitted any prompt to a model", value: funnel.madeGeneration },
+    { key: "completedGeneration", label: "Got a successful output", description: "At least one generation completed", value: funnel.completedGeneration },
+    { key: "stillSubscribed", label: "Still subscribed today", description: "subscription_active and not expired", value: funnel.stillSubscribed },
+  ];
+
+  const top = stages[0].value || 1; // avoid div/0
+  const ranges: { value: FunnelRange; label: string }[] = [
+    { value: "1", label: "Today" },
+    { value: "7", label: "7 days" },
+    { value: "30", label: "30 days" },
+    { value: "all", label: "All time" },
+  ];
+
+  // Conversion to first generation, paid signup, retention
+  const convToFirstGen = funnel.signedUp > 0 ? (funnel.madeGeneration / funnel.signedUp) * 100 : 0;
+  const convToPaid = funnel.signedUp > 0 ? (funnel.subscriptionActive / funnel.signedUp) * 100 : 0;
+  const retention = funnel.subscriptionActive > 0 ? (funnel.stillSubscribed / funnel.subscriptionActive) * 100 : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Range selector */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {ranges.map((r) => (
+          <button
+            key={r.value}
+            onClick={() => onRangeChange(r.value)}
+            className={`rounded-md px-3 py-1.5 text-xs transition-colors ${range === r.value ? "bg-[#f26522]/15 text-[#f26522]" : "bg-[#0d1f30]/80 text-neutral-400 hover:text-white border border-neutral-800"}`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard label="Signups" value={funnel.signedUp.toString()} />
+        <KpiCard
+          label="→ First generation"
+          value={`${convToFirstGen.toFixed(0)}%`}
+          sublabel={`${funnel.madeGeneration} of ${funnel.signedUp}`}
+        />
+        <KpiCard
+          label="→ Paid"
+          value={`${convToPaid.toFixed(0)}%`}
+          sublabel={`${funnel.subscriptionActive} subscribed`}
+        />
+        <KpiCard
+          label="Retention"
+          value={`${retention.toFixed(0)}%`}
+          sublabel="still active today"
+        />
+      </div>
+
+      {/* Funnel bars */}
+      <div className="rounded-lg border border-neutral-800 bg-[#0d1f30]/80 p-4">
+        <h2 className="text-sm font-semibold mb-1">Registration funnel</h2>
+        <p className="text-[11px] text-neutral-500 mb-4">
+          Each row counts users (signed up in the selected period) who reached that stage.
+        </p>
+        <div className="space-y-2.5">
+          {stages.map((stage, i) => {
+            const prev = i > 0 ? stages[i - 1].value : null;
+            const pctOfTop = (stage.value / top) * 100;
+            const conversion = prev !== null && prev > 0 ? (stage.value / prev) * 100 : null;
+            const dropoff = prev !== null && prev > 0 ? prev - stage.value : null;
+            return (
+              <div key={stage.key} className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-neutral-500 w-4 text-right">{i + 1}.</span>
+                    <span className="font-semibold text-white truncate">{stage.label}</span>
+                    <span className="text-neutral-500 truncate hidden md:inline">{stage.description}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {conversion !== null && (
+                      <span className="text-neutral-500">
+                        {conversion.toFixed(0)}% of prev
+                      </span>
+                    )}
+                    {dropoff !== null && dropoff > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-red-400/70">
+                        <TrendingDown className="h-3 w-3" />
+                        {dropoff} drop
+                      </span>
+                    )}
+                    <span className="font-mono font-bold text-white tabular-nums w-12 text-right">
+                      {stage.value}
+                    </span>
+                  </div>
+                </div>
+                <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
+                  <div
+                    className="h-full bg-[#f26522] transition-all"
+                    style={{ width: `${Math.max(pctOfTop, stage.value > 0 ? 1 : 0)}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Side metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <KpiCard
+          label="Median time to first gen"
+          value={
+            funnel.medianMinutesToFirstGen === null
+              ? "—"
+              : funnel.medianMinutesToFirstGen < 60
+                ? `${funnel.medianMinutesToFirstGen}m`
+                : `${(funnel.medianMinutesToFirstGen / 60).toFixed(1)}h`
+          }
+          sublabel="signup → first generation"
+        />
+        <KpiCard
+          label="Avg gens / active user"
+          value={funnel.avgGenerationsPerActive === null ? "—" : funnel.avgGenerationsPerActive.toString()}
+          sublabel="across the cohort"
+        />
+        <KpiCard
+          label="Generation success"
+          value={
+            funnel.totalGenerations > 0
+              ? `${((funnel.totalCompletedGenerations / funnel.totalGenerations) * 100).toFixed(0)}%`
+              : "—"
+          }
+          sublabel={`${funnel.totalCompletedGenerations} ok · ${funnel.totalFailedGenerations} failed`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, sublabel }: { label: string; value: string; sublabel?: string }) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-[#0d1f30]/80 p-3">
+      <p className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</p>
+      <p className="text-xl font-bold text-white mt-1">{value}</p>
+      {sublabel && <p className="text-[10px] text-neutral-500 mt-0.5">{sublabel}</p>}
     </div>
   );
 }
