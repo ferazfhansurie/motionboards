@@ -458,7 +458,10 @@ export function AIPromptPanel() {
     if (!isAIPromptOpen) return;
     const onPaste = (e: ClipboardEvent) => {
       // Skip if the event came from the textarea itself — handled by onPaste prop
-      if (e.target instanceof HTMLTextAreaElement) return;
+      // Skip if the event came from any of our own inputs — they have their
+      // own onPaste handlers. Otherwise we'd double-attach.
+      const t = e.target as HTMLElement | null;
+      if (t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement || t?.isContentEditable) return;
       const items = Array.from(e.clipboardData?.items || []);
       const files: File[] = [];
       for (const it of items) {
