@@ -39,6 +39,17 @@ interface UserRow {
   createdAt: string;
 }
 
+interface FunnelSignup {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  subscriptionActive: boolean;
+  loggedIn: boolean;
+  generationCount: number;
+  completedCount: number;
+}
+
 interface FunnelMetrics {
   rangeDays: number | null;
   signedUp: number;
@@ -52,6 +63,7 @@ interface FunnelMetrics {
   totalGenerations: number;
   totalCompletedGenerations: number;
   totalFailedGenerations: number;
+  signups: FunnelSignup[];
 }
 
 type Tab = "generations" | "users" | "funnel";
@@ -558,6 +570,74 @@ function FunnelView({
           }
           sublabel={`${funnel.totalCompletedGenerations} ok · ${funnel.totalFailedGenerations} failed`}
         />
+      </div>
+
+      {/* Signup list — one row per user who signed up in the period.
+          Length must equal the 'Signed up' count above. */}
+      <div className="rounded-lg border border-neutral-800 bg-[#0d1f30]/80">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
+          <div>
+            <h2 className="text-sm font-semibold">Signups in this period</h2>
+            <p className="text-[11px] text-neutral-500">
+              Showing {funnel.signups.length} of {funnel.signedUp}
+              {funnel.signups.length < funnel.signedUp && " (capped at 500)"}
+            </p>
+          </div>
+        </div>
+        {funnel.signups.length === 0 ? (
+          <p className="text-center py-10 text-sm text-neutral-500">No signups in this range.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-neutral-900/50 text-left text-[10px] uppercase tracking-wider text-neutral-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Email</th>
+                  <th className="px-4 py-2 font-medium">Name</th>
+                  <th className="px-4 py-2 font-medium">Joined</th>
+                  <th className="px-4 py-2 font-medium text-center">Logged in</th>
+                  <th className="px-4 py-2 font-medium text-center">Paid</th>
+                  <th className="px-4 py-2 font-medium text-right">Gens</th>
+                  <th className="px-4 py-2 font-medium text-right">OK</th>
+                </tr>
+              </thead>
+              <tbody>
+                {funnel.signups.map((s) => (
+                  <tr key={s.id} className="border-t border-neutral-800 hover:bg-neutral-900/40">
+                    <td className="px-4 py-2 font-mono text-neutral-200">{s.email}</td>
+                    <td className="px-4 py-2 text-neutral-300">{s.name || "—"}</td>
+                    <td className="px-4 py-2 text-neutral-500">
+                      {new Date(s.createdAt).toLocaleDateString("en-MY", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {s.loggedIn
+                        ? <CheckCircle className="h-3.5 w-3.5 text-green-400 inline" />
+                        : <span className="text-neutral-700">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {s.subscriptionActive
+                        ? <span className="rounded bg-[#f26522]/15 text-[#f26522] px-1.5 py-0.5 text-[10px] font-semibold">PAID</span>
+                        : <span className="text-neutral-700">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-right text-neutral-300 tabular-nums">
+                      {s.generationCount}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      <span className={s.completedCount > 0 ? "text-green-400" : "text-neutral-600"}>
+                        {s.completedCount}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

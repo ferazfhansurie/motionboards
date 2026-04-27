@@ -213,6 +213,17 @@ export async function getUserCredits(userId: string): Promise<number> {
 // All data is derived from existing tables (mb_users / mb_sessions /
 // mb_generations) — no new event log needed. Each stage is a strict subset
 // of the previous one, so conversion rates come straight from the counts.
+export interface FunnelSignup {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  subscriptionActive: boolean;
+  loggedIn: boolean;          // has at least one session row
+  generationCount: number;    // total generations submitted
+  completedCount: number;     // generations that completed
+}
+
 export interface FunnelMetrics {
   rangeDays: number | null; // null = all time
   signedUp: number;
@@ -227,6 +238,9 @@ export interface FunnelMetrics {
   totalGenerations: number;
   totalCompletedGenerations: number;
   totalFailedGenerations: number;
+  // Per-user list — every signup in the period, with the per-stage flags
+  // so the table count must equal `signedUp` by construction.
+  signups: FunnelSignup[];
 }
 
 export async function getRegistrationFunnel(rangeDays: number | null): Promise<FunnelMetrics> {
@@ -322,6 +336,63 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
     ? Math.round((totalGenerations / madeGeneration) * 10) / 10
     : null;
 
+  // Per-user list. One row per signup in the period, with flags showing
+  // exactly which funnel stages they reached. Newest signups first so the
+  // first row of the table matches the most recent activity.
+  let signups: FunnelSignup[] = [];
+  try {
+    const rows = await sql`
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.created_at,
+        COALESCE(u.subscription_active, false) AS subscription_active,
+        EXISTS (SELECT 1 FROM mb_sessions s WHERE s.user_id = u.id) AS logged_in,
+        (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id)::int AS gen_count,
+        (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id AND g.status = 'completed')::int AS completed_count
+      FROM mb_users u
+      WHERE u.created_at >= ${since}
+      ORDER BY u.created_at DESC
+      LIMIT 500
+    `;
+    signups = rows.map((r) => ({
+      id: r.id as string,
+      name: (r.name as string) || "",
+      email: (r.email as string) || "",
+      createdAt: (r.created_at as Date).toISOString(),
+      subscriptionActive: !!r.subscription_active,
+      loggedIn: !!r.logged_in,
+      generationCount: (r.gen_count as number) || 0,
+      completedCount: (r.completed_count as number) || 0,
+    }));
+  } catch (err) {
+    // Subscription column probably hasn't been created yet — fall back to a
+    // query without it so we still surface the list.
+    console.error("[funnel] signup list fallback:", err);
+    const rows = await sql`
+      SELECT
+        u.id, u.name, u.email, u.created_at,
+        EXISTS (SELECT 1 FROM mb_sessions s WHERE s.user_id = u.id) AS logged_in,
+        (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id)::int AS gen_count,
+        (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id AND g.status = 'completed')::int AS completed_count
+      FROM mb_users u
+      WHERE u.created_at >= ${since}
+      ORDER BY u.created_at DESC
+      LIMIT 500
+    `;
+    signups = rows.map((r) => ({
+      id: r.id as string,
+      name: (r.name as string) || "",
+      email: (r.email as string) || "",
+      createdAt: (r.created_at as Date).toISOString(),
+      subscriptionActive: false,
+      loggedIn: !!r.logged_in,
+      generationCount: (r.gen_count as number) || 0,
+      completedCount: (r.completed_count as number) || 0,
+    }));
+  }
+
   return {
     rangeDays,
     signedUp,
@@ -335,6 +406,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
     totalGenerations,
     totalCompletedGenerations,
     totalFailedGenerations,
+    signups,
   };
 }
 
