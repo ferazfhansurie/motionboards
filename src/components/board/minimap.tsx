@@ -161,9 +161,11 @@ export function Minimap() {
   }, [resizing]);
 
   // ---- Collapse ----
-  const [collapsed, setCollapsed] = useState(false);
+  // Default = collapsed. Only opens if the user explicitly toggled it open.
+  const [collapsed, setCollapsed] = useState(true);
   useEffect(() => {
-    setCollapsed(typeof window !== "undefined" && localStorage.getItem("motionboards_minimap_collapsed") === "true");
+    if (typeof window === "undefined") return;
+    setCollapsed(localStorage.getItem("motionboards_minimap_collapsed") !== "false");
   }, []);
   const toggleCollapse = () => {
     setCollapsed((prev) => {
