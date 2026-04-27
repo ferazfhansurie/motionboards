@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { CheckCircle, Loader2 } from "lucide-react";
-import { fbqTrack } from "@/components/analytics/meta-pixel";
+import { track } from "@/lib/track";
 
 const SUBSCRIPTION_VALUE_MYR = 100;
 
@@ -29,19 +29,14 @@ export default function SignupSuccessPage() {
       .then((data) => {
         if (data.success) {
           setStatus("success");
-          // The actual conversion. Fire CompleteRegistration + Subscribe + Purchase
-          // so all three ad-objective optimisations work (signup, subscription, ROAS).
+          // The actual conversion. Single event with full revenue context.
           if (!firedRef.current) {
             firedRef.current = true;
-            const params = {
+            track("subscription_completed", {
               value: SUBSCRIPTION_VALUE_MYR,
               currency: "MYR",
-              content_name: "MotionBoards Monthly",
-              content_category: "subscription",
-            };
-            fbqTrack("CompleteRegistration", params);
-            fbqTrack("Subscribe", params);
-            fbqTrack("Purchase", params);
+              plan: "MotionBoards Monthly",
+            });
           }
         } else {
           setStatus("error");

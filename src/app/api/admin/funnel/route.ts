@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken, isAdmin, getRegistrationFunnel } from "@/lib/db";
+import { getUserFromToken, isAdmin, getRegistrationFunnel, getEventCounts, getTopPaths } from "@/lib/db";
 
-// Returns the registration / activation funnel for the requested time range.
+// Returns the full registration funnel + in-house event metrics
+// (impressions, conversions) for the requested time range.
 // Admin-only. Range is the ?days query param: 1 / 7 / 30 / "all".
 export async function GET(req: NextRequest) {
   try {
@@ -19,8 +20,12 @@ export async function GET(req: NextRequest) {
       rangeDays = Number.isFinite(n) && n > 0 ? n : 30;
     }
 
-    const metrics = await getRegistrationFunnel(rangeDays);
-    return NextResponse.json(metrics);
+    const [metrics, events, topPaths] = await Promise.all([
+      getRegistrationFunnel(rangeDays),
+      getEventCounts(rangeDays),
+      getTopPaths(rangeDays, 15),
+    ]);
+    return NextResponse.json({ ...metrics, events, topPaths });
   } catch (err) {
     console.error("Funnel metrics error:", err);
     return NextResponse.json({ error: "Failed to load funnel metrics" }, { status: 500 });

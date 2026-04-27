@@ -50,6 +50,19 @@ interface FunnelSignup {
   completedCount: number;
 }
 
+interface EventCount {
+  eventName: string;
+  count: number;
+  uniqueAnons: number;
+  uniqueUsers: number;
+}
+
+interface PathImpression {
+  pathname: string;
+  count: number;
+  uniqueVisitors: number;
+}
+
 interface FunnelMetrics {
   rangeDays: number | null;
   signedUp: number;
@@ -64,6 +77,8 @@ interface FunnelMetrics {
   totalCompletedGenerations: number;
   totalFailedGenerations: number;
   signups: FunnelSignup[];
+  events: EventCount[];
+  topPaths: PathImpression[];
 }
 
 type Tab = "generations" | "users" | "funnel";
@@ -459,6 +474,16 @@ function FunnelView({
   const convToPaid = funnel.signedUp > 0 ? (funnel.subscriptionActive / funnel.signedUp) * 100 : 0;
   const retention = funnel.subscriptionActive > 0 ? (funnel.stillSubscribed / funnel.subscriptionActive) * 100 : 0;
 
+  // Impressions block — extracted from in-house event log
+  const events = funnel.events ?? [];
+  const topPaths = funnel.topPaths ?? [];
+  const pageViewEvent = events.find((e) => e.eventName === "page_view");
+  const impressions = pageViewEvent?.count || 0;
+  const uniqueVisitors = pageViewEvent ? Math.max(pageViewEvent.uniqueAnons, pageViewEvent.uniqueUsers, pageViewEvent.uniqueAnons + pageViewEvent.uniqueUsers) : 0;
+  // Drop page_view from the per-event chip list since we surface it separately.
+  const otherEvents = events.filter((e) => e.eventName !== "page_view");
+  const visitorToSignup = uniqueVisitors > 0 ? (funnel.signedUp / uniqueVisitors) * 100 : 0;
+
   return (
     <div className="space-y-6">
       {/* Range selector */}
@@ -473,6 +498,64 @@ function FunnelView({
           </button>
         ))}
       </div>
+
+      {/* Impressions / traffic */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard label="Impressions" value={impressions.toString()} sublabel="page views" />
+        <KpiCard label="Unique visitors" value={uniqueVisitors.toString()} sublabel="anon + signed-in" />
+        <KpiCard
+          label="Visitor → signup"
+          value={uniqueVisitors > 0 ? `${visitorToSignup.toFixed(1)}%` : "—"}
+          sublabel={`${funnel.signedUp} of ${uniqueVisitors}`}
+        />
+        <KpiCard
+          label="Total events"
+          value={events.reduce((sum, e) => sum + e.count, 0).toString()}
+          sublabel="all tracked actions"
+        />
+      </div>
+
+      {/* Top paths + per-event chips */}
+      {(topPaths.length > 0 || otherEvents.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-neutral-800 bg-[#0d1f30]/80 p-4">
+            <h2 className="text-sm font-semibold mb-3">Top pages</h2>
+            {topPaths.length === 0 ? (
+              <p className="text-xs text-neutral-500">No page views yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {topPaths.map((p) => (
+                  <div key={p.pathname} className="flex items-center justify-between text-[11px]">
+                    <span className="font-mono text-neutral-300 truncate flex-1 mr-2">{p.pathname}</span>
+                    <div className="flex items-center gap-3 shrink-0 text-neutral-500">
+                      <span className="tabular-nums">{p.uniqueVisitors} uniq</span>
+                      <span className="tabular-nums font-bold text-white w-12 text-right">{p.count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-[#0d1f30]/80 p-4">
+            <h2 className="text-sm font-semibold mb-3">Conversion events</h2>
+            {otherEvents.length === 0 ? (
+              <p className="text-xs text-neutral-500">No conversion events yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {otherEvents.map((e) => (
+                  <div key={e.eventName} className="flex items-center justify-between text-[11px]">
+                    <span className="font-mono text-neutral-300 truncate flex-1 mr-2">{e.eventName}</span>
+                    <div className="flex items-center gap-3 shrink-0 text-neutral-500">
+                      <span className="tabular-nums">{e.uniqueAnons + e.uniqueUsers} uniq</span>
+                      <span className="tabular-nums font-bold text-white w-12 text-right">{e.count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

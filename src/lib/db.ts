@@ -208,6 +208,130 @@ export async function getUserCredits(userId: string): Promise<number> {
   return rows.length > 0 ? (rows[0].credits as number) : 0;
 }
 
+// --- In-house event log (impressions, conversions, etc.) ---
+//
+// Replaces Meta Pixel. Every meaningful action — page view, generate-gated,
+// signup form view, subscribe click, paid conversion — gets a row. Anonymous
+// visitors get an `anon_id` (a UUID stored in their localStorage) so we can
+// stitch their pre-signup activity to their user_id once they sign up.
+
+let eventColumnsEnsured = false;
+async function ensureEventTable() {
+  if (eventColumnsEnsured) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_events (
+      id BIGSERIAL PRIMARY KEY,
+      user_id TEXT,
+      anon_id TEXT,
+      event_name TEXT NOT NULL,
+      pathname TEXT,
+      referrer TEXT,
+      user_agent TEXT,
+      properties JSONB,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_mb_events_event_name ON mb_events(event_name)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_mb_events_user_id ON mb_events(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_mb_events_anon_id ON mb_events(anon_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_mb_events_created_at ON mb_events(created_at DESC)`;
+  eventColumnsEnsured = true;
+}
+
+export interface RecordEventInput {
+  userId?: string | null;
+  anonId?: string | null;
+  eventName: string;
+  pathname?: string;
+  referrer?: string;
+  userAgent?: string;
+  properties?: Record<string, unknown>;
+}
+
+export async function recordEvent(input: RecordEventInput): Promise<void> {
+  await ensureEventTable();
+  await sql`
+    INSERT INTO mb_events (user_id, anon_id, event_name, pathname, referrer, user_agent, properties)
+    VALUES (
+      ${input.userId || null},
+      ${input.anonId || null},
+      ${input.eventName},
+      ${input.pathname || null},
+      ${input.referrer || null},
+      ${input.userAgent || null},
+      ${input.properties ? JSON.stringify(input.properties) : null}
+    )
+  `;
+}
+
+export interface EventCount {
+  eventName: string;
+  count: number;
+  uniqueAnons: number;
+  uniqueUsers: number;
+}
+
+export async function getEventCounts(rangeDays: number | null): Promise<EventCount[]> {
+  try {
+    await ensureEventTable();
+    const since = rangeDays === null
+      ? new Date("1970-01-01")
+      : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+    const rows = await sql`
+      SELECT
+        event_name,
+        COUNT(*)::int AS count,
+        COUNT(DISTINCT anon_id)::int AS unique_anons,
+        COUNT(DISTINCT user_id)::int AS unique_users
+      FROM mb_events
+      WHERE created_at >= ${since}
+      GROUP BY event_name
+      ORDER BY count DESC
+    `;
+    return rows.map((r) => ({
+      eventName: r.event_name as string,
+      count: (r.count as number) || 0,
+      uniqueAnons: (r.unique_anons as number) || 0,
+      uniqueUsers: (r.unique_users as number) || 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export interface PathImpression {
+  pathname: string;
+  count: number;
+  uniqueVisitors: number;
+}
+
+export async function getTopPaths(rangeDays: number | null, limit = 20): Promise<PathImpression[]> {
+  try {
+    await ensureEventTable();
+    const since = rangeDays === null
+      ? new Date("1970-01-01")
+      : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+    const rows = await sql`
+      SELECT
+        pathname,
+        COUNT(*)::int AS count,
+        COUNT(DISTINCT COALESCE(user_id, anon_id))::int AS unique_visitors
+      FROM mb_events
+      WHERE created_at >= ${since} AND event_name = 'page_view' AND pathname IS NOT NULL
+      GROUP BY pathname
+      ORDER BY count DESC
+      LIMIT ${limit}
+    `;
+    return rows.map((r) => ({
+      pathname: r.pathname as string,
+      count: (r.count as number) || 0,
+      uniqueVisitors: (r.unique_visitors as number) || 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // --- Registration funnel metrics ---
 //
 // All data is derived from existing tables (mb_users / mb_sessions /

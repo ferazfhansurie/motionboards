@@ -3,17 +3,17 @@
 import { useEffect, useState } from "react";
 import { Canvas } from "@/components/board/canvas";
 import { Loader2 } from "lucide-react";
-import { fbqTrack } from "@/components/analytics/meta-pixel";
+import { track } from "@/lib/track";
 
 export default function GeneratePage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     // Engaged-user signal. Separates "saw the ad → bounced" from
-    // "saw the ad → opened the canvas". PageView already fires from the
-    // root pixel; ViewContent here lets us optimise specifically toward
-    // people who load the actual app.
-    fbqTrack("ViewContent", { content_name: "Canvas", content_category: "app" });
+    // "saw the ad → opened the canvas". The general page_view already fires
+    // from TrackImpressions in the root layout — this is the explicit
+    // "canvas opened" event for funnel reporting.
+    track("canvas_opened");
 
     // Check auth but don't redirect — let everyone use the canvas
     fetch("/api/auth/me")
