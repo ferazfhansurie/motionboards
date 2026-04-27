@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Check, Zap } from "lucide-react";
+import { fbqTrack } from "@/components/analytics/meta-pixel";
+
+// RM100/month subscription — value passed to Meta in MYR so the algorithm
+// can optimise for ROAS and we get reliable revenue numbers in Events Manager.
+const SUBSCRIPTION_VALUE_MYR = 100;
 
 const PLAN_FEATURES = [
   "RM100 of credits refreshed every month",
@@ -19,6 +24,17 @@ export default function SignupPage() {
 
   const cancelled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("cancelled");
 
+  // Fire Lead on signup page mount — user reached the conversion form.
+  // If they got here from the Stripe-cancel URL, fire it as a separate
+  // event so we can spot drop-off at the checkout step.
+  useEffect(() => {
+    if (cancelled) {
+      fbqTrack("Lead", { content_name: "Signup page — payment cancelled", content_category: "signup_form" });
+    } else {
+      fbqTrack("Lead", { content_name: "Signup page view", content_category: "signup_form" });
+    }
+  }, [cancelled]);
+
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -31,6 +47,15 @@ export default function SignupPage() {
       return;
     }
     setLoading(true);
+    // High-intent action: user clicked Subscribe and we're about to send
+    // them to Stripe Checkout. AddPaymentInfo is the canonical Meta event
+    // for this step.
+    fbqTrack("AddPaymentInfo", {
+      value: SUBSCRIPTION_VALUE_MYR,
+      currency: "MYR",
+      content_name: "MotionBoards Monthly",
+      content_category: "subscription",
+    });
     try {
       const res = await fetch("/api/stripe/subscribe", {
         method: "POST",

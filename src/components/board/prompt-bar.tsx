@@ -849,7 +849,14 @@ export function PromptBar() {
 
       if (!res.ok) {
         useAppStore.getState().removeItem(genItem.id);
-        if (res.status === 401) { window.location.href = "/signup"; return; }
+        if (res.status === 401) {
+          // User tried to generate without an account — high-intent moment.
+          // Fire InitiateCheckout so Meta can optimise ad delivery toward
+          // people likely to take this exact step.
+          fbqTrack("InitiateCheckout", { content_name: "Generate gated → signup", content_category: "ai_generation" });
+          window.location.href = "/signup";
+          return;
+        }
         const msg = data.error || "Generation failed";
         // 429s and safety blocks get a longer toast so the actionable hint
         // stays on screen long enough to read.

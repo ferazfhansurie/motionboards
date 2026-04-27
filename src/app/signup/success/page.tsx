@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { CheckCircle, Loader2 } from "lucide-react";
+import { fbqTrack } from "@/components/analytics/meta-pixel";
+
+const SUBSCRIPTION_VALUE_MYR = 100;
 
 export default function SignupSuccessPage() {
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
   const [error, setError] = useState("");
+  // Guard against firing the conversion event twice on React strict-mode
+  // double-mount + the Stripe-success page being shareable.
+  const firedRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -23,6 +29,20 @@ export default function SignupSuccessPage() {
       .then((data) => {
         if (data.success) {
           setStatus("success");
+          // The actual conversion. Fire CompleteRegistration + Subscribe + Purchase
+          // so all three ad-objective optimisations work (signup, subscription, ROAS).
+          if (!firedRef.current) {
+            firedRef.current = true;
+            const params = {
+              value: SUBSCRIPTION_VALUE_MYR,
+              currency: "MYR",
+              content_name: "MotionBoards Monthly",
+              content_category: "subscription",
+            };
+            fbqTrack("CompleteRegistration", params);
+            fbqTrack("Subscribe", params);
+            fbqTrack("Purchase", params);
+          }
         } else {
           setStatus("error");
           setError(data.error || "Verification failed");
