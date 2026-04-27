@@ -362,6 +362,13 @@ export interface FunnelMetrics {
   totalGenerations: number;
   totalCompletedGenerations: number;
   totalFailedGenerations: number;
+  // Revenue (in CREDITS, divide by 100 for RM). Computed from the same
+  // signup-cohort: only counts users who signed up in the period.
+  subscriptionRevenueCredits: number;  // paid users × 10000 (RM100)
+  markupRevenueCredits: number;        // sum of markup_credits on completed gens
+  providerCostCredits: number;         // sum of actual_cost_credits on completed gens (your provider bill)
+  totalRevenueCredits: number;         // subscription + markup
+  expectedRmPerSignup: number;         // totalRevenueCredits / signedUp / 100, in RM
   // Per-user list — every signup in the period, with the per-stage flags
   // so the table count must equal `signedUp` by construction.
   signups: FunnelSignup[];
@@ -460,6 +467,30 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
     ? Math.round((totalGenerations / madeGeneration) * 10) / 10
     : null;
 
+  // Revenue inside the cohort. Subscription = paid users × 10000 sen (RM100).
+  // Markup = sum of markup_credits over their generations. Provider cost is
+  // the actual_cost_credits sum — useful for showing the platform's gross margin.
+  const SUBSCRIPTION_PRICE_CREDITS = 10000;
+  const subscriptionRevenueCredits = subscriptionActive * SUBSCRIPTION_PRICE_CREDITS;
+  let markupRevenueCredits = 0;
+  let providerCostCredits = 0;
+  try {
+    const r8 = await sql`
+      SELECT
+        COALESCE(SUM(g.markup_credits), 0)::int AS markup,
+        COALESCE(SUM(g.actual_cost_credits), 0)::int AS cost
+      FROM mb_generations g
+      INNER JOIN mb_users u ON g.user_id = u.id
+      WHERE u.created_at >= ${since} AND g.status = 'completed'
+    `;
+    markupRevenueCredits = (r8[0]?.markup as number) || 0;
+    providerCostCredits = (r8[0]?.cost as number) || 0;
+  } catch { /* columns absent on first run */ }
+  const totalRevenueCredits = subscriptionRevenueCredits + markupRevenueCredits;
+  const expectedRmPerSignup = signedUp > 0
+    ? Math.round((totalRevenueCredits / signedUp / 100) * 100) / 100
+    : 0;
+
   // Per-user list. One row per signup in the period, with flags showing
   // exactly which funnel stages they reached. Newest signups first so the
   // first row of the table matches the most recent activity.
@@ -530,6 +561,11 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
     totalGenerations,
     totalCompletedGenerations,
     totalFailedGenerations,
+    subscriptionRevenueCredits,
+    markupRevenueCredits,
+    providerCostCredits,
+    totalRevenueCredits,
+    expectedRmPerSignup,
     signups,
   };
 }

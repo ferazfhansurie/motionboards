@@ -76,6 +76,11 @@ interface FunnelMetrics {
   totalGenerations: number;
   totalCompletedGenerations: number;
   totalFailedGenerations: number;
+  subscriptionRevenueCredits: number;
+  markupRevenueCredits: number;
+  providerCostCredits: number;
+  totalRevenueCredits: number;
+  expectedRmPerSignup: number;
   signups: FunnelSignup[];
   events: EventCount[];
   topPaths: PathImpression[];
@@ -557,6 +562,38 @@ function FunnelView({
         </div>
       )}
 
+      {/* Revenue per signup — the answer to "what to expect per registration" */}
+      <div className="rounded-lg border border-[#f26522]/30 bg-gradient-to-br from-[#f26522]/10 to-[#0d1f30]/80 p-4">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[#f26522]">Expected revenue per signup</p>
+            <p className="text-3xl font-bold text-white mt-1">
+              RM {funnel.expectedRmPerSignup.toFixed(2)}
+            </p>
+            <p className="text-[11px] text-neutral-400 mt-1">
+              Total revenue ÷ {funnel.signedUp} signup{funnel.signedUp === 1 ? "" : "s"} in this period
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-right">
+            <RevCard
+              label="Subscriptions"
+              value={`RM ${(funnel.subscriptionRevenueCredits / 100).toFixed(2)}`}
+              sub={`${funnel.subscriptionActive} × RM100`}
+            />
+            <RevCard
+              label="Generation markup"
+              value={`RM ${(funnel.markupRevenueCredits / 100).toFixed(2)}`}
+              sub={`${funnel.totalCompletedGenerations} gens`}
+            />
+            <RevCard
+              label="Gross margin"
+              value={`RM ${((funnel.totalRevenueCredits - funnel.providerCostCredits) / 100).toFixed(2)}`}
+              sub={`after RM${(funnel.providerCostCredits / 100).toFixed(2)} provider cost`}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Signups" value={funnel.signedUp.toString()} />
@@ -732,6 +769,16 @@ function KpiCard({ label, value, sublabel }: { label: string; value: string; sub
       <p className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</p>
       <p className="text-xl font-bold text-white mt-1">{value}</p>
       {sublabel && <p className="text-[10px] text-neutral-500 mt-0.5">{sublabel}</p>}
+    </div>
+  );
+}
+
+function RevCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div>
+      <p className="text-[9px] uppercase tracking-wider text-neutral-500">{label}</p>
+      <p className="text-sm font-bold text-white mt-0.5 tabular-nums">{value}</p>
+      <p className="text-[9px] text-neutral-500 mt-0.5">{sub}</p>
     </div>
   );
 }
