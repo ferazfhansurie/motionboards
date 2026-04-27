@@ -3,25 +3,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 
-// Default size + position. Whatever the user drags / resizes to overrides
-// these and gets written to localStorage.
+// Default size. Position is now anchored to the top-right of the viewport
+// permanently (no drag-to-move). Only width/height are user-resizable.
 const DEFAULT_W = 200;
 const DEFAULT_H = 140;
 const MIN_W = 140;
 const MIN_H = 100;
 const MAX_W = 500;
 const MAX_H = 400;
+// Distance from viewport edges (right + top) — clears the floating toolbar.
+const ANCHOR_RIGHT = 12;
+const ANCHOR_TOP = 56;
 // Padding (in canvas coordinates) around the content bounds so items never
 // sit flush against the minimap edge.
 const PAD = 200;
 const STORAGE_KEY = "motionboards_minimap_state";
 
-interface MinimapState {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+interface MinimapState { w: number; h: number }
 
 function loadState(): MinimapState | null {
   if (typeof window === "undefined") return null;
@@ -29,8 +27,8 @@ function loadState(): MinimapState | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (typeof parsed?.x === "number" && typeof parsed?.y === "number" && typeof parsed?.w === "number" && typeof parsed?.h === "number") {
-      return parsed as MinimapState;
+    if (typeof parsed?.w === "number" && typeof parsed?.h === "number") {
+      return { w: parsed.w, h: parsed.h };
     }
   } catch {}
   return null;
@@ -54,15 +52,8 @@ export function Minimap() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Minimap size + on-screen position (both persistable). Default: bottom-left.
-  const [state, setState] = useState<MinimapState>({
-    x: 12,
-    y: 0, // computed after mount, when vp.h is known
-    w: DEFAULT_W,
-    h: DEFAULT_H,
-  });
-  // Hydrate from localStorage once the window dimensions are known so a stale
-  // saved position doesn't end up off-screen after a resize.
+  // Minimap size — position is fixed (top-right anchor), only w/h are persisted.
+  const [state, setState] = useState<MinimapState>({ w: DEFAULT_W, h: DEFAULT_H });
   const hydratedRef = useRef(false);
   useEffect(() => {
     if (hydratedRef.current || vp.w === 0) return;
@@ -70,10 +61,7 @@ export function Minimap() {
     const saved = loadState();
     const w = saved?.w ? Math.min(Math.max(saved.w, MIN_W), MAX_W) : DEFAULT_W;
     const h = saved?.h ? Math.min(Math.max(saved.h, MIN_H), MAX_H) : DEFAULT_H;
-    const defaultY = vp.h - h - 96; // 96px clears the prompt bar
-    const x = saved?.x != null ? Math.min(Math.max(saved.x, 0), vp.w - w) : 12;
-    const y = saved?.y != null ? Math.min(Math.max(saved.y, 0), vp.h - h - 22) : defaultY;
-    setState({ x, y, w, h });
+    setState({ w, h });
   }, [vp.w, vp.h]);
 
   // World-space bounding box: everything the user has on the board PLUS the
@@ -132,69 +120,43 @@ export function Minimap() {
   const [panDragging, setPanDragging] = useState(false);
   useEffect(() => {
     if (!panDragging) return;
-    const move = (e: MouseEvent) => handleJump(e.clientX, e.clientY);
+    const move = (e: PointerEvent) => handleJump(e.clientX, e.clientY);
     const up = () => setPanDragging(false);
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
     return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panDragging, bounds.minX, bounds.minY, scale, zoom, vp.w, vp.h, offsetX, offsetY]);
 
-  // ---- Reposition-via-drag on the header ----
-  const moveRef = useRef<{ startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
-  const [moving, setMoving] = useState(false);
-  useEffect(() => {
-    if (!moving) return;
-    const onMove = (e: MouseEvent) => {
-      const d = moveRef.current;
-      if (!d) return;
-      const dx = e.clientX - d.startClientX;
-      const dy = e.clientY - d.startClientY;
-      const headerH = 22;
-      const nextX = Math.min(Math.max(d.startX + dx, 0), vp.w - state.w);
-      const nextY = Math.min(Math.max(d.startY + dy, 0), vp.h - state.h - headerH);
-      setState((prev) => ({ ...prev, x: nextX, y: nextY }));
-    };
-    const onUp = () => {
-      setMoving(false);
-      moveRef.current = null;
-      setState((prev) => { saveState(prev); return prev; });
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [moving, vp.w, vp.h, state.w, state.h]);
-
-  // ---- Resize-via-drag on the corner handle ----
+  // ---- Resize-via-drag on the bottom-left corner handle ----
+  // Anchored top-right, so dragging the bottom-LEFT corner makes width grow
+  // leftward (negative dx → bigger w) and height grow downward (positive dy).
   const resizeRef = useRef<{ startClientX: number; startClientY: number; startW: number; startH: number } | null>(null);
   const [resizing, setResizing] = useState(false);
   useEffect(() => {
     if (!resizing) return;
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const d = resizeRef.current;
       if (!d) return;
       const dx = e.clientX - d.startClientX;
       const dy = e.clientY - d.startClientY;
-      const nextW = Math.min(Math.max(d.startW + dx, MIN_W), MAX_W);
+      const nextW = Math.min(Math.max(d.startW - dx, MIN_W), MAX_W);
       const nextH = Math.min(Math.max(d.startH + dy, MIN_H), MAX_H);
-      setState((prev) => ({ ...prev, w: nextW, h: nextH }));
+      setState({ w: nextW, h: nextH });
     };
     const onUp = () => {
       setResizing(false);
       resizeRef.current = null;
       setState((prev) => { saveState(prev); return prev; });
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
     return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
   }, [resizing]);
 
@@ -223,7 +185,7 @@ export function Minimap() {
         type="button"
         onClick={toggleCollapse}
         title="Show minimap"
-        style={{ left: state.x, top: state.y + state.h }}
+        style={{ right: ANCHOR_RIGHT, top: ANCHOR_TOP }}
         className={`fixed z-[40] rounded-lg border px-2 py-1 text-[10px] font-semibold shadow-md transition-colors ${
           isDark ? "bg-[#161b22]/90 border-gray-700 text-gray-300 hover:text-white" : "bg-white/90 border-gray-200 text-gray-600 hover:text-[#0d1117]"
         }`}
@@ -238,23 +200,15 @@ export function Minimap() {
       className={`fixed z-[40] rounded-lg border shadow-lg backdrop-blur-md ${
         isDark ? "bg-[#161b22]/90 border-gray-700" : "bg-white/90 border-gray-200"
       }`}
-      style={{ left: state.x, top: state.y, width: state.w + 2, height: state.h + 22 }}
+      style={{ right: ANCHOR_RIGHT, top: ANCHOR_TOP, width: state.w + 2, height: state.h + 22 }}
     >
-      {/* Header — drag it to reposition the minimap. */}
+      {/* Header — fixed in place, no longer draggable. */}
       <div
-        className={`flex items-center justify-between px-2 h-5 text-[9px] uppercase tracking-wider font-black cursor-move ${isDark ? "text-gray-500" : "text-gray-400"}`}
-        onMouseDown={(e) => {
-          // Don't start a move when clicking the close button itself.
-          if ((e.target as HTMLElement).closest("[data-mm-nodrag]")) return;
-          e.preventDefault();
-          moveRef.current = { startClientX: e.clientX, startClientY: e.clientY, startX: state.x, startY: state.y };
-          setMoving(true);
-        }}
+        className={`flex items-center justify-between px-2 h-5 text-[9px] uppercase tracking-wider font-black ${isDark ? "text-gray-500" : "text-gray-400"}`}
       >
         <span>Minimap</span>
         <button
           type="button"
-          data-mm-nodrag
           onClick={toggleCollapse}
           title="Hide minimap"
           className={`leading-none ${isDark ? "hover:text-white" : "hover:text-[#0d1117]"}`}
@@ -267,7 +221,7 @@ export function Minimap() {
         ref={mapRef}
         className={`relative cursor-crosshair select-none ${isDark ? "bg-[#0d1117]" : "bg-gray-50"}`}
         style={{ width: state.w, height: state.h, margin: "0 1px" }}
-        onMouseDown={(e) => {
+        onPointerDown={(e) => {
           e.preventDefault();
           handleJump(e.clientX, e.clientY);
           setPanDragging(true);
@@ -316,18 +270,19 @@ export function Minimap() {
           }}
         />
 
-        {/* Corner resize grip — drag to resize. */}
+        {/* Bottom-LEFT resize grip — drag to grow leftward + downward. */}
         <div
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             e.preventDefault();
-            e.stopPropagation(); // don't start a pan-drag
+            e.stopPropagation();
+            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
             resizeRef.current = { startClientX: e.clientX, startClientY: e.clientY, startW: state.w, startH: state.h };
             setResizing(true);
           }}
           title="Drag to resize"
-          className="absolute bottom-0 right-0 h-3 w-3 cursor-nwse-resize"
+          className="absolute bottom-0 left-0 h-4 w-4 cursor-nesw-resize touch-none"
           style={{
-            background: `linear-gradient(135deg, transparent 0%, transparent 50%, ${isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)"} 50%, ${isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)"} 100%)`,
+            background: `linear-gradient(45deg, transparent 0%, transparent 50%, ${isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)"} 50%, ${isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)"} 100%)`,
           }}
         />
       </div>
