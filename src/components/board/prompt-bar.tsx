@@ -1373,8 +1373,8 @@ export function PromptBar() {
               ))}
             </div>
 
-            {/* Need help / WhatsApp us */}
-            <div className="flex items-center justify-center mt-5">
+            {/* Need help / WhatsApp us / Visit website */}
+            <div className="flex items-center justify-center gap-2 mt-5 flex-wrap">
               <a
                 href="https://wa.me/60112167672?text=Hi%2C%20I%20need%20help%20with%20MotionBoards%20%F0%9F%91%8B"
                 target="_blank"
@@ -1383,6 +1383,19 @@ export function PromptBar() {
               >
                 <MessageCircle className="h-3.5 w-3.5" fill="currentColor" />
                 WhatsApp us
+              </a>
+              <a
+                href="https://adleticagency.com/motionboards-ai-video-software"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-3.5 py-2 rounded-full border transition-colors ${
+                  isDark
+                    ? "border-gray-700 text-gray-300 bg-[#161b22] hover:border-[#f26522] hover:text-[#f26522] active:opacity-70"
+                    : "border-gray-200 text-gray-600 bg-white hover:border-[#f26522] hover:text-[#f26522] active:opacity-70"
+                }`}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                Visit website
               </a>
             </div>
           </div>
