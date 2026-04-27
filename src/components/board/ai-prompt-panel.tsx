@@ -457,9 +457,16 @@ export function AIPromptPanel() {
   useEffect(() => {
     if (!isAIPromptOpen) return;
     const onPaste = (e: ClipboardEvent) => {
-      // Skip if the event came from the textarea itself — handled by onPaste prop
-      // Skip if the event came from any of our own inputs — they have their
-      // own onPaste handlers. Otherwise we'd double-attach.
+      // Skip if the focused element is one of our own inputs — they have
+      // their own onPaste handlers. e.target may be a Text node which has no
+      // isContentEditable, so check document.activeElement (where paste lands).
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLInputElement ||
+        active?.isContentEditable
+      ) return;
+      // Same fallback for e.target in case activeElement is null
       const t = e.target as HTMLElement | null;
       if (t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement || t?.isContentEditable) return;
       const items = Array.from(e.clipboardData?.items || []);
