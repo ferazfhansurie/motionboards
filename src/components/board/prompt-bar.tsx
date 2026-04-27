@@ -24,6 +24,7 @@ import { importBoardFromFile, ImportCancelled } from "@/lib/board-io";
 import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
 import { askConfirm, askPrompt, showToast } from "@/lib/ui-store";
+import { fbqTrack } from "@/components/analytics/meta-pixel";
 import { Pencil, MessageCircle } from "lucide-react";
 
 function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>): string {
@@ -1379,6 +1380,7 @@ export function PromptBar() {
                 href="https://wa.me/60112167672?text=Hi%2C%20I%20need%20help%20with%20MotionBoards%20%F0%9F%91%8B"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => fbqTrack("Lead", { content_name: "WhatsApp us — empty hero" })}
                 className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3.5 py-2 rounded-full border border-[#25D366]/40 text-[#25D366] bg-[#25D366]/5 hover:bg-[#25D366]/10 active:bg-[#25D366]/15 transition-colors"
               >
                 <MessageCircle className="h-3.5 w-3.5" fill="currentColor" />

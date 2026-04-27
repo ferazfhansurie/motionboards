@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/layout/providers";
+import { MetaPixel } from "@/components/analytics/meta-pixel";
 
 const SITE_URL = "https://motionboards.vercel.app";
 const SITE_NAME = "MotionBoards";
@@ -141,6 +142,7 @@ export default function RootLayout({
             }),
           }}
         />
+        <MetaPixel />
         <Providers>
           {children}
         </Providers>
