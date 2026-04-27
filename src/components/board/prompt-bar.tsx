@@ -1061,6 +1061,20 @@ export function PromptBar() {
   // current viewport center, then uploads to R2 in the background. Mobile-
   // friendly equivalent of dragging or pasting a file.
   const heroFileInputRef = useRef<HTMLInputElement>(null);
+  const heroRefInputRef = useRef<HTMLInputElement>(null);
+  // Same as handleHeroFilePick, but also flags the resulting item as an input
+  // reference so the model uses it (i2i / i2v / referenced generation).
+  const handleHeroRefPick = async (file: File) => {
+    const beforeIds = useAppStore.getState().items.map((i) => i.id);
+    await handleHeroFilePick(file);
+    // Whatever new item appeared on the canvas as a result is the one we want
+    // to register as an inputRef.
+    const afterItems = useAppStore.getState().items;
+    const newItem = afterItems.find((i) => !beforeIds.includes(i.id));
+    if (newItem) {
+      useAppStore.setState((s) => ({ inputRefs: [...s.inputRefs, newItem.id] }));
+    }
+  };
   const handleHeroFilePick = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       showToast(`Only images supported here — got ${file.type || "unknown"}`, { kind: "error" });
@@ -1198,34 +1212,57 @@ export function PromptBar() {
                 className={`w-full backdrop-blur-md text-sm placeholder-gray-400 border-2 rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] focus:ring-4 focus:ring-[#f26522]/10 shadow-xl px-5 pt-4 pb-14 resize-none leading-5 ${isDark ? "bg-[#161b22] text-white border-gray-700" : "bg-white text-[#0d1117] border-gray-200"}`}
                 style={{ height: 120 }}
               />
+              {/* Reference thumbnails — show what's currently attached to the prompt */}
+              {refItems.length > 0 && (
+                <div className="absolute top-3 left-4 right-4 flex flex-wrap gap-1.5 pointer-events-none">
+                  {refItems.map((it, i) => (
+                    <div key={it.id} className="relative group/heroRef pointer-events-auto">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={it.outputUrl || it.src}
+                        alt={`ref ${i + 1}`}
+                        className={`h-9 w-9 rounded-md object-cover border ${isDark ? "border-gray-700" : "border-gray-300"}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => useAppStore.setState({ inputRefs: inputRefs.filter((id) => id !== it.id) })}
+                        className="absolute -top-1 -right-1 bg-neutral-800 rounded-full p-0.5 text-neutral-300 hover:text-white opacity-100 active:opacity-50 transition-opacity"
+                        title="Remove reference"
+                      >
+                        <X className="h-2 w-2" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Bottom row inside textarea */}
               <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  {/* Add image — tap-friendly upload (mobile gets a real
-                      button instead of having to drag/paste). */}
+                  {/* Reference image — uploads & adds the file as an input
+                      reference for the model (i2i / i2v / referenced gen). */}
                   <input
-                    ref={heroFileInputRef}
+                    ref={heroRefInputRef}
                     type="file"
                     accept="image/*"
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (f) handleHeroFilePick(f);
+                      if (f) handleHeroRefPick(f);
                       e.target.value = "";
                     }}
                   />
                   <button
                     type="button"
-                    onClick={() => heroFileInputRef.current?.click()}
-                    title="Add image to canvas"
-                    className={`flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-medium transition-colors ${
+                    onClick={() => heroRefInputRef.current?.click()}
+                    title="Add reference image to prompt"
+                    className={`flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-medium transition-colors active:opacity-70 ${
                       isDark
                         ? "text-gray-300 hover:text-[#f26522] hover:bg-white/5"
                         : "text-gray-500 hover:text-[#f26522] hover:bg-gray-100"
                     }`}
                   >
                     <ImagePlus className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Image</span>
+                    <span className="hidden sm:inline">Reference</span>
                   </button>
                   {selectedModel && (
                     <span className={`text-[10px] px-2 py-0.5 rounded-full truncate ${isDark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
@@ -1252,6 +1289,36 @@ export function PromptBar() {
             {/* Model generation options */}
             <div className="flex justify-center">
               {renderOptionPills()}
+            </div>
+
+            {/* Upload to canvas — separate from the in-chat reference button:
+                this drops the image as a regular board item without flagging
+                it as an input ref for the model. */}
+            <div className="flex justify-center mt-3">
+              <input
+                ref={heroFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleHeroFilePick(f);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => heroFileInputRef.current?.click()}
+                title="Upload an image directly to the canvas"
+                className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[11px] font-medium border transition-colors active:opacity-70 ${
+                  isDark
+                    ? "text-gray-300 border-gray-700 bg-[#161b22] hover:border-[#f26522] hover:text-[#f26522]"
+                    : "text-gray-600 border-gray-200 bg-white hover:border-[#f26522] hover:text-[#f26522]"
+                }`}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Upload to canvas
+              </button>
             </div>
 
             {/* Other boards — quick switcher when canvas is empty. Skips the
