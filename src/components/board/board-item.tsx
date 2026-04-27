@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
-import { useInViewport } from "@/lib/use-in-viewport";
 import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
 import { askShareToCommunity, pickFolder, showToast, updateToast } from "@/lib/ui-store";
@@ -182,7 +181,11 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const inView = useInViewport(containerRef, "400px");
+  // No IntersectionObserver gate — the canvas-level viewport culling
+  // (25-item cap on mobile, 200 on desktop) already limits how many
+  // <video> elements exist, and IntersectionObserver inside CSS-transformed
+  // parents is unreliable on mobile Safari (videos got stuck "Loading…").
+  const inView = true;
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -242,11 +245,10 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Mobile Safari OOM-kills tabs with too many decoded video elements.
-  // Mount the <video> only when the item is in/near the viewport. Once
-  // it's been seen we keep it mounted while it stays nearby — preventing
-  // remount-flicker on small scroll wobbles.
-  const inView = useInViewport(containerRef, "400px");
+  // No IntersectionObserver gate — see UploadedVideoPreview comment.
+  // Canvas-level culling (25 cap on mobile) caps the <video> count;
+  // IntersectionObserver inside transforms doesn't fire reliably on iOS.
+  const inView = true;
 
   // Click toggles play. While playing: native browser controls visible
   // and audio unmuted. Mousedown is swallowed during playback so the user
