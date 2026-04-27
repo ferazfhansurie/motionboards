@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, finalizeGeneration, getUserFromToken, deductCredits, putFile } from "@/lib/db";
+import { getSettings, finalizeGeneration, getUserFromToken, putFile, chargeForGeneration } from "@/lib/db";
 import { models } from "@/lib/models";
 import { downloadOutput, getHistoryOutputs, getJobStatus, pickOutputFile } from "@/lib/comfy";
 
@@ -143,10 +143,8 @@ export async function GET(req: NextRequest) {
               outputUrl = videoUri || "";
             }
 
-            const modelInfo = models.find((m) => m.id === modelId);
-            const actualCreditCost = modelInfo?.creditCost || 0;
-            const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
-            await deductCredits(user.id, actualCreditCost);
+            const charge = await chargeForGeneration({ userId: user.id, generationId, modelId });
+            const costDisplay = `RM${(charge.totalCredits / 100).toFixed(2)}`;
             await finalizeGeneration(generationId, { status: "completed", outputUrl });
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
           }
@@ -203,10 +201,8 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ status: "failed", error: "Failed to download video from OpenAI" });
           }
 
-          const modelInfo = models.find((m) => m.id === modelId);
-          const actualCreditCost = modelInfo?.creditCost || 0;
-          const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
-          await deductCredits(user.id, actualCreditCost);
+          const charge = await chargeForGeneration({ userId: user.id, generationId, modelId });
+          const costDisplay = `RM${(charge.totalCredits / 100).toFixed(2)}`;
           await finalizeGeneration(generationId, { status: "completed", outputUrl });
           return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
         }
@@ -265,10 +261,8 @@ export async function GET(req: NextRequest) {
             console.error("Failed to re-host Ark video:", dlErr);
           }
 
-          const modelInfo = models.find((m) => m.id === modelId);
-          const actualCreditCost = modelInfo?.creditCost || 0;
-          const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
-          await deductCredits(user.id, actualCreditCost);
+          const charge = await chargeForGeneration({ userId: user.id, generationId, modelId });
+          const costDisplay = `RM${(charge.totalCredits / 100).toFixed(2)}`;
           await finalizeGeneration(generationId, { status: "completed", outputUrl });
           return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
         }
@@ -342,10 +336,8 @@ export async function GET(req: NextRequest) {
               // Fall back to the raw Replicate URL
             }
 
-            const modelInfo = models.find((m) => m.id === modelId);
-            const actualCreditCost = modelInfo?.creditCost || 0;
-            const costDisplay = `RM${(actualCreditCost / 100).toFixed(2)}`;
-            await deductCredits(user.id, actualCreditCost);
+            const charge = await chargeForGeneration({ userId: user.id, generationId, modelId });
+            const costDisplay = `RM${(charge.totalCredits / 100).toFixed(2)}`;
             await finalizeGeneration(generationId, { status: "completed", outputUrl });
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
           }
@@ -420,8 +412,7 @@ export async function GET(req: NextRequest) {
           const { id: fileId } = await putFile(buffer, mimeType, user.id);
           const outputUrl = `${req.nextUrl.origin}/api/files/${fileId}`;
 
-          const modelInfo = models.find((m) => m.id === modelId);
-          if (modelInfo) await deductCredits(user.id, modelInfo.creditCost);
+          await chargeForGeneration({ userId: user.id, generationId, modelId });
           await finalizeGeneration(generationId, { status: "completed", outputUrl });
           return NextResponse.json({ status: "completed", outputUrl });
         }

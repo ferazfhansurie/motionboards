@@ -151,6 +151,58 @@ export async function deductCredits(userId: string, amount: number): Promise<boo
   return rows.length > 0;
 }
 
+// Lazy migration for the per-charge audit columns. Called from
+// chargeForGeneration before its first write each cold start.
+let chargeColumnsEnsured = false;
+async function ensureChargeColumns() {
+  if (chargeColumnsEnsured) return;
+  await sql`ALTER TABLE mb_generations ADD COLUMN IF NOT EXISTS actual_cost_credits INTEGER`;
+  await sql`ALTER TABLE mb_generations ADD COLUMN IF NOT EXISTS markup_credits INTEGER`;
+  chargeColumnsEnsured = true;
+}
+
+// Charge the user for a successful generation. Looks up the actual cost via
+// the pricing module, adds the platform markup, deducts in one DB write,
+// and records the breakdown on the generation row for audit.
+//
+// Returns the totalCredits actually deducted, or 0 if the user couldn't
+// afford it (which shouldn't happen — the pre-flight check should catch
+// that — but we don't want to crash if someone races their balance to zero).
+export async function chargeForGeneration(opts: {
+  userId: string;
+  generationId: string;
+  modelId: string;
+  providerCostUsd?: number;
+  durationSec?: number;
+  hasAudio?: boolean;
+  resolution?: string;
+}): Promise<{ totalCredits: number; providerCredits: number; markupCredits: number }> {
+  // Lazy-import to avoid a top-level cycle (pricing imports models, db is
+  // imported by routes that also import models).
+  const { computeCharge } = await import("@/lib/pricing");
+  const charge = computeCharge(opts);
+  await ensureChargeColumns();
+  const ok = await deductCredits(opts.userId, charge.totalCredits);
+  if (!ok) {
+    // Negative-balance guard: don't write the breakdown if we couldn't
+    // actually pull the funds. The caller should already have validated
+    // affordability up front; this is just belt-and-braces.
+    return { totalCredits: 0, providerCredits: 0, markupCredits: 0 };
+  }
+  await sql`
+    UPDATE mb_generations
+    SET credit_cost = ${charge.totalCredits},
+        actual_cost_credits = ${charge.providerCredits},
+        markup_credits = ${charge.markupCredits}
+    WHERE id = ${opts.generationId}
+  `;
+  return {
+    totalCredits: charge.totalCredits,
+    providerCredits: charge.providerCredits,
+    markupCredits: charge.markupCredits,
+  };
+}
+
 export async function getUserCredits(userId: string): Promise<number> {
   const rows = await sql`SELECT credits FROM mb_users WHERE id = ${userId}`;
   return rows.length > 0 ? (rows[0].credits as number) : 0;
@@ -312,7 +364,9 @@ export interface Generation {
   template?: string | null;
   params?: string | null;
   error?: string | null;
-  creditCost?: number;
+  creditCost?: number;          // Total deducted (provider + markup)
+  actualCostCredits?: number;   // Provider's portion only
+  markupCredits?: number;       // Platform markup
   createdAt: string;
   updatedAt: string;
 }
@@ -334,6 +388,8 @@ function rowToGeneration(row: Record<string, unknown>): Generation {
     params: row.params as string | null,
     error: row.error as string | null,
     creditCost: row.credit_cost as number,
+    actualCostCredits: row.actual_cost_credits as number | undefined,
+    markupCredits: row.markup_credits as number | undefined,
     createdAt: (row.created_at as Date).toISOString(),
     updatedAt: (row.updated_at as Date).toISOString(),
   };

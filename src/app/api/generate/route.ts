@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, createGeneration, finalizeGeneration, getUserFromToken, deductCredits, putFile, getFile } from "@/lib/db";
+import { getSettings, createGeneration, finalizeGeneration, getUserFromToken, putFile, getFile, chargeForGeneration } from "@/lib/db";
+import { estimateChargeForModel } from "@/lib/pricing";
 import { models } from "@/lib/models";
 import { submitPrompt, uploadFromUrl } from "@/lib/comfy";
 import wanAnimatePoseWorkflow from "@/lib/comfy-workflows/wan-animate-pose.json";
@@ -107,8 +108,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check credits
-    const creditCost = modelInfo.creditCost;
+    // Pre-flight affordability check using the estimate (provider cost + markup).
+    // Actual deduction happens AFTER the generation succeeds via chargeForGeneration.
+    const creditCost = estimateChargeForModel(modelId);
     if (!user.credits || user.credits <= 0) return NextResponse.json({ error: "No credits. Please top up." }, { status: 402 });
     if (user.credits < creditCost) {
       return NextResponse.json({ error: `Insufficient credits. ${modelInfo.name} costs RM${(creditCost / 100).toFixed(2)}. You have RM${(user.credits / 100).toFixed(2)}.` }, { status: 402 });
@@ -310,7 +312,7 @@ export async function POST(req: NextRequest) {
 
         const buffer = Buffer.from(b64, "base64");
         const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "image/png", user.id);
-        await deductCredits(user.id, creditCost);
+        await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
         await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
       } catch (oaiErr) {
@@ -340,7 +342,7 @@ export async function POST(req: NextRequest) {
         const b64 = await segRes.text();
         const buffer = Buffer.from(b64, "base64");
         const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "image/png", user.id);
-        await deductCredits(user.id, creditCost);
+        await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
         await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({
           generationId: generation.id,
@@ -527,7 +529,7 @@ export async function POST(req: NextRequest) {
         const buffer = Buffer.from(imageBase64, "base64");
         const outputUrl = await storeOutput(req.nextUrl.origin, buffer, imageMime, user.id);
 
-        await deductCredits(user.id, creditCost);
+        await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
         await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({
           generationId: generation.id,
@@ -575,7 +577,7 @@ export async function POST(req: NextRequest) {
         });
         const buffer = Buffer.from(await speech.arrayBuffer());
         const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "audio/mpeg", user.id);
-        await deductCredits(user.id, creditCost);
+        await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
         await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
       } catch (ttsErr) {
@@ -648,7 +650,7 @@ export async function POST(req: NextRequest) {
           headers: { "Authorization": `Bearer ${settings.fishApiKey}` },
         }).catch(() => {});
 
-        await deductCredits(user.id, creditCost);
+        await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
         await finalizeGeneration(generation.id, { status: "completed", outputUrl });
         return NextResponse.json({
           generationId: generation.id,
