@@ -180,12 +180,10 @@ const loadedImageCache = new Set<string>();
 function UploadedVideoPreview({ src, height }: { src: string; height?: number }) {
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  // No IntersectionObserver gate — the canvas-level viewport culling
-  // (25-item cap on mobile, 200 on desktop) already limits how many
-  // <video> elements exist, and IntersectionObserver inside CSS-transformed
-  // parents is unreliable on mobile Safari (videos got stuck "Loading…").
-  const inView = true;
+  // iOS: kick off metadata load explicitly when src arrives.
+  useEffect(() => {
+    try { videoRef.current?.load(); } catch { /* ignore */ }
+  }, [src]);
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -200,36 +198,28 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
   };
 
   return (
-    <div ref={containerRef} className="relative" style={{ height }}>
-      {inView ? (
-        <video
-          ref={videoRef}
-          src={src}
-          className="h-full w-full object-cover"
-          muted={!playing}
-          loop
-          playsInline
-          controls={playing}
-          preload="metadata"
-          draggable={false}
-          onContextMenu={(e) => e.preventDefault()}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
-        />
-      ) : (
-        <div className="h-full w-full bg-gray-800/50 flex items-center justify-center">
-          <Play className="h-6 w-6 text-gray-600" fill="currentColor" />
-        </div>
-      )}
-      {inView && !playing && (
-        // Small corner play button only — leaves the rest of the video
-        // surface free for drag/select.
+    <div className="relative" style={{ height }}>
+      <video
+        ref={videoRef}
+        src={src}
+        className="h-full w-full object-cover"
+        muted={!playing}
+        loop
+        playsInline
+        controls={playing}
+        preload="metadata"
+        draggable={false}
+        onContextMenu={(e) => e.preventDefault()}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
+      />
+      {!playing && (
         <button
           type="button"
           onClick={togglePlay}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute bottom-2 right-2 rounded-full bg-black/70 hover:bg-black/90 transition-colors p-1.5 z-[2]"
+          className="absolute bottom-2 right-2 rounded-full bg-black/70 hover:bg-black/90 active:bg-black transition-colors p-1.5 z-[2]"
           aria-label="Play video"
           title="Play"
         >
@@ -243,16 +233,23 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
 function GeneratedVideo({ item }: { item: BoardItem }) {
   const [loaded, setLoaded] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [errored, setErrored] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  // No IntersectionObserver gate — see UploadedVideoPreview comment.
-  // Canvas-level culling (25 cap on mobile) caps the <video> count;
-  // IntersectionObserver inside transforms doesn't fire reliably on iOS.
-  const inView = true;
 
-  // Click toggles play. While playing: native browser controls visible
-  // and audio unmuted. Mousedown is swallowed during playback so the user
-  // can scrub the timeline without the canvas treating it as a drag.
+  // iOS Safari is lazy about loading video metadata — explicit .load() kicks it
+  // off, and we listen on loadedmetadata (fires earlier than loadeddata).
+  // Also: a 4s safety timer flips the placeholder away even if neither event
+  // fires, so the user gets a play button instead of a perpetual spinner.
+  useEffect(() => {
+    setLoaded(false);
+    setErrored(false);
+    const v = videoRef.current;
+    if (!v) return;
+    try { v.load(); } catch { /* ignore */ }
+    const t = setTimeout(() => setLoaded(true), 4000);
+    return () => clearTimeout(t);
+  }, [item.outputUrl]);
+
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     const v = videoRef.current;
@@ -267,54 +264,50 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
 
   return (
     <div
-      ref={containerRef}
       className="relative"
       style={{ minHeight: loaded ? undefined : item.height || 120 }}
     >
-      {!loaded && inView && (
+      {!loaded && !errored && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-[1]">
           <Loader2 className="h-5 w-5 text-[#f26522] animate-spin" />
           <p className="text-[10px] text-gray-400">Loading video...</p>
         </div>
       )}
-      {inView ? (
-        <video
-          ref={videoRef}
-          src={item.outputUrl}
-          className={`w-full block ${loaded ? "" : "opacity-0"}`}
-          muted={!playing}
-          loop
-          playsInline
-          controls={playing}
-          preload="metadata"
-          draggable={false}
-          onContextMenu={(e) => e.preventDefault()}
-          onLoadedData={() => setLoaded(true)}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          // Stop drag from firing only while the user is actively interacting
-          // with controls (playing). When paused, mousedown propagates so the
-          // user can drag the item by grabbing the video surface.
-          onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
-        />
-      ) : (
-        // Off-screen placeholder — keeps layout stable, costs zero memory.
-        <div
-          className="w-full bg-gray-800/50 flex items-center justify-center"
-          style={{ height: item.height || 120 }}
-        >
-          <Play className="h-6 w-6 text-gray-600" fill="currentColor" />
+      {errored && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 z-[1] p-2">
+          <AlertCircle className="h-5 w-5 text-red-400" />
+          <p className="text-[10px] text-red-400 text-center">Video failed to load</p>
+          <button
+            className="text-[10px] text-[#f26522] active:opacity-50"
+            onClick={(e) => { e.stopPropagation(); setErrored(false); setLoaded(false); videoRef.current?.load(); }}
+          >Retry</button>
         </div>
       )}
-      {inView && loaded && !playing && (
-        // Small corner play button only — leaves the rest of the video
-        // surface free for drag/select. Stops propagation so clicking
-        // the button itself doesn't also kick off a drag.
+      <video
+        ref={videoRef}
+        src={item.outputUrl}
+        className={`w-full block ${loaded && !errored ? "" : "opacity-0"}`}
+        muted={!playing}
+        loop
+        playsInline
+        controls={playing}
+        preload="metadata"
+        draggable={false}
+        onContextMenu={(e) => e.preventDefault()}
+        onLoadedMetadata={() => setLoaded(true)}
+        onLoadedData={() => setLoaded(true)}
+        onCanPlay={() => setLoaded(true)}
+        onError={() => setErrored(true)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
+      />
+      {loaded && !errored && !playing && (
         <button
           type="button"
           onClick={togglePlay}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute bottom-2 right-2 rounded-full bg-black/70 hover:bg-black/90 transition-colors p-1.5 z-[2]"
+          className="absolute bottom-2 right-2 rounded-full bg-black/70 hover:bg-black/90 active:bg-black transition-colors p-1.5 z-[2]"
           aria-label="Play video"
           title="Play"
         >
