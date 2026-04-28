@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import {
   WandSparkles,
   Loader2,
@@ -1206,22 +1206,30 @@ export function PromptBar() {
   };
 
   // Empty-canvas backdrop. Two layers:
-  //   1. heroStencilText — big outlined uppercase model names splattered
-  //      around the viewport. Mix of orange and muted-gray strokes,
-  //      transparent fill ("text-stroke"). Same stencil treatment as the
-  //      adleticagency landing page's "+ MODELS · 16+ WORKFLOWS" section.
+  //   1. heroBigText — two horizontal marquee rows matching the
+  //      adleticagency landing page's bigtext block. Top row is the stat
+  //      line ("7+ MODELS · 16+ WORKFLOWS · …") with solid muted fill.
+  //      Bottom row is the model lineup ("SORA · VEO · KLING · …")
+  //      rendered as stencil outlines (text-stroke only, transparent
+  //      fill), alternating brand orange and muted gray. Same CSS tokens
+  //      as WaitlistPage.css `.mb-bigtext-row`.
   //   2. heroImages — sample renders in the corners + mid-edges, each
   //      labelled with the same stencil style above it. Eight slots
   //      (h1–h8) to fill the background without crowding the centre.
-  // Both layers sit behind the prompt UI (z-10) and use very low opacity
-  // so the headline + prompt + pills stay the focal point.
-  const heroStencilText = [
-    { text: "SORA",       x: "3%",   y: "8%",   size: 110, accent: true,  delay: 0.05 },
-    { text: "VEO",        x: "62%",  y: "5%",   size: 140, accent: false, delay: 0.10 },
-    { text: "KLING",      x: "1%",   y: "44%",  size: 92,  accent: false, delay: 0.15 },
-    { text: "HAILUO",     x: "78%",  y: "44%",  size: 96,  accent: true,  delay: 0.20 },
-    { text: "FLUX",       x: "30%",  y: "85%",  size: 78,  accent: false, delay: 0.25 },
-    { text: "SEEDANCE",   x: "55%",  y: "84%",  size: 88,  accent: true,  delay: 0.30 },
+  // Both layers sit behind the prompt UI (z-10) at very low contrast so
+  // the headline + prompt + pills stay the focal point.
+  const heroStatPhrases = ["7+ MODELS", "16+ WORKFLOWS", "5× CHEAPER", "TOP UP & GENERATE"];
+  // accent flag toggles per-span — matches `.row2 span.accent` rule on
+  // the source: every other model gets the orange stencil stroke.
+  const heroModelTokens: { text: string; accent: boolean }[] = [
+    { text: "SORA",        accent: true  },
+    { text: "VEO",         accent: false },
+    { text: "KLING",       accent: true  },
+    { text: "SEEDANCE",    accent: false },
+    { text: "HAILUO",      accent: true  },
+    { text: "WAN",         accent: false },
+    { text: "NANO BANANA", accent: true  },
+    { text: "FLUX",        accent: false },
   ];
 
   const heroImages = [
@@ -1241,34 +1249,95 @@ export function PromptBar() {
   if (isCanvasEmpty) {
     return (
       <>
-        {/* Editorial decoration — sample renders + big stenciled model
-            names in the background. Two layers, stenciled labels match
-            the adleticagency landing page treatment (text-stroke only,
-            transparent fill). */}
+        {/* Editorial decoration — two horizontal marquee rows of big
+            uppercase text (matches adleticagency landing page's
+            .mb-bigtext block exactly) plus eight sample renders around
+            the edges. Both layers sit behind the prompt UI. */}
         <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-          {/* Layer 1: big stenciled model names. Sit furthest back (z-0)
-              so the image cards above can read clearly. */}
-          {heroStencilText.map((s, i) => (
+          {/* Layer 1a: top row — solid muted stat phrases, orange
+              bullets between. Slow leftward scroll. */}
+          <div
+            className="absolute left-0 right-0 overflow-hidden"
+            style={{ top: "6%", transform: "rotate(-1.5deg)" }}
+          >
             <div
-              key={`stencil-${i}`}
-              className="absolute opacity-0 select-none whitespace-nowrap font-black tracking-tight uppercase"
+              className="flex items-center gap-8 whitespace-nowrap"
               style={{
-                left: s.x,
-                top: s.y,
-                fontSize: s.size,
-                lineHeight: 0.9,
-                letterSpacing: "-0.02em",
-                color: "transparent",
-                WebkitTextStroke: s.accent
-                  ? `2px ${isDark ? "rgba(242,101,34,0.35)" : "rgba(242,101,34,0.30)"}`
-                  : `2px ${isDark ? "rgba(255,255,255,0.10)" : "rgba(13,17,23,0.12)"}`,
-                animation: `heroStencilIn 0.8s ease-out ${s.delay}s forwards`,
-                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                width: "max-content",
+                animation: "mbMarqueeLeft 60s linear infinite",
               }}
             >
-              {s.text}
+              {/* Doubled content keeps the loop seamless. */}
+              {[0, 1].map((dup) => (
+                <Fragment key={dup}>
+                  {heroStatPhrases.map((p, i) => (
+                    <Fragment key={`stat-${dup}-${i}`}>
+                      <span
+                        className="font-black uppercase select-none"
+                        style={{
+                          fontSize: "clamp(2.5rem, 7vw, 6rem)",
+                          letterSpacing: "-0.04em",
+                          lineHeight: 1,
+                          color: isDark ? "rgba(255,255,255,0.06)" : "rgba(13,17,23,0.06)",
+                        }}
+                      >
+                        {p}
+                      </span>
+                      <span
+                        className="font-black select-none"
+                        style={{
+                          fontSize: "clamp(1.5rem, 4vw, 3rem)",
+                          color: "#f26522",
+                          opacity: 0.55,
+                        }}
+                      >
+                        •
+                      </span>
+                    </Fragment>
+                  ))}
+                </Fragment>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Layer 1b: bottom row — stenciled model names. Same speed
+              other direction so the two rows feel coupled. */}
+          <div
+            className="absolute left-0 right-0 overflow-hidden"
+            style={{ bottom: "5%", transform: "rotate(-1.5deg)" }}
+          >
+            <div
+              className="flex items-center gap-10 whitespace-nowrap"
+              style={{
+                width: "max-content",
+                animation: "mbMarqueeRight 65s linear infinite",
+              }}
+            >
+              {[0, 1].map((dup) => (
+                <Fragment key={dup}>
+                  {heroModelTokens.map((m, i) => (
+                    <span
+                      key={`model-${dup}-${i}`}
+                      className="font-black uppercase select-none"
+                      style={{
+                        fontSize: "clamp(2.5rem, 7vw, 6rem)",
+                        letterSpacing: "-0.04em",
+                        lineHeight: 1,
+                        color: m.accent
+                          ? "transparent"
+                          : (isDark ? "rgba(255,255,255,0.04)" : "rgba(13,17,23,0.04)"),
+                        WebkitTextStroke: m.accent
+                          ? "2px rgba(242,101,34,0.30)"
+                          : `1px ${isDark ? "rgba(255,255,255,0.10)" : "rgba(13,17,23,0.10)"}`,
+                      }}
+                    >
+                      {m.text}
+                    </span>
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+          </div>
 
           {/* Layer 2: sample-render cards with stenciled labels above. */}
           {heroImages.map((img, i) => (
@@ -1308,8 +1377,12 @@ export function PromptBar() {
             </div>
           ))}
           <style>{`
-            @keyframes heroFadeIn   { from { opacity: 0; } to { opacity: 0.55; } }
-            @keyframes heroStencilIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes heroFadeIn { from { opacity: 0; } to { opacity: 0.55; } }
+            @keyframes mbMarqueeLeft  { from { transform: translateX(0); }       to { transform: translateX(-50%); } }
+            @keyframes mbMarqueeRight { from { transform: translateX(-50%); }    to { transform: translateX(0); } }
+            @media (prefers-reduced-motion: reduce) {
+              [style*="mbMarqueeLeft"], [style*="mbMarqueeRight"] { animation: none !important; }
+            }
           `}</style>
         </div>
 
