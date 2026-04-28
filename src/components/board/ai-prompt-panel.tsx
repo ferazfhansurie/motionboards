@@ -833,32 +833,44 @@ export function AIPromptPanel() {
   const dispatchTool = async (
     toolUse: { id: string; name: string; input: Record<string, unknown> },
   ): Promise<MessagePart> => {
-    if (toolUse.name === "start_generation") {
-      const input = toolUse.input;
-      const result = await runAgentGeneration({
-        modelId: input.model_id as string,
-        prompt: input.prompt as string,
-        options: (input.options as Record<string, unknown>) || {},
-        inputImageUrl: input.input_image_url as string | undefined,
-        inputVideoUrl: input.input_video_url as string | undefined,
-      });
-      const isError = !!result.error;
-      const summary = isError
-        ? `Generation failed: ${result.error}`
-        : `Generation succeeded. Output URL: ${result.outputUrl}. The card is on the user's canvas (item ${result.itemId}, model: ${result.modelName}). Briefly tell the user how it went and suggest a useful next step (e.g. animate it, generate variations, change style).`;
+    try {
+      if (toolUse.name === "start_generation") {
+        const input = toolUse.input;
+        const result = await runAgentGeneration({
+          modelId: input.model_id as string,
+          prompt: input.prompt as string,
+          options: (input.options as Record<string, unknown>) || {},
+          inputImageUrl: input.input_image_url as string | undefined,
+          inputVideoUrl: input.input_video_url as string | undefined,
+        });
+        const isError = !!result.error;
+        const summary = isError
+          ? `Generation failed: ${result.error}`
+          : `Generation succeeded. Output URL: ${result.outputUrl}. The card is on the user's canvas (item ${result.itemId}, model: ${result.modelName}). Briefly tell the user how it went and suggest a useful next step (e.g. animate it, generate variations, change style).`;
+        return {
+          type: "tool_result",
+          tool_use_id: toolUse.id,
+          content: summary,
+          is_error: isError,
+        };
+      }
       return {
         type: "tool_result",
         tool_use_id: toolUse.id,
-        content: summary,
-        is_error: isError,
+        content: `Unknown tool: ${toolUse.name}`,
+        is_error: true,
+      };
+    } catch (err) {
+      // Tool execution must NEVER throw out of dispatchTool — that would
+      // unwind the handleSend loop and could crash the panel render.
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        type: "tool_result",
+        tool_use_id: toolUse.id,
+        content: `Tool ${toolUse.name} threw: ${msg}`,
+        is_error: true,
       };
     }
-    return {
-      type: "tool_result",
-      tool_use_id: toolUse.id,
-      content: `Unknown tool: ${toolUse.name}`,
-      is_error: true,
-    };
   };
 
   const handleSend = async (overrideText?: string) => {

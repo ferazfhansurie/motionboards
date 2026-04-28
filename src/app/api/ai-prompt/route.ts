@@ -34,7 +34,18 @@ function buildModelCatalog(): string {
 }
 const MODEL_CATALOG = buildModelCatalog();
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Lazy-init the SDK so a missing ANTHROPIC_API_KEY doesn't blow up at module
+// load time. The route itself returns a 500 with a clear message if the key
+// is absent — but at least the rest of the app isn't taken down with it.
+let _anthropic: Anthropic | null = null;
+function getAnthropic(): Anthropic {
+  if (_anthropic) return _anthropic;
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY not configured");
+  }
+  _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return _anthropic;
+}
 const ANTHROPIC_TOOLS = toAnthropicTools();
 
 // Claude streaming over a long system prompt + image payloads can take
@@ -191,7 +202,7 @@ export async function POST(req: NextRequest) {
       content: toAnthropicContent(m.content),
     }));
 
-    const stream = anthropic.messages.stream({
+    const stream = getAnthropic().messages.stream({
       model: chatModel,
       max_tokens: 4096,
       system: systemBlocks,
