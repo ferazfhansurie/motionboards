@@ -202,8 +202,11 @@ export function Toolbar() {
       <div
         className="absolute left-2 md:left-3 top-2 md:top-3 z-30 flex items-center gap-1 md:gap-2 pointer-events-auto rounded-xl px-1.5 md:px-2 py-1 md:py-1.5 backdrop-blur-md border shadow-sm overflow-x-auto max-w-[calc(100vw-130px)] md:max-w-none no-scrollbar"
         style={{
-          backgroundColor: isDark ? "#f26522" : "rgba(242,101,34,0.22)",
-          borderColor: isDark ? "#f26522" : "rgba(242,101,34,0.4)",
+          // Sleeker neutral pill — was loud orange. Dark / light translucent
+          // backgrounds with a subtle border, so the toolbar reads as chrome
+          // not as a feature.
+          backgroundColor: isDark ? "rgba(13,17,23,0.85)" : "rgba(255,255,255,0.85)",
+          borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
         }}
       >
         <div className="flex items-center px-0.5 md:px-1 py-0.5 rounded-lg shrink-0">

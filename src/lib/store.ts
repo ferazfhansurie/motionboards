@@ -442,7 +442,10 @@ export const useAppStore = create<AppState>((set) => {
   isProfileOpen: false,
   isHistoryOpen: false,
   isAIPromptOpen: false,
-  aiAgentMode: typeof window !== "undefined" && window.localStorage.getItem("motionboards_ai_agent_mode") === "true",
+  // Default to AI Agent — that's the primary product surface now. Manual is
+  // the explicit opt-out. Anyone who has previously toggled to Manual keeps
+  // their choice (localStorage value === "false"); everyone else defaults on.
+  aiAgentMode: typeof window === "undefined" || window.localStorage.getItem("motionboards_ai_agent_mode") !== "false",
   pendingChatSeed: null,
   pendingPrompt: null,
   startFrameId: null,

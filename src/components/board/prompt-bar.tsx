@@ -1170,97 +1170,98 @@ export function PromptBar() {
   };
 
   // Floating hero images for empty canvas
+  // Editorial-style decoration: clean rectangles with model-name labels
+  // above them, no rotation, no float — subtle backdrop, not a feature.
   const heroImages = [
-    { src: "/hero/h1.jpg", x: "8%", y: "12%", w: 120, delay: 0, rotate: -6 },
-    { src: "/hero/h2.jpg", x: "78%", y: "8%", w: 140, delay: 0.2, rotate: 5 },
-    { src: "/hero/h3.jpg", x: "4%", y: "55%", w: 110, delay: 0.4, rotate: -4 },
-    { src: "/hero/h4.jpg", x: "82%", y: "50%", w: 130, delay: 0.6, rotate: 7 },
-    { src: "/hero/h5.jpg", x: "18%", y: "75%", w: 100, delay: 0.8, rotate: -3 },
-    { src: "/hero/h6.jpg", x: "72%", y: "78%", w: 115, delay: 1.0, rotate: 4 },
-    { src: "/hero/h7.jpg", x: "35%", y: "5%", w: 90, delay: 0.3, rotate: -2 },
-    { src: "/hero/h8.jpg", x: "55%", y: "4%", w: 95, delay: 0.5, rotate: 3 },
+    { src: "/hero/h1.jpg", label: "Nano Banana 2", x: "5%",  y: "16%", w: 130, delay: 0 },
+    { src: "/hero/h4.jpg", label: "Veo 3.1",       x: "82%", y: "14%", w: 140, delay: 0.1 },
+    { src: "/hero/h3.jpg", label: "FLUX Schnell",  x: "6%",  y: "62%", w: 120, delay: 0.2 },
+    { src: "/hero/h6.jpg", label: "Seedance 2.0",  x: "80%", y: "64%", w: 130, delay: 0.3 },
   ];
 
   // Centered hero prompt for empty canvas
   if (isCanvasEmpty) {
     return (
       <>
-        {/* Floating hero images */}
+        {/* Editorial decoration — labelled rectangles, low contrast, no float */}
         <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
           {heroImages.map((img, i) => (
             <div
               key={i}
-              className="absolute rounded-xl overflow-hidden shadow-lg opacity-0 border-2 border-white/20"
+              className="absolute opacity-0"
               style={{
                 left: img.x,
                 top: img.y,
                 width: img.w,
-                height: img.w * 0.7,
-                transform: `rotate(${img.rotate}deg)`,
-                animation: `heroFloat${i % 3} 6s ease-in-out infinite, heroFadeIn 0.8s ease-out ${img.delay}s forwards`,
+                animation: `heroFadeIn 0.6s ease-out ${img.delay}s forwards`,
               }}
             >
-              <img
-                src={img.src}
-                alt=""
-                className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
+              <p className={`text-[10px] uppercase tracking-[0.15em] mb-1.5 font-medium ${isDark ? "text-gray-400/80" : "text-gray-500/80"}`}>
+                {img.label}
+              </p>
+              <div
+                className="rounded-md overflow-hidden"
+                style={{ height: img.w * 0.7 }}
+              >
+                <img
+                  src={img.src}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              </div>
             </div>
           ))}
           <style>{`
-            @keyframes heroFloat0 { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-12px) rotate(-4deg); } }
-            @keyframes heroFloat1 { 0%, 100% { transform: translateY(0) rotate(5deg); } 50% { transform: translateY(-15px) rotate(7deg); } }
-            @keyframes heroFloat2 { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-10px) rotate(-1deg); } }
-            @keyframes heroFadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 0.35; } }
+            @keyframes heroFadeIn { from { opacity: 0; } to { opacity: 0.55; } }
           `}</style>
         </div>
 
         {/* Centered prompt */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="pointer-events-auto w-full max-w-xl px-4">
-            {/* Manual ↔ AI Agent mode toggle */}
-            <div className="flex items-center justify-center mb-4">
-              <div className={`inline-flex items-center gap-1 rounded-full p-1 border ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"} shadow-sm`}>
-                <button
-                  type="button"
-                  onClick={() => setAiAgentMode(false)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
-                    !aiAgentMode
-                      ? "bg-[#f26522] text-white shadow"
-                      : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-[#0d1117]"
-                  }`}
-                  title="Pick a model and write the prompt yourself"
-                >
-                  <WandSparkles className="h-3 w-3" />
-                  Manual
-                </button>
+            {/* Manual ↔ AI Agent toggle — sleek, single accent, no gradient */}
+            <div className="flex items-center justify-center mb-5">
+              <div className={`inline-flex items-center rounded-full p-0.5 border text-[11px] ${isDark ? "bg-[#0d1117] border-gray-800" : "bg-gray-50 border-gray-200"}`}>
                 <button
                   type="button"
                   onClick={() => setAiAgentMode(true)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-full font-medium transition-colors ${
                     aiAgentMode
-                      ? "bg-gradient-to-r from-[#f26522] to-[#ec4899] text-white shadow"
-                      : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-[#0d1117]"
+                      ? isDark ? "bg-white text-[#0d1117]" : "bg-[#0d1117] text-white"
+                      : isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-[#0d1117]"
                   }`}
-                  title="Just describe what you want — ADletic AI handles the rest"
                 >
-                  <Sparkles className="h-3 w-3" />
                   AI Agent
-                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${aiAgentMode ? "bg-white/25" : "bg-[#f26522]/15 text-[#f26522]"}`}>NEW</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiAgentMode(false)}
+                  className={`px-3.5 py-1.5 rounded-full font-medium transition-colors ${
+                    !aiAgentMode
+                      ? isDark ? "bg-white text-[#0d1117]" : "bg-[#0d1117] text-white"
+                      : isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-[#0d1117]"
+                  }`}
+                >
+                  Manual
                 </button>
               </div>
             </div>
 
-            <div className="text-center mb-6">
-              <h2 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-                {aiAgentMode
-                  ? "Just describe it. ADletic builds it."
-                  : "Describe anything. We'll generate it."}
+            <div className="text-center mb-7">
+              <h2
+                className={`text-[40px] leading-tight font-light tracking-tight mb-3 ${isDark ? "text-white" : "text-[#0d1117]"}`}
+                style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+              >
+                {aiAgentMode ? (
+                  <>What should we <em className="italic">make</em>?</>
+                ) : (
+                  <>Describe it. <em className="italic">We&apos;ll build it.</em></>
+                )}
               </h2>
-              <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+              <p className={`text-[13px] ${isDark ? "text-gray-500" : "text-gray-500"}`}>
                 {aiAgentMode
-                  ? "Tell the AI what you want — it'll pick the right model, ask for what it needs, and run it for you"
+                  ? "ADletic picks the right model and runs it — just talk to it"
                   : `Type your prompt and ${selectedModel?.name || "AI"} will create it for you`}
               </p>
             </div>
@@ -1291,7 +1292,7 @@ export function PromptBar() {
                     handleGenerate();
                   }
                 }}
-                className={`w-full backdrop-blur-md text-sm placeholder-gray-400 border-2 rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] focus:ring-4 focus:ring-[#f26522]/10 shadow-xl px-5 ${aiAgentMode ? "pt-36" : "pt-4"} pb-14 resize-none leading-5 ${isDark ? "bg-[#161b22] text-white border-gray-700" : "bg-white text-[#0d1117] border-gray-200"}`}
+                className={`w-full backdrop-blur-md text-sm placeholder-gray-400 border rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522]/60 focus:ring-2 focus:ring-[#f26522]/10 shadow-md px-5 ${aiAgentMode ? "pt-36" : "pt-4"} pb-14 resize-none leading-5 ${isDark ? "bg-[#0d1117]/95 text-white border-gray-800" : "bg-white text-[#0d1117] border-gray-200"}`}
                 style={{ height: aiAgentMode ? 260 : 120 }}
               />
               {/* Reference thumbnails — show what's currently attached to the prompt */}
@@ -1440,22 +1441,36 @@ export function PromptBar() {
               </div>
             )}
 
-            {/* Quick suggestions */}
-            <div className="flex flex-wrap gap-2 mt-3 justify-center">
+            {/* Suggestion pills — Flora-style sleek dark capsules with icons */}
+            <div className="flex flex-wrap gap-2 mt-4 justify-center">
               {[
-                "Cinematic drone shot of a city at golden hour",
-                "Slow motion coffee pour, macro lens",
-                "Anime fight scene with speed lines",
+                { label: "Storyboard an ad", text: "Build me a 30-second storyboard for a coffee ad", icon: <LayoutGrid className="h-3 w-3" /> },
+                { label: "Animate an image", text: "Animate this image into a 5-second clip with subtle camera push-in", icon: <FileImage className="h-3 w-3" /> },
+                { label: "Generate a hero poster", text: "Generate a cinematic neon-noir poster, 16:9", icon: <Sparkles className="h-3 w-3" /> },
               ].map((s) => (
                 <button
-                  key={s}
-                  className={`text-[10px] px-3 py-1.5 rounded-full border transition-colors ${isDark ? "text-gray-400 border-gray-700 hover:border-[#f26522] hover:text-[#f26522]" : "text-gray-500 border-gray-200 hover:border-[#f26522] hover:text-[#f26522]"}`}
-                  onClick={() => setPrompt(s)}
+                  key={s.label}
+                  onClick={() => setPrompt(s.text)}
+                  className={`group flex items-center gap-1.5 text-[11px] px-3.5 py-2 rounded-full border transition-all ${isDark ? "text-gray-300 border-gray-800 bg-[#0d1117]/60 hover:border-gray-600" : "text-gray-700 border-gray-200 bg-white/60 hover:border-gray-400"}`}
                 >
-                  {s}
+                  <span className={isDark ? "text-gray-500" : "text-gray-400"}>{s.icon}</span>
+                  {s.label}
                 </button>
               ))}
             </div>
+
+            {/* OR / double-click hint — Flora-style discoverability cue */}
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <div className={`h-px flex-1 max-w-[60px] ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+              <span className={`text-[10px] uppercase tracking-[0.2em] font-medium ${isDark ? "text-gray-600" : "text-gray-400"}`}>or</span>
+              <div className={`h-px flex-1 max-w-[60px] ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+            </div>
+            <p className={`text-center text-[11px] mt-3 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ${isDark ? "bg-[#161b22] text-gray-300 border border-gray-800" : "bg-gray-100 text-gray-700 border border-gray-200"}`}>
+                Double-click
+              </span>
+              <span className="ml-1.5">anywhere on the canvas to create a node</span>
+            </p>
 
             {/* Need help / WhatsApp us / Visit website */}
             <div className="flex items-center justify-center gap-2 mt-5 flex-wrap">
