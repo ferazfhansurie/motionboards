@@ -139,35 +139,32 @@ export function AIGreetingCard({ isDark, onComplete, skipAnimation }: Props) {
   }
 
   return (
-    <div className={`mb-5 rounded-2xl border shadow-lg backdrop-blur-md ${isDark ? "bg-[#161b22]/85 border-gray-700" : "bg-white/85 border-gray-200"}`}>
-      <div className="flex items-start gap-3 p-4">
-        <div className="relative shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#f26522] to-[#ec4899] rounded-2xl blur-md opacity-40" />
-          <div className="relative h-10 w-10 rounded-2xl bg-gradient-to-br from-[#f26522] to-[#ec4899] flex items-center justify-center ring-2 ring-white/20">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
+    <div className="flex items-start gap-2.5 p-1">
+      <div className="relative shrink-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#f26522] to-[#ec4899] rounded-xl blur-md opacity-30" />
+        <div className="relative h-8 w-8 rounded-xl bg-gradient-to-br from-[#f26522] to-[#ec4899] flex items-center justify-center ring-1 ring-white/20">
+          <Sparkles className="h-4 w-4 text-white" />
         </div>
-        <div className="min-w-0 flex-1 pt-0.5">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`text-[12px] font-bold tracking-tight ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-              ADletic
-            </span>
-            <span className="text-[9px] font-medium text-green-500 flex items-center gap-1">
-              <span className="inline-block w-1 h-1 rounded-full bg-green-500 animate-pulse" />
-              live
-            </span>
-          </div>
-          <div className={`text-[13px] leading-relaxed space-y-1.5 ${isDark ? "text-gray-200" : "text-[#0d1117]"}`}>
-            {renderedLines.map((line, i) => (
-              <p key={i} className="whitespace-pre-wrap">
-                {line}
-                {/* blinking cursor only on the line that's currently typing */}
-                {!done && i === renderedLines.length - 1 && (
-                  <span className="inline-block w-[2px] h-[1em] -mb-[2px] ml-0.5 bg-[#f26522] animate-pulse align-middle" />
-                )}
-              </p>
-            ))}
-          </div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`text-[11px] font-bold tracking-tight ${isDark ? "text-white" : "text-[#0d1117]"}`}>
+            ADletic
+          </span>
+          <span className="text-[9px] font-medium text-green-500 flex items-center gap-1">
+            <span className="inline-block w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+            live
+          </span>
+        </div>
+        <div className={`text-[12.5px] leading-snug space-y-1 ${isDark ? "text-gray-200" : "text-[#0d1117]"}`}>
+          {renderedLines.map((line, i) => (
+            <p key={i} className="whitespace-pre-wrap">
+              {line}
+              {!done && i === renderedLines.length - 1 && (
+                <span className="inline-block w-[2px] h-[1em] -mb-[2px] ml-0.5 bg-[#f26522] animate-pulse align-middle" />
+              )}
+            </p>
+          ))}
         </div>
       </div>
     </div>

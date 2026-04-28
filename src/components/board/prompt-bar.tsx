@@ -1219,13 +1219,6 @@ export function PromptBar() {
         {/* Centered prompt */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="pointer-events-auto w-full max-w-xl px-4">
-            {/* ADletic typewriter greeting — only in AI Agent mode. The
-                animation is gated by sessionStorage so it plays once per
-                tab; subsequent renders just show the full static text. */}
-            {aiAgentMode && (
-              <AIGreetingCard isDark={isDark} />
-            )}
-
             {/* Manual ↔ AI Agent mode toggle */}
             <div className="flex items-center justify-center mb-4">
               <div className={`inline-flex items-center gap-1 rounded-full p-1 border ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"} shadow-sm`}>
@@ -1272,11 +1265,20 @@ export function PromptBar() {
               </p>
             </div>
             <div className="relative">
+              {/* ADletic typewriter greeting — sits inside the chatbox at
+                  the top in AI Agent mode. Pointer-events-none so the user
+                  can click through to focus the textarea without the
+                  greeting eating the click. */}
+              {aiAgentMode && (
+                <div className="absolute top-0 left-0 right-0 px-3 pt-3 z-10 pointer-events-none">
+                  <AIGreetingCard isDark={isDark} />
+                </div>
+              )}
               <textarea
                 ref={promptRef}
                 placeholder={
                   aiAgentMode
-                    ? "Tell ADletic what to build — e.g. \"a 30s comic-noir reel about a courier in a cyberpunk city\""
+                    ? "Reply to ADletic — what do you want to create?"
                     : selectedModel
                       ? `Describe what ${selectedModel.name} should create...`
                       : "Select a model first"
@@ -1289,8 +1291,8 @@ export function PromptBar() {
                     handleGenerate();
                   }
                 }}
-                className={`w-full backdrop-blur-md text-sm placeholder-gray-400 border-2 rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] focus:ring-4 focus:ring-[#f26522]/10 shadow-xl px-5 pt-4 pb-14 resize-none leading-5 ${isDark ? "bg-[#161b22] text-white border-gray-700" : "bg-white text-[#0d1117] border-gray-200"}`}
-                style={{ height: 120 }}
+                className={`w-full backdrop-blur-md text-sm placeholder-gray-400 border-2 rounded-2xl transition-all duration-200 focus:outline-none focus:border-[#f26522] focus:ring-4 focus:ring-[#f26522]/10 shadow-xl px-5 ${aiAgentMode ? "pt-36" : "pt-4"} pb-14 resize-none leading-5 ${isDark ? "bg-[#161b22] text-white border-gray-700" : "bg-white text-[#0d1117] border-gray-200"}`}
+                style={{ height: aiAgentMode ? 260 : 120 }}
               />
               {/* Reference thumbnails — show what's currently attached to the prompt */}
               {refItems.length > 0 && (

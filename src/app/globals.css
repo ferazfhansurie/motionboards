@@ -191,3 +191,9 @@
     text-align: left;
   }
 }
+/* Slide-in for the ADletic AI panel — used when AI Agent mode hands a
+   message off from the empty hero. Quick, eased, doesn't fight the user. */
+@keyframes slideInRight {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
