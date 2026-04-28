@@ -481,7 +481,9 @@ export async function POST(req: NextRequest) {
         // Gemini image models use the same ID on both AI Studio and Vertex AI
         const imageModelId = modelId;
 
-        const response = await ai.models.generateContent({
+        // 4K Nano Banana 2 sees frequent 503 UNAVAILABLE bursts when Google's
+        // GPU pool is hot. Single auto-retry after a short wait clears most.
+        const callGemini = () => ai.models.generateContent({
           model: imageModelId,
           contents: contentParts,
           config: {
@@ -489,6 +491,18 @@ export async function POST(req: NextRequest) {
             imageConfig: Object.keys(imageConfig).length > 0 ? imageConfig : undefined,
           },
         });
+        let response;
+        try {
+          response = await callGemini();
+        } catch (firstErr) {
+          const msg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+          if (/503|UNAVAILABLE|high demand/i.test(msg)) {
+            await new Promise((r) => setTimeout(r, 8000));
+            response = await callGemini();
+          } else {
+            throw firstErr;
+          }
+        }
 
         const parts = response.candidates?.[0]?.content?.parts;
         let imageBase64: string | null = null;
@@ -541,7 +555,14 @@ export async function POST(req: NextRequest) {
         // Translate common Google API errors into actionable copy.
         let userMsg = raw;
         let status = 500;
-        if (/RESOURCE_EXHAUSTED|429|quota/i.test(raw)) {
+        if (/503|UNAVAILABLE|high demand/i.test(raw)) {
+          // Capacity spike on Google's side, usually only at higher resolutions.
+          // 2K runs on a different pool and almost always works.
+          const res = (input.resolution as string) || "";
+          const lower4k = /4k/i.test(res) ? " Try dropping resolution to 2K — 4K hits Google's capacity ceiling first." : " Try again in a minute.";
+          userMsg = "Google's image servers are busy right now." + lower4k;
+          status = 503;
+        } else if (/RESOURCE_EXHAUSTED|429|quota/i.test(raw)) {
           userMsg = "Image model is rate-limited right now. Wait a minute and try again.";
           status = 429;
         } else if (/SAFETY|blocked|PROHIBITED/i.test(raw)) {
