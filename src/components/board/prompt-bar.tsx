@@ -1205,22 +1205,72 @@ export function PromptBar() {
     tempImg.src = dataUri;
   };
 
-  // Floating hero images for empty canvas
-  // Editorial-style decoration: clean rectangles with model-name labels
-  // above them, no rotation, no float — subtle backdrop, not a feature.
+  // Empty-canvas backdrop. Two layers:
+  //   1. heroStencilText — big outlined uppercase model names splattered
+  //      around the viewport. Mix of orange and muted-gray strokes,
+  //      transparent fill ("text-stroke"). Same stencil treatment as the
+  //      adleticagency landing page's "+ MODELS · 16+ WORKFLOWS" section.
+  //   2. heroImages — sample renders in the corners + mid-edges, each
+  //      labelled with the same stencil style above it. Eight slots
+  //      (h1–h8) to fill the background without crowding the centre.
+  // Both layers sit behind the prompt UI (z-10) and use very low opacity
+  // so the headline + prompt + pills stay the focal point.
+  const heroStencilText = [
+    { text: "SORA",       x: "3%",   y: "8%",   size: 110, accent: true,  delay: 0.05 },
+    { text: "VEO",        x: "62%",  y: "5%",   size: 140, accent: false, delay: 0.10 },
+    { text: "KLING",      x: "1%",   y: "44%",  size: 92,  accent: false, delay: 0.15 },
+    { text: "HAILUO",     x: "78%",  y: "44%",  size: 96,  accent: true,  delay: 0.20 },
+    { text: "FLUX",       x: "30%",  y: "85%",  size: 78,  accent: false, delay: 0.25 },
+    { text: "SEEDANCE",   x: "55%",  y: "84%",  size: 88,  accent: true,  delay: 0.30 },
+  ];
+
   const heroImages = [
-    { src: "/hero/h1.jpg", label: "Nano Banana 2", x: "5%",  y: "16%", w: 130, delay: 0 },
-    { src: "/hero/h4.jpg", label: "Veo 3.1",       x: "82%", y: "14%", w: 140, delay: 0.1 },
-    { src: "/hero/h3.jpg", label: "FLUX Schnell",  x: "6%",  y: "62%", w: 120, delay: 0.2 },
-    { src: "/hero/h6.jpg", label: "Seedance 2.0",  x: "80%", y: "64%", w: 130, delay: 0.3 },
+    // Corners — anchor the layout
+    { src: "/hero/h1.jpg", label: "Nano Banana 2", x: "4%",  y: "16%", w: 130, delay: 0.0 },
+    { src: "/hero/h4.jpg", label: "Veo 3.1",       x: "84%", y: "14%", w: 140, delay: 0.1 },
+    { src: "/hero/h3.jpg", label: "FLUX Schnell",  x: "5%",  y: "64%", w: 120, delay: 0.2 },
+    { src: "/hero/h6.jpg", label: "Seedance 2.0",  x: "82%", y: "66%", w: 130, delay: 0.3 },
+    // Mid-edge fillers — break up the empty space without crowding centre
+    { src: "/hero/h2.jpg", label: "Kling 2.5",     x: "1%",  y: "38%", w: 100, delay: 0.35 },
+    { src: "/hero/h5.jpg", label: "Sora 2",        x: "88%", y: "37%", w: 105, delay: 0.40 },
+    { src: "/hero/h7.jpg", label: "Hailuo 02",     x: "12%", y: "82%", w: 90,  delay: 0.45 },
+    { src: "/hero/h8.jpg", label: "Wan 2.5",       x: "84%", y: "84%", w: 95,  delay: 0.50 },
   ];
 
   // Centered hero prompt for empty canvas
   if (isCanvasEmpty) {
     return (
       <>
-        {/* Editorial decoration — labelled rectangles, low contrast, no float */}
+        {/* Editorial decoration — sample renders + big stenciled model
+            names in the background. Two layers, stenciled labels match
+            the adleticagency landing page treatment (text-stroke only,
+            transparent fill). */}
         <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+          {/* Layer 1: big stenciled model names. Sit furthest back (z-0)
+              so the image cards above can read clearly. */}
+          {heroStencilText.map((s, i) => (
+            <div
+              key={`stencil-${i}`}
+              className="absolute opacity-0 select-none whitespace-nowrap font-black tracking-tight uppercase"
+              style={{
+                left: s.x,
+                top: s.y,
+                fontSize: s.size,
+                lineHeight: 0.9,
+                letterSpacing: "-0.02em",
+                color: "transparent",
+                WebkitTextStroke: s.accent
+                  ? `2px ${isDark ? "rgba(242,101,34,0.35)" : "rgba(242,101,34,0.30)"}`
+                  : `2px ${isDark ? "rgba(255,255,255,0.10)" : "rgba(13,17,23,0.12)"}`,
+                animation: `heroStencilIn 0.8s ease-out ${s.delay}s forwards`,
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              }}
+            >
+              {s.text}
+            </div>
+          ))}
+
+          {/* Layer 2: sample-render cards with stenciled labels above. */}
           {heroImages.map((img, i) => (
             <div
               key={i}
@@ -1232,7 +1282,16 @@ export function PromptBar() {
                 animation: `heroFadeIn 0.6s ease-out ${img.delay}s forwards`,
               }}
             >
-              <p className={`text-[10px] uppercase tracking-[0.15em] mb-1.5 font-medium ${isDark ? "text-gray-400/80" : "text-gray-500/80"}`}>
+              <p
+                className="uppercase mb-1.5 font-black select-none whitespace-nowrap"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.12em",
+                  color: "transparent",
+                  WebkitTextStroke: `1px ${isDark ? "rgba(255,255,255,0.55)" : "rgba(13,17,23,0.55)"}`,
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                }}
+              >
                 {img.label}
               </p>
               <div
@@ -1249,7 +1308,8 @@ export function PromptBar() {
             </div>
           ))}
           <style>{`
-            @keyframes heroFadeIn { from { opacity: 0; } to { opacity: 0.55; } }
+            @keyframes heroFadeIn   { from { opacity: 0; } to { opacity: 0.55; } }
+            @keyframes heroStencilIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
           `}</style>
         </div>
 
