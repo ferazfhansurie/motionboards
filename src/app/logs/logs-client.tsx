@@ -64,7 +64,8 @@ interface PathImpression {
 }
 
 interface FunnelMetrics {
-  rangeDays: number | null;
+  since: string;
+  until: string;
   signedUp: number;
   loggedIn: number;
   subscriptionActive: number;
@@ -87,7 +88,15 @@ interface FunnelMetrics {
 }
 
 type Tab = "generations" | "users" | "funnel";
-type FunnelRange = "1" | "7" | "30" | "all";
+type FunnelRange = "1" | "7" | "30" | "all" | "custom";
+
+// Default custom range: from a week ago to "tomorrow" so today is included
+// (the API treats `end` as exclusive).
+function todayPlusYMD(daysOffset: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function LogsClient() {
   const router = useRouter();
@@ -100,6 +109,8 @@ export default function LogsClient() {
   const [funnel, setFunnel] = useState<FunnelMetrics | null>(null);
   const [funnelLoading, setFunnelLoading] = useState(false);
   const [funnelRange, setFunnelRange] = useState<FunnelRange>("30");
+  const [customStart, setCustomStart] = useState<string>(() => todayPlusYMD(-7));
+  const [customEnd, setCustomEnd] = useState<string>(() => todayPlusYMD(1)); // exclusive — tomorrow includes today
 
   const fetchGenerations = async () => {
     setLoading(true);
@@ -127,10 +138,13 @@ export default function LogsClient() {
     }
   };
 
-  const fetchFunnel = async (range: FunnelRange) => {
+  const fetchFunnel = async () => {
     setFunnelLoading(true);
     try {
-      const res = await fetch(`/api/admin/funnel?days=${range}`);
+      const url = funnelRange === "custom"
+        ? `/api/admin/funnel?start=${encodeURIComponent(customStart)}&end=${encodeURIComponent(customEnd)}`
+        : `/api/admin/funnel?days=${funnelRange}`;
+      const res = await fetch(url);
       const data = await res.json();
       if (data && typeof data.signedUp === "number") setFunnel(data);
     } catch (err) {
@@ -143,15 +157,15 @@ export default function LogsClient() {
   useEffect(() => {
     fetchGenerations();
     fetchUsers();
-    fetchFunnel(funnelRange);
+    fetchFunnel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-fetch funnel when range changes
+  // Re-fetch funnel when range or custom dates change
   useEffect(() => {
-    fetchFunnel(funnelRange);
+    fetchFunnel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [funnelRange]);
+  }, [funnelRange, customStart, customEnd]);
 
   const handleDelete = async (id: string) => {
     setDeleting(id);
@@ -229,7 +243,13 @@ export default function LogsClient() {
                 ) : tab === "users" ? (
                   <>{users.length} registered user{users.length === 1 ? "" : "s"}</>
                 ) : (
-                  <>Registration funnel — {funnelRange === "all" ? "all time" : `last ${funnelRange}d`}</>
+                  <>Registration funnel — {
+                    funnelRange === "all"
+                      ? "all time"
+                      : funnelRange === "custom"
+                        ? `${customStart} → ${customEnd}`
+                        : `last ${funnelRange}d`
+                  }</>
                 )}
               </p>
             </div>
@@ -238,7 +258,7 @@ export default function LogsClient() {
             onClick={() => {
               if (tab === "generations") fetchGenerations();
               else if (tab === "users") fetchUsers();
-              else fetchFunnel(funnelRange);
+              else fetchFunnel();
             }}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors"
           >
@@ -419,6 +439,10 @@ export default function LogsClient() {
             loading={funnelLoading}
             range={funnelRange}
             onRangeChange={setFunnelRange}
+            customStart={customStart}
+            customEnd={customEnd}
+            onCustomStartChange={setCustomStart}
+            onCustomEndChange={setCustomEnd}
           />
         )}
       </div>
@@ -440,11 +464,19 @@ function FunnelView({
   loading,
   range,
   onRangeChange,
+  customStart,
+  customEnd,
+  onCustomStartChange,
+  onCustomEndChange,
 }: {
   funnel: FunnelMetrics | null;
   loading: boolean;
   range: FunnelRange;
   onRangeChange: (r: FunnelRange) => void;
+  customStart: string;
+  customEnd: string;
+  onCustomStartChange: (v: string) => void;
+  onCustomEndChange: (v: string) => void;
 }) {
   if (loading && !funnel) {
     return (
@@ -472,6 +504,7 @@ function FunnelView({
     { value: "7", label: "7 days" },
     { value: "30", label: "30 days" },
     { value: "all", label: "All time" },
+    { value: "custom", label: "Custom" },
   ];
 
   // Conversion to first generation, paid signup, retention
@@ -503,6 +536,31 @@ function FunnelView({
           </button>
         ))}
       </div>
+
+      {/* Custom date range — visible only when Custom pill is selected */}
+      {range === "custom" && (
+        <div className="flex items-center gap-2 flex-wrap rounded-lg border border-neutral-800 bg-[#0d1f30]/80 p-3 text-xs">
+          <label className="flex items-center gap-2 text-neutral-400">
+            From
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => onCustomStartChange(e.target.value)}
+              className="rounded-md bg-[#08131f] border border-neutral-700 px-2 py-1 text-white focus:outline-none focus:border-[#f26522]"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-neutral-400">
+            To
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => onCustomEndChange(e.target.value)}
+              className="rounded-md bg-[#08131f] border border-neutral-700 px-2 py-1 text-white focus:outline-none focus:border-[#f26522]"
+            />
+          </label>
+          <span className="text-[10px] text-neutral-500 ml-1">end is exclusive — pick the day after to include it</span>
+        </div>
+      )}
 
       {/* Impressions / traffic */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

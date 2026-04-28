@@ -271,12 +271,10 @@ export interface EventCount {
   uniqueUsers: number;
 }
 
-export async function getEventCounts(rangeDays: number | null): Promise<EventCount[]> {
+export async function getEventCounts(since: Date, until?: Date): Promise<EventCount[]> {
   try {
     await ensureEventTable();
-    const since = rangeDays === null
-      ? new Date("1970-01-01")
-      : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+    const upper = until ?? new Date();
     // Exclude admin users (role='admin' OR the operator email) so the funnel
     // reflects real visitor behaviour, not the team browsing their own site.
     const rows = await sql`
@@ -288,6 +286,7 @@ export async function getEventCounts(rangeDays: number | null): Promise<EventCou
       FROM mb_events e
       LEFT JOIN mb_users u ON u.id = e.user_id
       WHERE e.created_at >= ${since}
+        AND e.created_at < ${upper}
         AND (u.id IS NULL OR (u.role <> 'admin' AND LOWER(u.email) <> LOWER(${ADMIN_EMAIL})))
       GROUP BY e.event_name
       ORDER BY count DESC
@@ -309,12 +308,10 @@ export interface PathImpression {
   uniqueVisitors: number;
 }
 
-export async function getTopPaths(rangeDays: number | null, limit = 20): Promise<PathImpression[]> {
+export async function getTopPaths(since: Date, until?: Date, limit = 20): Promise<PathImpression[]> {
   try {
     await ensureEventTable();
-    const since = rangeDays === null
-      ? new Date("1970-01-01")
-      : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+    const upper = until ?? new Date();
     // SPLIT_PART strips any leftover query string from older rows that were
     // captured before we stopped including window.location.search — so
     // /generate?fbclid=... folds back into /generate.
@@ -327,6 +324,7 @@ export async function getTopPaths(rangeDays: number | null, limit = 20): Promise
       FROM mb_events e
       LEFT JOIN mb_users u ON u.id = e.user_id
       WHERE e.created_at >= ${since}
+        AND e.created_at < ${upper}
         AND e.event_name = 'page_view'
         AND e.pathname IS NOT NULL
         AND (u.id IS NULL OR (u.role <> 'admin' AND LOWER(u.email) <> LOWER(${ADMIN_EMAIL})))
@@ -361,7 +359,8 @@ export interface FunnelSignup {
 }
 
 export interface FunnelMetrics {
-  rangeDays: number | null; // null = all time
+  since: string; // ISO timestamp of cohort lower bound (inclusive)
+  until: string; // ISO timestamp of cohort upper bound (exclusive)
   signedUp: number;
   loggedIn: number;
   subscriptionActive: number;
@@ -386,14 +385,13 @@ export interface FunnelMetrics {
   signups: FunnelSignup[];
 }
 
-export async function getRegistrationFunnel(rangeDays: number | null): Promise<FunnelMetrics> {
-  // SQL bound parameter: a Date for the lower bound, or null = no bound.
-  const since = rangeDays === null
-    ? new Date("1970-01-01")
-    : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+export async function getRegistrationFunnel(since: Date, until?: Date): Promise<FunnelMetrics> {
+  // The cohort is everyone who signed up between `since` (inclusive) and
+  // `until` (exclusive). Defaults to "now" for the upper bound.
+  const upper = until ?? new Date();
 
   // Signed up in range
-  const r1 = await sql`SELECT COUNT(*)::int AS n FROM mb_users WHERE created_at >= ${since}`;
+  const r1 = await sql`SELECT COUNT(*)::int AS n FROM mb_users WHERE created_at >= ${since} AND created_at < ${upper}`;
   const signedUp = (r1[0]?.n as number) || 0;
 
   // Logged in: any session row tied to a user who signed up in range.
@@ -401,7 +399,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
     SELECT COUNT(DISTINCT u.id)::int AS n
     FROM mb_users u
     INNER JOIN mb_sessions s ON s.user_id = u.id
-    WHERE u.created_at >= ${since}
+    WHERE u.created_at >= ${since} AND u.created_at < ${upper}
   `;
   const loggedIn = (r2[0]?.n as number) || 0;
 
@@ -412,13 +410,14 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
   try {
     const r3 = await sql`
       SELECT COUNT(*)::int AS n FROM mb_users
-      WHERE created_at >= ${since} AND subscription_id IS NOT NULL
+      WHERE created_at >= ${since} AND created_at < ${upper} AND subscription_id IS NOT NULL
     `;
     subscriptionActive = (r3[0]?.n as number) || 0;
 
     const r3b = await sql`
       SELECT COUNT(*)::int AS n FROM mb_users
       WHERE created_at >= ${since}
+        AND created_at < ${upper}
         AND subscription_active = true
         AND subscription_expires_at > NOW()
     `;
@@ -430,7 +429,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
     SELECT COUNT(DISTINCT u.id)::int AS n
     FROM mb_users u
     INNER JOIN mb_generations g ON g.user_id = u.id
-    WHERE u.created_at >= ${since}
+    WHERE u.created_at >= ${since} AND u.created_at < ${upper}
   `;
   const madeGeneration = (r4[0]?.n as number) || 0;
 
@@ -439,7 +438,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
     SELECT COUNT(DISTINCT u.id)::int AS n
     FROM mb_users u
     INNER JOIN mb_generations g ON g.user_id = u.id
-    WHERE u.created_at >= ${since} AND g.status = 'completed'
+    WHERE u.created_at >= ${since} AND u.created_at < ${upper} AND g.status = 'completed'
   `;
   const completedGeneration = (r5[0]?.n as number) || 0;
 
@@ -454,7 +453,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
       INNER JOIN (
         SELECT user_id, MIN(created_at) AS first_gen FROM mb_generations GROUP BY user_id
       ) g ON g.user_id = u.id
-      WHERE u.created_at >= ${since}
+      WHERE u.created_at >= ${since} AND u.created_at < ${upper}
     `;
     const p50 = r6[0]?.p50;
     if (typeof p50 === "string") medianMinutesToFirstGen = Math.round(parseFloat(p50));
@@ -469,7 +468,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
       SUM(CASE WHEN g.status = 'failed' THEN 1 ELSE 0 END)::int AS failed
     FROM mb_generations g
     INNER JOIN mb_users u ON g.user_id = u.id
-    WHERE u.created_at >= ${since}
+    WHERE u.created_at >= ${since} AND u.created_at < ${upper}
   `;
   const totalGenerations = (r7[0]?.total as number) || 0;
   const totalCompletedGenerations = (r7[0]?.completed as number) || 0;
@@ -493,7 +492,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
         COALESCE(SUM(g.actual_cost_credits), 0)::int AS cost
       FROM mb_generations g
       INNER JOIN mb_users u ON g.user_id = u.id
-      WHERE u.created_at >= ${since} AND g.status = 'completed'
+      WHERE u.created_at >= ${since} AND u.created_at < ${upper} AND g.status = 'completed'
     `;
     markupRevenueCredits = (r8[0]?.markup as number) || 0;
     providerCostCredits = (r8[0]?.cost as number) || 0;
@@ -519,7 +518,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
         (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id)::int AS gen_count,
         (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id AND g.status = 'completed')::int AS completed_count
       FROM mb_users u
-      WHERE u.created_at >= ${since}
+      WHERE u.created_at >= ${since} AND u.created_at < ${upper}
       ORDER BY u.created_at DESC
       LIMIT 500
     `;
@@ -544,7 +543,7 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
         (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id)::int AS gen_count,
         (SELECT COUNT(*) FROM mb_generations g WHERE g.user_id = u.id AND g.status = 'completed')::int AS completed_count
       FROM mb_users u
-      WHERE u.created_at >= ${since}
+      WHERE u.created_at >= ${since} AND u.created_at < ${upper}
       ORDER BY u.created_at DESC
       LIMIT 500
     `;
@@ -561,7 +560,8 @@ export async function getRegistrationFunnel(rangeDays: number | null): Promise<F
   }
 
   return {
-    rangeDays,
+    since: since.toISOString(),
+    until: upper.toISOString(),
     signedUp,
     loggedIn,
     subscriptionActive,
@@ -803,6 +803,40 @@ export async function getAllGenerations(userId?: string, limit = 50): Promise<Ge
     ? await sql`SELECT * FROM mb_generations WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT ${limit}`
     : await sql`SELECT * FROM mb_generations ORDER BY created_at DESC LIMIT ${limit}`;
   return rows.map(rowToGeneration);
+}
+
+// Same as getAllGenerations but joins on mb_users so the admin logs view can
+// show whose account each generation came from. Email + name only — never
+// returns password hashes.
+export interface GenerationWithUser extends Generation {
+  userEmail?: string | null;
+  userName?: string | null;
+}
+
+export async function getAllGenerationsWithUser(opts?: { limit?: number; userId?: string }): Promise<GenerationWithUser[]> {
+  const limit = opts?.limit ?? 500;
+  const userIdFilter = opts?.userId;
+  const rows = userIdFilter
+    ? await sql`
+        SELECT g.*, u.email AS u_email, u.name AS u_name
+        FROM mb_generations g
+        LEFT JOIN mb_users u ON u.id = g.user_id
+        WHERE g.user_id = ${userIdFilter}
+        ORDER BY g.created_at DESC
+        LIMIT ${limit}
+      `
+    : await sql`
+        SELECT g.*, u.email AS u_email, u.name AS u_name
+        FROM mb_generations g
+        LEFT JOIN mb_users u ON u.id = g.user_id
+        ORDER BY g.created_at DESC
+        LIMIT ${limit}
+      `;
+  return rows.map((r) => ({
+    ...rowToGeneration(r),
+    userEmail: (r.u_email as string | null) ?? null,
+    userName: (r.u_name as string | null) ?? null,
+  }));
 }
 
 export async function getGeneration(id: string): Promise<Generation | undefined> {

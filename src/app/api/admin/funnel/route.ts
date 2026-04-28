@@ -11,19 +11,37 @@ export async function GET(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!isAdmin(user)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
-    const daysParam = req.nextUrl.searchParams.get("days");
-    let rangeDays: number | null;
-    if (daysParam === null || daysParam === "all") {
-      rangeDays = null;
+    // Resolve the time range. Two ways to ask:
+    //   ?days=N          → from now back N days. days=all = all-time.
+    //   ?start=…&end=…  → explicit ISO/yyyy-mm-dd window (overrides days).
+    // end is exclusive — pass tomorrow's date to include all of today.
+    const sp = req.nextUrl.searchParams;
+    const startParam = sp.get("start");
+    const endParam = sp.get("end");
+    const daysParam = sp.get("days");
+
+    let since: Date;
+    let until: Date;
+    if (startParam) {
+      since = new Date(startParam);
+      until = endParam ? new Date(endParam) : new Date();
+      // Guard: invalid date strings → fall back to all time
+      if (isNaN(since.getTime())) since = new Date("1970-01-01");
+      if (isNaN(until.getTime())) until = new Date();
+    } else if (daysParam === "all" || daysParam === null) {
+      since = new Date("1970-01-01");
+      until = new Date();
     } else {
       const n = parseInt(daysParam, 10);
-      rangeDays = Number.isFinite(n) && n > 0 ? n : 30;
+      const days = Number.isFinite(n) && n > 0 ? n : 30;
+      since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      until = new Date();
     }
 
     const [metrics, events, topPaths] = await Promise.all([
-      getRegistrationFunnel(rangeDays),
-      getEventCounts(rangeDays),
-      getTopPaths(rangeDays, 15),
+      getRegistrationFunnel(since, until),
+      getEventCounts(since, until),
+      getTopPaths(since, until, 15),
     ]);
     return NextResponse.json({ ...metrics, events, topPaths });
   } catch (err) {
