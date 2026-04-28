@@ -26,6 +26,7 @@ import { requireAuth } from "@/lib/auth-gate";
 import { askConfirm, askPrompt, showToast } from "@/lib/ui-store";
 import { track } from "@/lib/track";
 import { Pencil, MessageCircle } from "lucide-react";
+import { AIGreetingCard } from "./ai-greeting-card";
 
 function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>): string {
   if (!model) return "";
@@ -1218,6 +1219,13 @@ export function PromptBar() {
         {/* Centered prompt */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="pointer-events-auto w-full max-w-xl px-4">
+            {/* ADletic typewriter greeting — only in AI Agent mode. The
+                animation is gated by sessionStorage so it plays once per
+                tab; subsequent renders just show the full static text. */}
+            {aiAgentMode && (
+              <AIGreetingCard isDark={isDark} />
+            )}
+
             {/* Manual ↔ AI Agent mode toggle */}
             <div className="flex items-center justify-center mb-4">
               <div className={`inline-flex items-center gap-1 rounded-full p-1 border ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"} shadow-sm`}>
