@@ -636,7 +636,7 @@ function FunnelView({
             <RevCard
               label="Subscriptions"
               value={`RM ${(funnel.subscriptionRevenueCredits / 100).toFixed(2)}`}
-              sub={`${funnel.subscriptionActive} × RM100`}
+              sub={`${funnel.subscriptionActive} × RM10`}
             />
             <RevCard
               label="Generation markup"

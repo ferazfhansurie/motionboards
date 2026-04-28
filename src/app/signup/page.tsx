@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { Loader2, Check, Zap } from "lucide-react";
 import { track } from "@/lib/track";
 
-// RM100/month subscription — recorded as event properties so the funnel
+// RM10/month subscription — recorded as event properties so the funnel
 // page can show revenue alongside conversion counts.
-const SUBSCRIPTION_VALUE_MYR = 100;
+const SUBSCRIPTION_VALUE_MYR = 10;
 
 const PLAN_FEATURES = [
-  "RM100 of credits refreshed every month",
+  "RM10 of credits refreshed every month",
   "Access to every AI model on the canvas",
   "ADletic AI prompt assistant built in",
   "Cancel anytime — no long commitment",
@@ -82,7 +82,7 @@ export default function SignupPage() {
           Subscribe to MotionBoards
         </h1>
         <p className="text-sm text-gray-400 text-center mb-6">
-          RM100/month — every AI model, every workflow, one subscription
+          RM10/month — every AI model, every workflow, one subscription
         </p>
 
         {cancelled && (
@@ -107,7 +107,7 @@ export default function SignupPage() {
               <h2 className="text-lg font-bold text-[#0d1117]">MotionBoards Monthly</h2>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-3xl font-black text-[#0d1117] leading-none">RM100</p>
+              <p className="text-3xl font-black text-[#0d1117] leading-none">RM10</p>
               <p className="text-[10px] text-gray-500 mt-0.5">/ month</p>
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function SignupPage() {
             ) : (
               <>
                 <Zap className="h-4 w-4" />
-                Subscribe RM100/month
+                Subscribe RM10/month
               </>
             )}
           </button>

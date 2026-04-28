@@ -335,7 +335,7 @@ export function ProfilePanel() {
                 </div>
               </div>
 
-              {/* Monthly subscription — RM100/mo adds 10,000 credits each cycle */}
+              {/* Monthly subscription — RM10/mo adds 1,000 credits each cycle */}
               <div className={`rounded-xl border p-3 ${isDark ? "border-gray-700 bg-[#0d1117]" : "border-gray-200 bg-gray-50"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -349,10 +349,10 @@ export function ProfilePanel() {
                           {subscription.expiresAt
                             ? new Date(subscription.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
                             : "each month"}
-                          . RM100/mo adds 100 credits every cycle.
+                          . RM10/mo adds 10 credits every cycle.
                         </>
                       ) : (
-                        <>RM100/mo. Adds 100 credits the moment it renews. Cancel anytime.</>
+                        <>RM10/mo. Adds 10 credits the moment it renews. Cancel anytime.</>
                       )}
                     </p>
                   </div>

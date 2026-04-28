@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { track } from "@/lib/track";
 
-const SUBSCRIPTION_VALUE_MYR = 100;
+const SUBSCRIPTION_VALUE_MYR = 10;
 
 export default function SignupSuccessPage() {
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");

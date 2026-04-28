@@ -375,7 +375,7 @@ export interface FunnelMetrics {
   totalFailedGenerations: number;
   // Revenue (in CREDITS, divide by 100 for RM). Computed from the same
   // signup-cohort: only counts users who signed up in the period.
-  subscriptionRevenueCredits: number;  // paid users × 10000 (RM100)
+  subscriptionRevenueCredits: number;  // paid users × 1000 (RM10)
   markupRevenueCredits: number;        // sum of markup_credits on completed gens
   providerCostCredits: number;         // sum of actual_cost_credits on completed gens (your provider bill)
   totalRevenueCredits: number;         // subscription + markup
@@ -478,10 +478,10 @@ export async function getRegistrationFunnel(since: Date, until?: Date): Promise<
     ? Math.round((totalGenerations / madeGeneration) * 10) / 10
     : null;
 
-  // Revenue inside the cohort. Subscription = paid users × 10000 sen (RM100).
+  // Revenue inside the cohort. Subscription = paid users × 1000 sen (RM10).
   // Markup = sum of markup_credits over their generations. Provider cost is
   // the actual_cost_credits sum — useful for showing the platform's gross margin.
-  const SUBSCRIPTION_PRICE_CREDITS = 10000;
+  const SUBSCRIPTION_PRICE_CREDITS = 1000;
   const subscriptionRevenueCredits = subscriptionActive * SUBSCRIPTION_PRICE_CREDITS;
   let markupRevenueCredits = 0;
   let providerCostCredits = 0;
@@ -582,14 +582,18 @@ export async function getRegistrationFunnel(since: Date, until?: Date): Promise<
   };
 }
 
-// --- Monthly subscription (RM100/mo → 10000 credits added per billing cycle) ---
+// --- Monthly subscription (RM10/mo → 1000 credits added per billing cycle) ---
+//
+// Low-friction entry tier for conversion. Pay RM10, get RM10 worth of credits
+// to spend on AI generations. Platform earns from the per-generation markup
+// (RM0.01/image, RM0.20/video) on top of the credits the user spends.
 //
 // The columns are added lazily the first time the feature runs. Credits stay
 // in the user's balance whether the subscription is active or not — cancellation
 // just stops new top-ups from being applied, it doesn't wipe what's already
 // sitting in the account.
-export const MONTHLY_SUBSCRIPTION_CREDITS = 10000; // RM100 in sen / 100 credits per RM
-export const MONTHLY_SUBSCRIPTION_PRICE_SEN = 10000; // RM100
+export const MONTHLY_SUBSCRIPTION_CREDITS = 1000; // RM10 in sen / 100 credits per RM
+export const MONTHLY_SUBSCRIPTION_PRICE_SEN = 1000; // RM10
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 
 let subscriptionColumnsEnsured = false;
