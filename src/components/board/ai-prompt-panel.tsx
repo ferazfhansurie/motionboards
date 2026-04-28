@@ -8,13 +8,34 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { useAppStore } from "@/lib/store";
 import { CHAT_MODELS, DEFAULT_CHAT_MODEL } from "@/lib/chat-models";
+import { runAgentGeneration } from "@/lib/agent-generation";
 
-// Message content is either a plain string (simple turns) or an array of parts
-// when the user attaches images/videos. OpenAI-shaped — passes through to
-// chat.completions server-side.
+// Message content is either a plain string (simple turns) or an array of
+// parts. The server route translates these to Anthropic's content-block
+// shape — keep this contract stable so older chats stored in the DB
+// continue to render.
 type MessagePart =
   | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
+  | { type: "image_url"; image_url: { url: string } }
+  // assistant-side: a tool the AI invoked. We render this inline as a card.
+  // status/result are local UI state — the server only sees id/name/input.
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      status?: "pending" | "running" | "completed" | "failed";
+      result?: { itemId?: string; outputUrl?: string; error?: string; modelName?: string };
+    }
+  // user-side: result of a tool call we executed. Goes back to the AI to
+  // continue the loop. Not rendered to the user — the assistant tool_use
+  // card carries the visible status.
+  | {
+      type: "tool_result";
+      tool_use_id: string;
+      content: string;
+      is_error?: boolean;
+    };
 type MessageContent = string | MessagePart[];
 
 interface Message {
@@ -684,6 +705,162 @@ export function AIPromptPanel() {
   const isUploading = attachments.some((a) => a.uploading);
   const hasUploadError = attachments.some((a) => a.error);
 
+  // Stream one turn from /api/ai-prompt. Parses NDJSON events as they arrive
+  // and updates the assistant bubble in place. Returns the final assistant
+  // message + Claude's stop_reason so the outer loop knows whether to
+  // continue with tool execution.
+  const streamOneTurn = async (
+    history: Message[],
+  ): Promise<{ assistant: Message; stopReason: string | null; error?: string }> => {
+    const res = await fetch("/api/ai-prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: history }),
+    });
+
+    if (!res.ok || !res.body) {
+      let errMsg = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        if (data?.error) errMsg = data.error;
+      } catch {
+        const t = await res.text().catch(() => "");
+        if (t) errMsg = t.slice(0, 200);
+      }
+      return {
+        assistant: { role: "assistant", content: `Error: ${errMsg}` },
+        stopReason: null,
+        error: errMsg,
+      };
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let textAccum = "";
+    const blocks: MessagePart[] = [];
+    let stopReason: string | null = null;
+    let errorMsg: string | undefined;
+
+    const renderProgress = () => {
+      // Build the in-flight assistant message: text-so-far + any tool_use
+      // cards already announced. Re-set messages so the UI streams.
+      const content: MessagePart[] = [];
+      if (textAccum) content.push({ type: "text", text: textAccum });
+      for (const b of blocks) content.push(b);
+      const assistantPreview: Message = {
+        role: "assistant",
+        content: content.length === 0 ? "" : content.length === 1 && content[0].type === "text"
+          ? (content[0] as { text: string }).text
+          : content,
+      };
+      setMessages([...history, assistantPreview]);
+    };
+
+    const handleEvent = (ev: Record<string, unknown>) => {
+      const t = ev.type as string;
+      if (t === "text") {
+        textAccum += (ev.text as string) || "";
+        renderProgress();
+      } else if (t === "tool_use") {
+        // Once we get a tool_use we lock in the text-so-far as a content
+        // block (so the tool card renders AFTER the text Claude said) and
+        // add the tool block in pending state.
+        if (textAccum) {
+          blocks.push({ type: "text", text: textAccum });
+          textAccum = "";
+        }
+        blocks.push({
+          type: "tool_use",
+          id: ev.id as string,
+          name: ev.name as string,
+          input: (ev.input as Record<string, unknown>) || {},
+          status: "pending",
+        });
+        renderProgress();
+      } else if (t === "end") {
+        stopReason = (ev.stop_reason as string) || null;
+      } else if (t === "error") {
+        errorMsg = (ev.message as string) || "Stream failed";
+      }
+    };
+
+    // NDJSON line parser
+    const flushBuffer = (final: boolean) => {
+      let nl = buffer.indexOf("\n");
+      while (nl !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (line) {
+          try { handleEvent(JSON.parse(line)); } catch { /* skip malformed */ }
+        }
+        nl = buffer.indexOf("\n");
+      }
+      if (final && buffer.trim()) {
+        try { handleEvent(JSON.parse(buffer.trim())); } catch { /* skip */ }
+        buffer = "";
+      }
+    };
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      flushBuffer(false);
+    }
+    buffer += decoder.decode();
+    flushBuffer(true);
+
+    // Build the final assistant content
+    const finalContent: MessagePart[] = [];
+    if (textAccum) finalContent.push({ type: "text", text: textAccum });
+    for (const b of blocks) finalContent.push(b);
+    const assistant: Message = {
+      role: "assistant",
+      content: finalContent.length === 0
+        ? (errorMsg ? `Error: ${errorMsg}` : "Could not generate a response. Try again.")
+        : finalContent.length === 1 && finalContent[0].type === "text"
+          ? (finalContent[0] as { text: string }).text
+          : finalContent,
+    };
+    return { assistant, stopReason, error: errorMsg };
+  };
+
+  // Tool dispatcher — when the assistant emits tool_use blocks, we run the
+  // matching client-side action and produce a tool_result block to feed
+  // back to the AI on the next turn.
+  const dispatchTool = async (
+    toolUse: { id: string; name: string; input: Record<string, unknown> },
+  ): Promise<MessagePart> => {
+    if (toolUse.name === "start_generation") {
+      const input = toolUse.input;
+      const result = await runAgentGeneration({
+        modelId: input.model_id as string,
+        prompt: input.prompt as string,
+        options: (input.options as Record<string, unknown>) || {},
+        inputImageUrl: input.input_image_url as string | undefined,
+        inputVideoUrl: input.input_video_url as string | undefined,
+      });
+      const isError = !!result.error;
+      const summary = isError
+        ? `Generation failed: ${result.error}`
+        : `Generation succeeded. Output URL: ${result.outputUrl}. The card is on the user's canvas (item ${result.itemId}, model: ${result.modelName}). Briefly tell the user how it went and suggest a useful next step (e.g. animate it, generate variations, change style).`;
+      return {
+        type: "tool_result",
+        tool_use_id: toolUse.id,
+        content: summary,
+        is_error: isError,
+      };
+    }
+    return {
+      type: "tool_result",
+      tool_use_id: toolUse.id,
+      content: `Unknown tool: ${toolUse.name}`,
+      is_error: true,
+    };
+  };
+
   const handleSend = async (overrideText?: string) => {
     // overrideText is set when the AI Agent toggle hands a request off from
     // the empty hero — bypasses the input/attachments path entirely.
@@ -701,58 +878,91 @@ export function AIPromptPanel() {
         }
       : { role: "user", content: text };
 
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    let history = [...messages, userMsg];
+    setMessages(history);
     setInput("");
     setAttachments([]);
     setLoading(true);
 
+    // Tool-use loop: stream a turn → if Claude called tools, execute them
+    // and continue with their results. Bail after MAX_TURNS to prevent a
+    // runaway loop (shouldn't happen but better safe).
+    const MAX_TURNS = 6;
     try {
-      const res = await fetch("/api/ai-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
-      });
+      for (let turn = 0; turn < MAX_TURNS; turn++) {
+        const { assistant, stopReason, error } = await streamOneTurn(history);
+        history = [...history, assistant];
+        setMessages(history);
+        if (error || stopReason !== "tool_use") break;
 
-      // If server returned an error JSON (no stream), surface it
-      if (!res.ok || !res.body) {
-        let errMsg = `HTTP ${res.status}`;
-        try {
-          const data = await res.json();
-          if (data?.error) errMsg = data.error;
-        } catch {
-          const text = await res.text().catch(() => "");
-          if (text) errMsg = text.slice(0, 200);
+        // Execute tool_use blocks. For each, mark pending → running →
+        // completed/failed in the assistant message so the card animates.
+        if (Array.isArray(assistant.content)) {
+          const toolUses = assistant.content.filter(
+            (p): p is Extract<MessagePart, { type: "tool_use" }> => p.type === "tool_use",
+          );
+          if (toolUses.length === 0) break;
+
+          const toolResults: MessagePart[] = [];
+          for (const tu of toolUses) {
+            // Mark as running
+            const updateBlock = (status: "running" | "completed" | "failed", result?: { itemId?: string; outputUrl?: string; error?: string; modelName?: string }) => {
+              history = history.map((m) => {
+                if (m !== assistant) return m;
+                if (!Array.isArray(m.content)) return m;
+                return {
+                  ...m,
+                  content: m.content.map((p) =>
+                    p.type === "tool_use" && p.id === tu.id
+                      ? { ...p, status, result }
+                      : p,
+                  ),
+                };
+              });
+              setMessages(history);
+            };
+            updateBlock("running");
+            const tr = await dispatchTool(tu);
+            // Pull the run result so the card can show the generated preview
+            let resultMeta: { itemId?: string; outputUrl?: string; error?: string; modelName?: string } | undefined;
+            if (tu.name === "start_generation") {
+              const input = tu.input;
+              // dispatchTool already ran the generation — mirror what it
+              // returned by reading the canvas item it created.
+              const items = useAppStore.getState().items;
+              // Find the most recent generation matching the prompt
+              const match = [...items].reverse().find((it) =>
+                it.type === "generation" &&
+                it.model === (input.model_id as string) &&
+                it.prompt === (input.prompt as string),
+              );
+              if (match) {
+                resultMeta = {
+                  itemId: match.id,
+                  outputUrl: match.outputUrl || undefined,
+                  error: match.error || undefined,
+                  modelName: match.modelName,
+                };
+              }
+            }
+            const trIsError = tr.type === "tool_result" && !!tr.is_error;
+            updateBlock(trIsError ? "failed" : "completed", resultMeta);
+            toolResults.push(tr);
+          }
+
+          // Append a user-role message containing all tool results, then loop
+          // for the next assistant turn.
+          history = [...history, { role: "user", content: toolResults }];
+          setMessages(history);
+        } else {
+          break;
         }
-        const final = [...newMessages, { role: "assistant" as const, content: `Error: ${errMsg}` }];
-        setMessages(final);
-        await persistMessages(currentChatId, final);
-        return;
       }
-
-      // Stream tokens straight into the assistant bubble — only push the bubble
-      // once the FIRST chunk arrives so the loading dots show until then.
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        if (!chunk) continue;
-        accumulated += chunk;
-        setMessages([...newMessages, { role: "assistant", content: accumulated }]);
-      }
-      // Flush any final buffered bytes
-      accumulated += decoder.decode();
-      const final = [...newMessages, { role: "assistant" as const, content: accumulated || "Could not generate a response. Try again." }];
-      setMessages(final);
-      await persistMessages(currentChatId, final);
+      await persistMessages(currentChatId, history);
       loadChats();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const final = [...newMessages, { role: "assistant" as const, content: `Failed to connect: ${msg}. Try again.` }];
+      const final = [...history, { role: "assistant" as const, content: `Failed to connect: ${msg}. Try again.` }];
       setMessages(final);
       await persistMessages(currentChatId, final);
     } finally {
@@ -1115,13 +1325,27 @@ export function AIPromptPanel() {
               const text = messageText(msg.content);
               const imgs = messageImages(msg.content);
               const isUser = msg.role === "user";
+              const toolUses = Array.isArray(msg.content)
+                ? msg.content.filter((p): p is Extract<MessagePart, { type: "tool_use" }> => p.type === "tool_use")
+                : [];
+
+              // Skip user-side tool_result-only messages — they're for the AI,
+              // not the user. The matching assistant tool_use card already
+              // shows the visible status.
+              if (isUser && Array.isArray(msg.content) && msg.content.length > 0 && msg.content.every((p) => p.type === "tool_result")) {
+                return null;
+              }
+
+              const isOnlyToolUse = !isUser && !text && imgs.length === 0 && toolUses.length > 0;
               return (
                 <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
                     className={`max-w-[88%] rounded-2xl px-4 py-3 text-[12.5px] leading-relaxed ${
                       isUser
                         ? "bg-[#f26522] text-white rounded-br-sm"
-                        : isDark ? "bg-[#0d1117] border border-gray-700 text-gray-200 rounded-bl-sm" : "bg-gray-50 border border-gray-200 text-[#0d1117] rounded-bl-sm"
+                        : isOnlyToolUse
+                          ? "bg-transparent border-0 p-0"
+                          : isDark ? "bg-[#0d1117] border border-gray-700 text-gray-200 rounded-bl-sm" : "bg-gray-50 border border-gray-200 text-[#0d1117] rounded-bl-sm"
                     }`}
                   >
                     {imgs.length > 0 && (
@@ -1141,7 +1365,15 @@ export function AIPromptPanel() {
                         </div>
                       )
                     )}
-                    {!isUser && (
+                    {/* Tool use cards (start_generation etc.) */}
+                    {toolUses.length > 0 && (
+                      <div className={`flex flex-col gap-2 ${text ? "mt-3" : ""}`}>
+                        {toolUses.map((tu) => (
+                          <ToolUseCard key={tu.id} tool={tu} isDark={isDark} />
+                        ))}
+                      </div>
+                    )}
+                    {!isUser && text && !isOnlyToolUse && (
                       <div className={`flex items-center gap-2 mt-2.5 pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-200/70"}`}>
                         <button
                           type="button"
@@ -1319,6 +1551,77 @@ export function AIPromptPanel() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Renders a tool_use call as an inline card so the user can see what the
+// agent is doing in real time. Currently only `start_generation` has a
+// rich card; other tools render a generic skeleton. Adding new tools to
+// AGENT_TOOLS without a custom card here is fine — they fall through to
+// the generic shape.
+function ToolUseCard({
+  tool,
+  isDark,
+}: {
+  tool: Extract<MessagePart, { type: "tool_use" }>;
+  isDark: boolean;
+}) {
+  const status = tool.status || "pending";
+  const isStart = tool.name === "start_generation";
+  const input = tool.input || {};
+  const modelName = (tool.result?.modelName as string | undefined) || (input.model_id as string | undefined) || "Unknown model";
+  const prompt = (input.prompt as string | undefined) || "";
+  const promptPreview = prompt.length > 120 ? prompt.slice(0, 117) + "…" : prompt;
+  const outputUrl = tool.result?.outputUrl;
+  const errorMsg = tool.result?.error;
+
+  const statusBadge = (() => {
+    if (status === "completed") return { icon: <Check className="h-3 w-3" />, label: "Done", color: "text-green-500", bg: "bg-green-500/10 border-green-500/30" };
+    if (status === "failed") return { icon: <X className="h-3 w-3" />, label: "Failed", color: "text-red-500", bg: "bg-red-500/10 border-red-500/30" };
+    if (status === "running") return { icon: <Loader2 className="h-3 w-3 animate-spin" />, label: "Generating…", color: "text-[#f26522]", bg: "bg-[#f26522]/10 border-[#f26522]/30" };
+    return { icon: <Loader2 className="h-3 w-3 animate-spin" />, label: "Starting…", color: "text-[#f26522]", bg: "bg-[#f26522]/10 border-[#f26522]/30" };
+  })();
+
+  return (
+    <div className={`rounded-xl border p-3 ${isDark ? "bg-[#0d1117]/80 border-gray-700" : "bg-white border-gray-200"}`}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#f26522] to-[#ec4899] flex items-center justify-center shrink-0">
+            <Sparkles className="h-3.5 w-3.5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className={`text-[11px] font-bold truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
+              {isStart ? modelName : tool.name}
+            </p>
+            <p className={`text-[9px] uppercase tracking-wider font-semibold ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+              {isStart ? "Generating" : "Tool call"}
+            </p>
+          </div>
+        </div>
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${statusBadge.bg} ${statusBadge.color}`}>
+          {statusBadge.icon}
+          {statusBadge.label}
+        </span>
+      </div>
+      {isStart && promptPreview && (
+        <p className={`text-[11px] leading-snug mb-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+          {promptPreview}
+        </p>
+      )}
+      {outputUrl && status === "completed" && (
+        <div className={`mt-2 rounded-md overflow-hidden border ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {outputUrl.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
+            <video src={outputUrl} className="w-full max-h-64 object-contain bg-black" controls playsInline />
+          ) : (
+            <img src={outputUrl} alt="generated output" className="w-full max-h-64 object-contain bg-black" />
+          )}
+        </div>
+      )}
+      {errorMsg && status === "failed" && (
+        <p className="text-[11px] text-red-400 mt-1">{errorMsg}</p>
+      )}
     </div>
   );
 }

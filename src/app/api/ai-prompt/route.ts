@@ -3,11 +3,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getUserFromToken, getUserAIInstruction, getUserAIModel } from "@/lib/db";
 import { models } from "@/lib/models";
 import { resolveChatModel } from "@/lib/chat-models";
+import { toAnthropicTools } from "@/lib/agent-tools";
 
-// Render the live model catalog as a compact reference the chat model can
-// quote from. Includes everything the user actually has on their picker —
-// id, type, what category, what each input slot expects, what options the
-// model accepts. Disabled models get marked so we don't recommend them.
+// Render the live model catalog as a compact reference Claude can quote
+// from. Includes everything the user has on their picker — id, type,
+// category, what each input slot expects, options. Disabled models are
+// flagged so we don't recommend them.
 function buildModelCatalog(): string {
   const lines: string[] = [];
   for (const m of models) {
@@ -34,73 +35,106 @@ function buildModelCatalog(): string {
 const MODEL_CATALOG = buildModelCatalog();
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const ANTHROPIC_TOOLS = toAnthropicTools();
 
 // Claude streaming over a long system prompt + image payloads can take
-// ~30-60s end to end. Give the route headroom on Vercel Pro (300s ceiling).
+// 30-60s end to end. Headroom on Vercel Pro (300s ceiling).
 export const maxDuration = 60;
 
-// ADletic AI is a general-purpose assistant inside MotionBoards. It can hold
-// normal conversations, answer questions, brainstorm, explain things — AND it
-// specializes in crafting AI-generation prompts (Veo, Sora, Kling, Wan,
-// Seedance, FLUX, Nano Banana, etc) when that's what the user wants. It does
-// NOT generate on the user's behalf — the user drives generation from the
-// canvas prompt bar.
-const BASE_SYSTEM_PROMPT = `You are ADletic AI, a helpful assistant built into the MotionBoards creative canvas. You're having a normal conversation with the user — they can ask you anything: questions, brainstorming, explanations, debugging, writing help, casual chat.
+const BASE_SYSTEM_PROMPT = `You are ADletic AI, a creative agent built into the MotionBoards canvas. The user talks to you in plain language and you actually run generations on their behalf using your start_generation tool.
 
-You also happen to be a great prompt engineer for AI image and video generation models (Veo, Sora, Kling, Wan, Seedance, FLUX, Nano Banana, etc). When the user asks for a prompt, or is clearly describing a scene they want to generate, switch into prompt-crafting mode.
+You have access to every AI image / video / audio model wired into MotionBoards. Pick the right one for the user's intent, ask for any missing inputs in plain text, and call start_generation when you have everything needed.
 
-General conversation rules:
-- Be direct and helpful. Match the user's tone — casual when they're casual, precise when they want detail.
-- Don't pad responses. No unnecessary preambles, disclaimers, or "happy to help!" filler.
-- Use markdown where it clarifies (code blocks, lists, bold for emphasis) but don't force structure on short answers.
-- If they attach images, describe what you see and work with it.
+## How to think about this
 
-Prompt-crafting mode (when the user is clearly asking for a generation prompt):
-- Return ONE compact prompt only. No titles, no headings, no "---" dividers, no "Ready to use" footer.
-- No markdown formatting in the prompt itself — plain prose, copy-paste ready.
-- For SINGLE shots: 1–3 sentences for images, 2–4 for video, all in one paragraph.
-- For MULTI-shot / storyboards / panel sequences: split each shot/panel onto its own paragraph with a BLANK LINE between them. Hard line breaks between panels — never run a 12-panel storyboard as one wall of text. Example layout:
-    Panel 1: [description].
+1. **Listen for intent.** "make a poster of …" → image. "animate that into a 5-second clip" → video. "build me a 12-panel storyboard" → image (use a multi-panel-capable model). "now turn this into …" usually means the user wants a follow-up generation building on a previous output.
 
-    Panel 2: [description].
+2. **Pick the model.** Match the user's intent to a row in the catalog below. Prefer cheaper/faster models for iteration ("draft", "rough", "quick"); reach for premium ones for hero shots. If the user names a model ("use Veo", "with Nano Banana"), respect that — only override if the model can't do what they're asking.
 
-    Panel 3: [description].
-- Default to hyper-realistic (real camera/lens refs, natural light, film grain) unless the user asks for stylized/animated.
-- If they say "shorter", "simpler", "more compact" — cut hard.
+3. **Check what the model needs.** Look at the model's inputs in the catalog. If it requires an image (i2i / i2v / s2e), check whether you've been given one. If not, ASK in plain text — "I need a starting image to animate. Drop one on the canvas or paste a URL." Don't call the tool until you have it.
 
-Figure out which mode the user wants from context. Err toward conversational unless they're obviously requesting a prompt.
+4. **Call start_generation.** Once you have a clear prompt and any required inputs, call the tool. The user sees a card appear on their canvas immediately. You'll get the result (output_url or error) as a tool_result. Use that to tell them how it went.
 
-## MODEL CATALOG (live — pulled from the user's picker)
+5. **Suggest next steps.** After a successful generation, briefly point out what they could do next ("Want to animate this with Veo?" "Want a 4K version?" "Ready to chain into a video?"). Keep it short.
 
-You know exactly which models are wired up on this MotionBoards instance and what each one needs. When a user picks a model, asks "what does X take?", or you're crafting a prompt for a specific model, use this list as your source of truth. Don't invent fields the model doesn't have. Don't recommend a DISABLED model.
+## Conversation style
 
-If the user asks "what should I tag for [model]?", answer using the input list — name the slot (e.g. "tag a still image as the character_image input") and what each slot expects. If they ask for a prompt, tailor the wording to the model's strengths and accepted options (aspect ratio, duration, resolution).
+- Be direct and brief. No "Happy to help!" filler. No long preambles before tool calls — just say "Generating now…" and call the tool.
+- If you're confident about the model and prompt, don't ask for permission — just generate. Users want speed.
+- If the request is ambiguous (e.g. "make me an ad"), ask ONE clarifying question, not five. "Image or video? What's the product?"
+- For prompts: use real, specific descriptions (camera/lens for photoreal, art direction for stylized). Plain prose, no markdown formatting INSIDE the prompt itself.
+- For multi-panel storyboards: explicit panel breaks with blank lines between them in the prompt.
+- After tool_result, summarize in 1-2 lines max. Don't restate the obvious.
+
+## When NOT to use the tool
+
+- The user is just chatting / asking questions / brainstorming with no clear "make it now" intent.
+- The user is asking you HOW something works (educate them, don't generate).
+- A required input is missing — ask first.
+- The model they want is marked DISABLED in the catalog.
+
+## MODEL CATALOG (live)
 
 ${MODEL_CATALOG}`;
 
-// Client sends OpenAI-shaped parts (text + image_url) — keep that contract so
-// the front-end doesn't have to change. We translate to Anthropic shape on
-// the server: image_url → {type: "image", source: {type: "url", url}}.
+// Client sends OpenAI-shaped parts (text + image_url) — we keep that
+// contract for backward compatibility. Translate to Anthropic shape on
+// the way through.
 type ClientPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string | ClientPart[];
+type ToolUseBlock = {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
 };
 
-function toAnthropicContent(content: string | ClientPart[]): string | Anthropic.ContentBlockParam[] {
+type ToolResultBlock = {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+};
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  // user can send strings, OpenAI-shaped parts (text+image), OR tool results
+  // assistant can send strings OR an array of text + tool_use blocks
+  content:
+    | string
+    | ClientPart[]
+    | (Anthropic.ContentBlockParam | ToolUseBlock | ToolResultBlock)[];
+};
+
+function toAnthropicContent(content: ChatMessage["content"]): string | Anthropic.ContentBlockParam[] {
   if (typeof content === "string") return content;
   const out: Anthropic.ContentBlockParam[] = [];
   for (const part of content) {
-    if (part.type === "text") {
-      out.push({ type: "text", text: part.text });
-    } else if (part.type === "image_url" && part.image_url?.url) {
+    const p = part as Record<string, unknown>;
+    const t = p.type as string;
+    if (t === "text") {
+      out.push({ type: "text", text: p.text as string });
+    } else if (t === "image_url" && p.image_url) {
+      const url = (p.image_url as { url: string }).url;
+      if (url) out.push({ type: "image", source: { type: "url", url } });
+    } else if (t === "tool_use") {
       out.push({
-        type: "image",
-        source: { type: "url", url: part.image_url.url },
+        type: "tool_use",
+        id: p.id as string,
+        name: p.name as string,
+        input: (p.input as Record<string, unknown>) ?? {},
       });
+    } else if (t === "tool_result") {
+      out.push({
+        type: "tool_result",
+        tool_use_id: p.tool_use_id as string,
+        content: p.content as string,
+        is_error: (p.is_error as boolean) || undefined,
+      });
+    } else if (t === "image" && p.source) {
+      out.push(part as Anthropic.ContentBlockParam);
     }
   }
   return out;
@@ -123,25 +157,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
 
-    // Keep last 10 messages for context.
-    const history = (messages.slice(-10) as ChatMessage[]);
+    // Trim to last 20 messages — generous, since tool_use/tool_result pairs
+    // can chain through several turns and we don't want to lose context.
+    const history = (messages.slice(-20) as ChatMessage[]);
 
-    // Per-account instruction + model picker — user's preferences override defaults.
     const [userInstruction, userModel] = await Promise.all([
       getUserAIInstruction(user.id),
       getUserAIModel(user.id),
     ]);
-    // resolveChatModel falls back to DEFAULT_CHAT_MODEL if user hasn't picked
-    // one, or if the stored value isn't in the allow-list (e.g. an old OpenAI
-    // model id from before the Claude swap).
     const chatModel = resolveChatModel(userModel);
 
-    // System blocks. The big BASE_SYSTEM_PROMPT (with the model catalog) is
-    // identical for every user and every request — we mark its tail with
-    // cache_control so Claude caches it. Subsequent requests pay ~10% of the
-    // base input cost on that ~5-15K token prefix instead of full price. The
-    // per-user instruction goes in a SEPARATE block after the cache breakpoint
-    // so per-user variation doesn't invalidate the shared cache.
+    // System blocks. The big BASE_SYSTEM_PROMPT (with model catalog) is
+    // identical for every user and every request — mark its tail with
+    // cache_control so Claude caches it. Per-user instruction goes in a
+    // separate block AFTER the cache breakpoint so per-user variation
+    // doesn't invalidate the shared cache.
     const systemBlocks: Anthropic.TextBlockParam[] = [
       {
         type: "text",
@@ -163,22 +193,45 @@ export async function POST(req: NextRequest) {
 
     const stream = anthropic.messages.stream({
       model: chatModel,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: systemBlocks,
+      tools: ANTHROPIC_TOOLS,
       messages: anthMessages,
     });
 
     const encoder = new TextEncoder();
+
+    // Stream NDJSON: one event per line, each line a JSON object. Event
+    // types the client cares about:
+    //   {type:"text", text:"…"}                 — text delta
+    //   {type:"tool_use", id, name, input}      — finalized tool call
+    //   {type:"end", stop_reason:"tool_use"|"end_turn"|…}
+    //   {type:"error", message}
+    //
+    // The stream API gives us per-event callbacks; we accumulate tool_use
+    // input deltas server-side (they arrive as partial JSON) and only emit
+    // the finalized tool_use once the block ends.
     const body = new ReadableStream({
       async start(controller) {
+        const send = (obj: unknown) => {
+          controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+        };
         try {
-          // Stream just the text deltas to the client. Other event types
-          // (content_block_start, message_delta, etc) carry metadata we don't
-          // need to forward — the client renders raw text.
           stream.on("text", (delta: string) => {
-            controller.enqueue(encoder.encode(delta));
+            send({ type: "text", text: delta });
           });
-          await stream.finalMessage();
+          stream.on("contentBlock", (block) => {
+            if (block.type === "tool_use") {
+              send({
+                type: "tool_use",
+                id: block.id,
+                name: block.name,
+                input: block.input,
+              });
+            }
+          });
+          const finalMsg = await stream.finalMessage();
+          send({ type: "end", stop_reason: finalMsg.stop_reason });
           controller.close();
         } catch (streamErr) {
           let msg = "stream failed";
@@ -189,7 +242,7 @@ export async function POST(req: NextRequest) {
           } else if (streamErr instanceof Error) {
             msg = streamErr.message;
           }
-          controller.enqueue(encoder.encode(`\n\n[Error: ${msg}]`));
+          send({ type: "error", message: msg });
           controller.close();
         }
       },
@@ -197,7 +250,7 @@ export async function POST(req: NextRequest) {
 
     return new Response(body, {
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         "X-Accel-Buffering": "no",
       },
