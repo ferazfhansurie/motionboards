@@ -118,7 +118,7 @@ function readAsDataUrl(file: File): Promise<string> {
 }
 
 export function AIPromptPanel() {
-  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, theme, items: canvasItems, boards, activeBoardId } = useAppStore();
+  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, pendingChatSeed, setPendingChatSeed, theme, items: canvasItems, boards, activeBoardId } = useAppStore();
   const isDark = theme === "dark";
 
   // Resizable width — persisted to localStorage
@@ -684,8 +684,10 @@ export function AIPromptPanel() {
   const isUploading = attachments.some((a) => a.uploading);
   const hasUploadError = attachments.some((a) => a.error);
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const handleSend = async (overrideText?: string) => {
+    // overrideText is set when the AI Agent toggle hands a request off from
+    // the empty hero — bypasses the input/attachments path entirely.
+    const text = (overrideText ?? input).trim();
     if ((!text && attachments.length === 0) || loading || !currentChatId) return;
     if (overLimit || isUploading || hasUploadError) return;
 
@@ -757,6 +759,22 @@ export function AIPromptPanel() {
       setLoading(false);
     }
   };
+
+  // AI Agent handoff: when the empty hero hands a request to ADletic AI it
+  // sets pendingChatSeed in the store. Consume it once the panel is open and
+  // a chat is ready, then clear the seed.
+  const seedFiredRef = useRef(false);
+  useEffect(() => {
+    if (!pendingChatSeed) { seedFiredRef.current = false; return; }
+    if (!isAIPromptOpen || !currentChatId || loading) return;
+    if (seedFiredRef.current) return;
+    seedFiredRef.current = true;
+    const seed = pendingChatSeed;
+    setPendingChatSeed(null);
+    // Defer one tick so any pending state writes (open, current chat) settle.
+    setTimeout(() => { handleSend(seed); }, 30);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingChatSeed, isAIPromptOpen, currentChatId, loading]);
 
   const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
@@ -1263,7 +1281,7 @@ export function AIPromptPanel() {
               <button
                 type="button"
                 disabled={loading || overLimit || isUploading || hasUploadError || (!input.trim() && attachments.length === 0)}
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 className={`absolute right-3 bottom-3 h-7 w-7 rounded-full flex items-center justify-center transition-all ${
                   loading || overLimit || isUploading || hasUploadError || (!input.trim() && attachments.length === 0)
                     ? isDark ? "bg-gray-700 text-gray-500" : "bg-gray-200 text-gray-400"

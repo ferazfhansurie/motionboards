@@ -287,6 +287,13 @@ export interface AppState {
   isProfileOpen: boolean;
   isHistoryOpen: boolean;
   isAIPromptOpen: boolean;
+  // AI Agent mode — when true, the empty-hero "Generate" sends the user's
+  // request to ADletic AI in the panel instead of directly running the
+  // currently selected model. Persisted to localStorage on toggle.
+  aiAgentMode: boolean;
+  // Seed message for the AI panel — set by AI Agent mode handoff. Panel
+  // consumes it on mount, fires it as the first user message, then clears.
+  pendingChatSeed: string | null;
 
   // References
   startFrameId: string | null;
@@ -344,6 +351,8 @@ export interface AppState {
   setProfileOpen: (open: boolean) => void;
   setHistoryOpen: (open: boolean) => void;
   setAIPromptOpen: (open: boolean) => void;
+  setAiAgentMode: (on: boolean) => void;
+  setPendingChatSeed: (seed: string | null) => void;
   setStartFrame: (id: string | null) => void;
   setEndFrame: (id: string | null) => void;
   toggleInputRef: (id: string) => void;
@@ -433,6 +442,8 @@ export const useAppStore = create<AppState>((set) => {
   isProfileOpen: false,
   isHistoryOpen: false,
   isAIPromptOpen: false,
+  aiAgentMode: typeof window !== "undefined" && window.localStorage.getItem("motionboards_ai_agent_mode") === "true",
+  pendingChatSeed: null,
   pendingPrompt: null,
   startFrameId: null,
   endFrameId: null,
@@ -646,6 +657,13 @@ export const useAppStore = create<AppState>((set) => {
   setProfileOpen: (isProfileOpen) => set({ isProfileOpen, isHistoryOpen: false }),
   setHistoryOpen: (isHistoryOpen) => set({ isHistoryOpen, isProfileOpen: false }),
   setAIPromptOpen: (isAIPromptOpen) => set({ isAIPromptOpen }),
+  setAiAgentMode: (aiAgentMode) => {
+    if (typeof window !== "undefined") {
+      try { window.localStorage.setItem("motionboards_ai_agent_mode", String(aiAgentMode)); } catch {}
+    }
+    set({ aiAgentMode });
+  },
+  setPendingChatSeed: (pendingChatSeed) => set({ pendingChatSeed }),
   setStartFrame: (startFrameId) => set({ startFrameId }),
   setEndFrame: (endFrameId) => set({ endFrameId }),
   toggleInputRef: (id) =>

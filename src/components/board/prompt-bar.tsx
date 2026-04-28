@@ -199,6 +199,8 @@ export function PromptBar() {
     setHistoryOpen,
     isAIPromptOpen,
     setAIPromptOpen,
+    aiAgentMode,
+    setAiAgentMode,
     generationOptions,
     setGenerationOption,
     boards,
@@ -535,6 +537,23 @@ export function PromptBar() {
   };
 
   const handleGenerate = async () => {
+    // AI Agent mode — instead of running the model directly, hand the user's
+    // request to ADletic AI in the panel. ADletic will craft / clarify and
+    // (in the next wave) call generation tools on the user's behalf.
+    if (aiAgentMode) {
+      const text = prompt.trim();
+      if (!text) {
+        showToast("Tell ADletic what you want to create", { kind: "info" });
+        return;
+      }
+      // Seed the chat panel with the user's message and open it. The panel
+      // reads pendingChatSeed on mount and auto-sends it as the first turn.
+      useAppStore.getState().setPendingChatSeed(text);
+      setAIPromptOpen(true);
+      setPrompt("");
+      return;
+    }
+
     if (!selectedModel) return;
     if (!prompt.trim() && selectedModel.inputs.some((i) => i.type === "text" && i.required)) return;
 
@@ -1199,18 +1218,61 @@ export function PromptBar() {
         {/* Centered prompt */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="pointer-events-auto w-full max-w-xl px-4">
+            {/* Manual ↔ AI Agent mode toggle */}
+            <div className="flex items-center justify-center mb-4">
+              <div className={`inline-flex items-center gap-1 rounded-full p-1 border ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"} shadow-sm`}>
+                <button
+                  type="button"
+                  onClick={() => setAiAgentMode(false)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
+                    !aiAgentMode
+                      ? "bg-[#f26522] text-white shadow"
+                      : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-[#0d1117]"
+                  }`}
+                  title="Pick a model and write the prompt yourself"
+                >
+                  <WandSparkles className="h-3 w-3" />
+                  Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiAgentMode(true)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
+                    aiAgentMode
+                      ? "bg-gradient-to-r from-[#f26522] to-[#ec4899] text-white shadow"
+                      : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-[#0d1117]"
+                  }`}
+                  title="Just describe what you want — ADletic AI handles the rest"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  AI Agent
+                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${aiAgentMode ? "bg-white/25" : "bg-[#f26522]/15 text-[#f26522]"}`}>NEW</span>
+                </button>
+              </div>
+            </div>
+
             <div className="text-center mb-6">
               <h2 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-                Describe anything. We'll generate it.
+                {aiAgentMode
+                  ? "Just describe it. ADletic builds it."
+                  : "Describe anything. We'll generate it."}
               </h2>
               <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                Type your prompt and {selectedModel?.name || "AI"} will create it for you
+                {aiAgentMode
+                  ? "Tell the AI what you want — it'll pick the right model, ask for what it needs, and run it for you"
+                  : `Type your prompt and ${selectedModel?.name || "AI"} will create it for you`}
               </p>
             </div>
             <div className="relative">
               <textarea
                 ref={promptRef}
-                placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "Select a model first"}
+                placeholder={
+                  aiAgentMode
+                    ? "Tell ADletic what to build — e.g. \"a 30s comic-noir reel about a courier in a cyberpunk city\""
+                    : selectedModel
+                      ? `Describe what ${selectedModel.name} should create...`
+                      : "Select a model first"
+                }
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => {
@@ -1282,17 +1344,19 @@ export function PromptBar() {
                 </div>
                 <button
                   type="button"
-                  disabled={!selectedModel}
+                  disabled={!aiAgentMode && !selectedModel}
                   onClick={handleGenerate}
                   className={`shrink-0 flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-semibold transition-all ${
-                    !selectedModel
+                    !aiAgentMode && !selectedModel
                       ? "bg-gray-300 text-gray-400 cursor-not-allowed"
-                      : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer hover:scale-105"
+                      : aiAgentMode
+                        ? "bg-gradient-to-r from-[#f26522] to-[#ec4899] text-white hover:shadow-lg cursor-pointer hover:scale-105"
+                        : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer hover:scale-105"
                   }`}
-                  title="Generate (Ctrl+Enter)"
+                  title={aiAgentMode ? "Send to ADletic AI (Ctrl+Enter)" : "Generate (Ctrl+Enter)"}
                 >
-                  <WandSparkles className="h-3.5 w-3.5" />
-                  Generate
+                  {aiAgentMode ? <Sparkles className="h-3.5 w-3.5" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                  {aiAgentMode ? "Ask ADletic" : "Generate"}
                 </button>
               </div>
             </div>
