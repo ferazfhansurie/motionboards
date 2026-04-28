@@ -19,12 +19,26 @@ type MessagePart =
   | { type: "image_url"; image_url: { url: string } }
   // assistant-side: a tool the AI invoked. We render this inline as a card.
   // status/result are local UI state — the server only sees id/name/input.
+  //
+  // Status flow for `start_generation`:
+  //   pending → awaiting_approval → running → completed / failed
+  //                              ↘ cancelled  (user clicked Cancel on the
+  //                                            review card; tool_result
+  //                                            tells Claude what happened)
+  //
+  // Other tools skip awaiting_approval and go straight pending → running.
   | {
       type: "tool_use";
       id: string;
       name: string;
       input: Record<string, unknown>;
-      status?: "pending" | "running" | "completed" | "failed";
+      status?:
+        | "pending"
+        | "awaiting_approval"
+        | "running"
+        | "completed"
+        | "failed"
+        | "cancelled";
       result?: { itemId?: string; outputUrl?: string; error?: string; modelName?: string };
     }
   // user-side: result of a tool call we executed. Goes back to the AI to
@@ -98,6 +112,29 @@ function toPlainPrompt(markdown: string): string {
 function messageImages(content: MessageContent): string[] {
   if (typeof content === "string") return [];
   return content.filter((p) => p.type === "image_url").map((p) => (p as { image_url: { url: string } }).image_url.url);
+}
+
+// On chat load, flip any orphaned `awaiting_approval` tool_use blocks to
+// `cancelled`. These would otherwise render Generate / Edit / Cancel
+// buttons whose handlers point at a long-dead promise — clicking them
+// would do nothing. Treating them as cancelled is the safe default
+// (matches what would have happened if the user closed the panel
+// without deciding). `running` is left alone: the canvas item may still
+// be processing in the background, and we don't want to misreport that.
+function normalizeLoadedMessages(messages: Message[]): Message[] {
+  return messages.map((m) => {
+    if (m.role !== "assistant" || !Array.isArray(m.content)) return m;
+    let touched = false;
+    const content = m.content.map((p) => {
+      if (p.type !== "tool_use") return p;
+      if (p.status === "awaiting_approval") {
+        touched = true;
+        return { ...p, status: "cancelled" as const };
+      }
+      return p;
+    });
+    return touched ? { ...m, content } : m;
+  });
 }
 
 async function extractVideoFrame(file: File): Promise<string | null> {
@@ -627,7 +664,7 @@ export function AIPromptPanel() {
     try {
       const res = await fetch(`/api/chats/${id}`);
       const data = await res.json();
-      setMessages(data.chat?.messages || []);
+      setMessages(normalizeLoadedMessages(data.chat?.messages || []));
     } catch {
       setMessages([]);
     }
@@ -700,6 +737,24 @@ export function AIPromptPanel() {
   const handleSendRef = useRef<((override?: { text?: string; imageUrl?: string }) => void) | null>(null);
   const createNewChatRef = useRef<(() => Promise<void>) | null>(null);
   const seedFiredRef = useRef(false);
+
+  // Approval bridge for the review-before-generate flow. When the tool loop
+  // hits a `start_generation`, it parks a resolver here keyed by tool_use
+  // id. The ToolUseCard's Generate / Edit / Cancel buttons resolve the
+  // matching promise so the loop can continue. Map-of-resolvers (instead
+  // of a single ref) means concurrent tool calls don't clobber each other.
+  type ApprovalDecision =
+    | { kind: "approve"; input?: Record<string, unknown> }
+    | { kind: "cancel" };
+  const approvalHandlersRef = useRef<Map<string, (d: ApprovalDecision) => void>>(new Map());
+  const approveTool = useCallback((id: string, input?: Record<string, unknown>) => {
+    const handler = approvalHandlersRef.current.get(id);
+    if (handler) handler({ kind: "approve", input });
+  }, []);
+  const cancelTool = useCallback((id: string) => {
+    const handler = approvalHandlersRef.current.get(id);
+    if (handler) handler({ kind: "cancel" });
+  }, []);
   useEffect(() => {
     if (!pendingChatSeed) { seedFiredRef.current = false; return; }
     if (!isAIPromptOpen || loading) return;
@@ -950,8 +1005,12 @@ export function AIPromptPanel() {
 
           const toolResults: MessagePart[] = [];
           for (const tu of toolUses) {
-            // Mark as running
-            const updateBlock = (status: "running" | "completed" | "failed", result?: { itemId?: string; outputUrl?: string; error?: string; modelName?: string }) => {
+            // Patch this specific tool_use block in the assistant message
+            // so its card animates through the status flow. Accepts a
+            // partial so we can update status, input, and/or result in a
+            // single pass.
+            type ToolUseBlock = Extract<MessagePart, { type: "tool_use" }>;
+            const patchBlock = (patch: Partial<ToolUseBlock>) => {
               history = history.map((m) => {
                 if (m !== assistant) return m;
                 if (!Array.isArray(m.content)) return m;
@@ -959,27 +1018,63 @@ export function AIPromptPanel() {
                   ...m,
                   content: m.content.map((p) =>
                     p.type === "tool_use" && p.id === tu.id
-                      ? { ...p, status, result }
+                      ? { ...p, ...patch }
                       : p,
                   ),
                 };
               });
               setMessages(history);
             };
-            updateBlock("running");
-            const tr = await dispatchTool(tu);
-            // Pull the run result so the card can show the generated preview
+
+            // Review-before-generate: pause `start_generation` and wait for
+            // the user to approve / edit / cancel via the ToolUseCard
+            // buttons. Other tools skip this and run straight away.
+            let runInput: Record<string, unknown> = tu.input;
+            if (tu.name === "start_generation") {
+              patchBlock({ status: "awaiting_approval" });
+              const decision = await new Promise<ApprovalDecision>((resolve) => {
+                approvalHandlersRef.current.set(tu.id, resolve);
+              });
+              approvalHandlersRef.current.delete(tu.id);
+
+              if (decision.kind === "cancel") {
+                patchBlock({ status: "cancelled" });
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: tu.id,
+                  content: "The user reviewed this proposed generation and cancelled it before it ran. Don't restate the prompt back at them — ask in one short line what they'd like changed (different angle, different model, different vibe), or suggest a tighter alternative.",
+                  // Not is_error — Claude should respond conversationally.
+                  is_error: false,
+                });
+                continue;
+              }
+
+              // Approved. If the user edited any inputs (currently just the
+              // prompt), persist the edit on the tool_use block so the
+              // history we send to Claude on the next turn reflects what
+              // actually ran.
+              if (decision.input) {
+                runInput = decision.input;
+                patchBlock({ input: runInput });
+              }
+            }
+
+            patchBlock({ status: "running" });
+            const tr = await dispatchTool({ ...tu, input: runInput });
+
+            // Pull the run result so the card can show the generated preview.
             let resultMeta: { itemId?: string; outputUrl?: string; error?: string; modelName?: string } | undefined;
             if (tu.name === "start_generation") {
-              const input = tu.input;
               // dispatchTool already ran the generation — mirror what it
               // returned by reading the canvas item it created.
               const items = useAppStore.getState().items;
-              // Find the most recent generation matching the prompt
+              // Find the most recent generation matching the prompt that
+              // actually ran (runInput, not tu.input — they may differ if
+              // the user edited the prompt during review).
               const match = [...items].reverse().find((it) =>
                 it.type === "generation" &&
-                it.model === (input.model_id as string) &&
-                it.prompt === (input.prompt as string),
+                it.model === (runInput.model_id as string) &&
+                it.prompt === (runInput.prompt as string),
               );
               if (match) {
                 resultMeta = {
@@ -991,7 +1086,7 @@ export function AIPromptPanel() {
               }
             }
             const trIsError = tr.type === "tool_result" && !!tr.is_error;
-            updateBlock(trIsError ? "failed" : "completed", resultMeta);
+            patchBlock({ status: trIsError ? "failed" : "completed", result: resultMeta });
             toolResults.push(tr);
           }
 
@@ -1403,7 +1498,13 @@ export function AIPromptPanel() {
                     {toolUses.length > 0 && (
                       <div className={`flex flex-col gap-2 ${text ? "mt-3" : ""}`}>
                         {toolUses.map((tu) => (
-                          <ToolUseCard key={tu.id} tool={tu} isDark={isDark} />
+                          <ToolUseCard
+                            key={tu.id}
+                            tool={tu}
+                            isDark={isDark}
+                            onApprove={approveTool}
+                            onCancel={cancelTool}
+                          />
                         ))}
                       </div>
                     )}
@@ -1590,16 +1691,21 @@ export function AIPromptPanel() {
 }
 
 // Renders a tool_use call as an inline card so the user can see what the
-// agent is doing in real time. Currently only `start_generation` has a
-// rich card; other tools render a generic skeleton. Adding new tools to
-// AGENT_TOOLS without a custom card here is fine — they fall through to
-// the generic shape.
+// agent is doing in real time. For `start_generation`, this card is also
+// the **review surface**: when the loop pauses awaiting approval, we show
+// Generate / Edit / Cancel buttons here. Other tools render a generic
+// skeleton — adding new tools to AGENT_TOOLS without a custom card here
+// is fine.
 function ToolUseCard({
   tool,
   isDark,
+  onApprove,
+  onCancel,
 }: {
   tool: Extract<MessagePart, { type: "tool_use" }>;
   isDark: boolean;
+  onApprove: (id: string, input?: Record<string, unknown>) => void;
+  onCancel: (id: string) => void;
 }) {
   const status = tool.status || "pending";
   const isStart = tool.name === "start_generation";
@@ -1609,16 +1715,37 @@ function ToolUseCard({
   const promptPreview = prompt.length > 120 ? prompt.slice(0, 117) + "…" : prompt;
   const outputUrl = tool.result?.outputUrl;
   const errorMsg = tool.result?.error;
+  const awaiting = status === "awaiting_approval";
+
+  // Local edit state — only relevant while awaiting approval. Keyed off
+  // tool.id implicitly via React's per-instance state, so each card gets
+  // its own draft.
+  const [editing, setEditing] = useState(false);
+  const [draftPrompt, setDraftPrompt] = useState(prompt);
 
   const statusBadge = (() => {
     if (status === "completed") return { icon: <Check className="h-3 w-3" />, label: "Done", color: "text-green-500", bg: "bg-green-500/10 border-green-500/30" };
     if (status === "failed") return { icon: <X className="h-3 w-3" />, label: "Failed", color: "text-red-500", bg: "bg-red-500/10 border-red-500/30" };
+    if (status === "cancelled") return { icon: <X className="h-3 w-3" />, label: "Cancelled", color: isDark ? "text-gray-500" : "text-gray-400", bg: isDark ? "bg-gray-700/30 border-gray-700" : "bg-gray-100 border-gray-200" };
     if (status === "running") return { icon: <Loader2 className="h-3 w-3 animate-spin" />, label: "Generating…", color: "text-[#f26522]", bg: "bg-[#f26522]/10 border-[#f26522]/30" };
+    if (status === "awaiting_approval") return { icon: <Sparkles className="h-3 w-3" />, label: "Review", color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/30" };
     return { icon: <Loader2 className="h-3 w-3 animate-spin" />, label: "Starting…", color: "text-[#f26522]", bg: "bg-[#f26522]/10 border-[#f26522]/30" };
   })();
 
+  const subtitle = isStart
+    ? (status === "awaiting_approval" ? "Proposed generation" :
+       status === "cancelled" ? "Cancelled by you" :
+       "Generating")
+    : "Tool call";
+
   return (
-    <div className={`rounded-xl border p-3 ${isDark ? "bg-[#0d1117]/80 border-gray-700" : "bg-white border-gray-200"}`}>
+    <div className={`rounded-xl border p-3 ${
+      status === "cancelled"
+        ? isDark ? "bg-[#0d1117]/40 border-gray-800 opacity-70" : "bg-gray-50 border-gray-200 opacity-70"
+        : awaiting
+          ? isDark ? "bg-[#0d1117] border-amber-500/40 ring-1 ring-amber-500/20" : "bg-white border-amber-500/50 ring-1 ring-amber-500/15"
+          : isDark ? "bg-[#0d1117]/80 border-gray-700" : "bg-white border-gray-200"
+    }`}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#f26522] to-[#ec4899] flex items-center justify-center shrink-0">
@@ -1629,7 +1756,7 @@ function ToolUseCard({
               {isStart ? modelName : tool.name}
             </p>
             <p className={`text-[9px] uppercase tracking-wider font-semibold ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-              {isStart ? "Generating" : "Tool call"}
+              {subtitle}
             </p>
           </div>
         </div>
@@ -1638,11 +1765,79 @@ function ToolUseCard({
           {statusBadge.label}
         </span>
       </div>
-      {isStart && promptPreview && (
-        <p className={`text-[11px] leading-snug mb-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          {promptPreview}
-        </p>
+
+      {/* Prompt — full text while reviewing or editing, preview otherwise. */}
+      {isStart && (awaiting || editing) ? (
+        editing ? (
+          <textarea
+            value={draftPrompt}
+            onChange={(e) => setDraftPrompt(e.target.value)}
+            rows={Math.min(10, Math.max(3, draftPrompt.split("\n").length))}
+            autoFocus
+            className={`w-full text-[11px] leading-snug rounded-md border px-2.5 py-2 mb-2 resize-y focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 ${isDark ? "bg-[#161b22] border-gray-700 text-gray-200" : "bg-white border-gray-300 text-[#0d1117]"}`}
+          />
+        ) : (
+          prompt && (
+            <p className={`text-[11px] leading-snug mb-2 whitespace-pre-wrap ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              {prompt}
+            </p>
+          )
+        )
+      ) : (
+        isStart && promptPreview && (
+          <p className={`text-[11px] leading-snug mb-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+            {promptPreview}
+          </p>
+        )
       )}
+
+      {/* Review buttons — only when awaiting approval. */}
+      {isStart && awaiting && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (editing) {
+                const trimmed = draftPrompt.trim();
+                if (!trimmed) return;
+                onApprove(tool.id, { ...input, prompt: trimmed });
+                setEditing(false);
+              } else {
+                onApprove(tool.id);
+              }
+            }}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-lg px-3 py-1.5 bg-[#f26522] text-white hover:bg-[#d9541a] transition-colors"
+          >
+            <Sparkles className="h-3 w-3" />
+            {editing ? "Save & generate" : "Generate"}
+          </button>
+          {editing ? (
+            <button
+              type="button"
+              onClick={() => { setEditing(false); setDraftPrompt(prompt); }}
+              className={`text-[11px] font-medium rounded-lg px-2.5 py-1.5 transition-colors ${isDark ? "text-gray-400 hover:text-gray-200 hover:bg-white/5" : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"}`}
+            >
+              Cancel edit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className={`inline-flex items-center gap-1 text-[11px] font-medium rounded-lg px-2.5 py-1.5 border transition-colors ${isDark ? "border-gray-700 text-gray-200 hover:border-[#f26522]/40 hover:bg-white/5" : "border-gray-300 text-[#0d1117] hover:border-[#f26522]/40 hover:bg-[#fff5ee]"}`}
+            >
+              Edit prompt
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onCancel(tool.id)}
+            className={`text-[11px] font-medium rounded-lg px-2.5 py-1.5 transition-colors ${isDark ? "text-gray-400 hover:text-red-400 hover:bg-red-500/5" : "text-gray-500 hover:text-red-500 hover:bg-red-50"}`}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {outputUrl && status === "completed" && (
         <div className={`mt-2 rounded-md overflow-hidden border ${isDark ? "border-gray-700" : "border-gray-200"}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

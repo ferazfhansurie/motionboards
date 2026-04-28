@@ -43,14 +43,18 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "start_generation",
     kind: "client_action",
-    description: `Run a generation on the user's canvas using a specific model from the catalog.
+    description: `Propose a generation for the user to review, then run it on their canvas if they approve.
 
 Use this when:
   - You have a clear prompt (text describing what to create).
   - You've picked the right model based on the user's request — match category (Image / Video / Audio) and type (t2v / i2v / s2e / t2i / i2i / etc.) to what they asked for.
   - You have any required reference inputs (e.g. an input_image_url for i2i / i2v / s2e models). If a model needs an image you don't have, ask the user FIRST in plain text — don't call this tool yet.
 
-The user will see a card appear on their canvas immediately. The generation runs in the background and the result fills in when ready. The tool result returns when generation either completes or fails — use that to tell the user how it went and what they can do next (e.g. "want to animate this with Veo?").
+**Review step.** When you call this tool the user sees a review card in the chat with the proposed model + prompt and three buttons: Generate (approve), Edit prompt (tweak then approve), or Cancel. The actual generation only kicks off after they approve. So you don't need to ask "should I generate?" in plain text — just call the tool with your best prompt and model. The review card lets the user fine-tune.
+
+If the user cancels, the tool_result tells you so — respond gracefully (don't restate the prompt back at them; ask what to change or suggest a different angle, briefly).
+
+If approved, the generation runs in the background and the result fills in when ready. The tool result returns when generation completes or fails — use that to tell the user how it went and what they can do next (e.g. "want to animate this with Veo?").
 
 Pick model_id from the catalog in your system prompt. Don't invent ids.`,
     input_schema: {
