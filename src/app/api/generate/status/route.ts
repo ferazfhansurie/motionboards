@@ -78,14 +78,18 @@ export async function GET(req: NextRequest) {
 
     const settings = getSettings();
 
-    // --- Gemini Video polling (Vertex AI preferred, falls back to API key) ---
+    // --- Veo (Gemini Video) polling. Uses the dedicated GEMINI_VEO_* env
+    // vars so its project/quota stays separate from Gemini Image. Vertex AI
+    // path takes precedence when both project + service account are set,
+    // otherwise falls back to the AI Studio API key.
     if (geminiVideo === "true") {
-      const gcpProject = process.env.GOOGLE_PROJECT_ID;
+      const gcpProject = process.env.GEMINI_VEO_PROJECT_ID;
       const gcpLocation = process.env.GOOGLE_LOCATION || "global";
-      const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+      const gcpServiceAccount = process.env.GEMINI_VEO_SERVICE_ACCOUNT_KEY;
+      const veoApiKey = process.env.GEMINI_VEO_API_KEY;
       const hasVertexAI = !!(gcpProject && gcpServiceAccount);
 
-      if (!hasVertexAI && !settings.geminiApiKey) return NextResponse.json({ error: "Google API not configured" }, { status: 500 });
+      if (!hasVertexAI && !veoApiKey) return NextResponse.json({ error: "Veo not configured. Set GEMINI_VEO_API_KEY or GEMINI_VEO_PROJECT_ID + GEMINI_VEO_SERVICE_ACCOUNT_KEY." }, { status: 500 });
       try {
         const { GoogleGenAI, GenerateVideosOperation } = await import("@google/genai");
         const ai = hasVertexAI
@@ -95,7 +99,7 @@ export async function GET(req: NextRequest) {
               location: gcpLocation,
               googleAuthOptions: { credentials: JSON.parse(gcpServiceAccount!) },
             })
-          : new GoogleGenAI({ apiKey: settings.geminiApiKey });
+          : new GoogleGenAI({ apiKey: veoApiKey });
 
         // Poll using operation name stored in requestId
         const opStub = new GenerateVideosOperation();

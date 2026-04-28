@@ -356,23 +356,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Gemini: prefer Vertex AI (direct Google Cloud, service-account auth) for
-    // both video and images when the GCP env vars are set. Falls back to the
-    // AI Studio API key if only that's configured.
+    // Gemini: image (Nano Banana 2) uses GEMINI_API_KEY directly via AI Studio.
+    // Video (Veo) uses a dedicated set — GEMINI_VEO_API_KEY for AI Studio, or
+    // GEMINI_VEO_PROJECT_ID + GEMINI_VEO_SERVICE_ACCOUNT_KEY for Vertex AI —
+    // so Veo's quota / billing stays separate from image generation.
     if (modelInfo.provider === "gemini") {
-      const gcpProject = process.env.GOOGLE_PROJECT_ID;
-      const gcpServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-      const hasVertexAI = !!(gcpProject && gcpServiceAccount);
       const isVideo = ["t2v", "i2v", "s2e"].includes(modelInfo.type);
-      // Vertex AI for everything when it's available; otherwise fall back to the API key
-      const useVertexAI = hasVertexAI;
+
+      let apiKey: string | undefined;
+      let gcpProject: string | undefined;
+      let gcpServiceAccount: string | undefined;
+      let useVertexAI = false;
+
+      if (isVideo) {
+        apiKey = process.env.GEMINI_VEO_API_KEY;
+        gcpProject = process.env.GEMINI_VEO_PROJECT_ID;
+        gcpServiceAccount = process.env.GEMINI_VEO_SERVICE_ACCOUNT_KEY;
+        useVertexAI = !!(gcpProject && gcpServiceAccount);
+        if (!useVertexAI && !apiKey) {
+          return NextResponse.json({
+            error: "Veo not configured. Set GEMINI_VEO_API_KEY (AI Studio), or GEMINI_VEO_PROJECT_ID + GEMINI_VEO_SERVICE_ACCOUNT_KEY (Vertex AI).",
+          }, { status: 500 });
+        }
+      } else {
+        apiKey = settings.geminiApiKey;
+        if (!apiKey) {
+          return NextResponse.json({
+            error: "Gemini Image not configured. Set GEMINI_API_KEY.",
+          }, { status: 500 });
+        }
+      }
+
       const gcpLocation = process.env.GOOGLE_LOCATION || "global";
 
-      if (!useVertexAI && !settings.geminiApiKey) {
-        return NextResponse.json({
-          error: "Google API not configured. Set GOOGLE_PROJECT_ID + GOOGLE_SERVICE_ACCOUNT_KEY for Vertex AI, or a GEMINI_API_KEY for AI Studio.",
-        }, { status: 500 });
-      }
       try {
         const { GoogleGenAI } = await import("@google/genai");
         const ai = useVertexAI
@@ -382,7 +398,7 @@ export async function POST(req: NextRequest) {
               location: gcpLocation,
               googleAuthOptions: { credentials: JSON.parse(gcpServiceAccount!) },
             })
-          : new GoogleGenAI({ apiKey: settings.geminiApiKey });
+          : new GoogleGenAI({ apiKey });
 
         if (isVideo) {
           // --- Gemini Video Generation (async long-running operation) ---
