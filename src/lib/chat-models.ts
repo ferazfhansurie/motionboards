@@ -1,9 +1,9 @@
-// Allow-list of OpenAI chat models the user can pick for ADletic AI.
+// Allow-list of Claude chat models the user can pick for ADletic AI.
 // Single source of truth — used by:
 //   - the model picker in the AI panel settings (rendered)
 //   - /api/ai-prompt for runtime validation (rejects unknown ids)
 //   - /api/ai-settings for write validation
-// Add new entries here when OpenAI ships a new model and you want it
+// Add new entries here when Anthropic ships a new model and you want it
 // available in the picker.
 
 export interface ChatModel {
@@ -15,42 +15,27 @@ export interface ChatModel {
 
 export const CHAT_MODELS: ChatModel[] = [
   {
-    id: "gpt-5",
-    name: "GPT-5",
-    description: "Best — newest flagship, smartest reasoning",
+    id: "claude-haiku-4-5",
+    name: "Claude Haiku 4.5",
+    description: "Default — fastest and most cost-effective. Best for chat.",
     recommended: true,
   },
   {
-    id: "gpt-5-mini",
-    name: "GPT-5 mini",
-    description: "Faster & cheaper than GPT-5, still very strong",
+    id: "claude-sonnet-4-6",
+    name: "Claude Sonnet 4.6",
+    description: "Balanced — best speed-vs-intelligence tradeoff for complex tasks",
   },
   {
-    id: "gpt-4.1",
-    name: "GPT-4.1",
-    description: "Previous flagship — great for long-context tasks",
-  },
-  {
-    id: "gpt-4.1-mini",
-    name: "GPT-4.1 mini",
-    description: "Old default — fast, cheap, capable",
-  },
-  {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    description: "Multimodal classic, solid all-around",
-  },
-  {
-    id: "gpt-4o-mini",
-    name: "GPT-4o mini",
-    description: "Cheapest tier — for very simple chats",
+    id: "claude-opus-4-7",
+    name: "Claude Opus 4.7",
+    description: "Most capable — best for long-horizon agentic work",
   },
 ];
 
-// Default for users who haven't picked anything. "Best chatbot" per user
-// preference — they upgraded to the full OpenAI catalog so we can ship
-// the flagship as the out-of-box choice.
-export const DEFAULT_CHAT_MODEL = "gpt-5";
+// Default for users who haven't picked anything. Haiku 4.5 — fast, cheap,
+// and plenty smart for prompt-crafting and conversation. Users who want
+// more capability can upgrade to Sonnet 4.6 or Opus 4.7 from the picker.
+export const DEFAULT_CHAT_MODEL = "claude-haiku-4-5";
 
 export function isValidChatModel(id: string | null | undefined): boolean {
   if (!id) return false;

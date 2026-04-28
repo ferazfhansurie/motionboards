@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { getUserFromToken, getUserAIInstruction, getUserAIModel } from "@/lib/db";
 import { models } from "@/lib/models";
 import { resolveChatModel } from "@/lib/chat-models";
@@ -33,9 +33,10 @@ function buildModelCatalog(): string {
 }
 const MODEL_CATALOG = buildModelCatalog();
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// OpenAI calls with attached images can take 20–40s; give the route headroom.
+// Claude streaming over a long system prompt + image payloads can take
+// ~30-60s end to end. Give the route headroom on Vercel Pro (300s ceiling).
 export const maxDuration = 60;
 
 // ADletic AI is a general-purpose assistant inside MotionBoards. It can hold
@@ -77,8 +78,9 @@ If the user asks "what should I tag for [model]?", answer using the input list �
 
 ${MODEL_CATALOG}`;
 
-// The client already sends OpenAI-shaped parts (text + image_url), so we just
-// pass them through to chat.completions after a shallow type cast.
+// Client sends OpenAI-shaped parts (text + image_url) — keep that contract so
+// the front-end doesn't have to change. We translate to Anthropic shape on
+// the server: image_url → {type: "image", source: {type: "url", url}}.
 type ClientPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
@@ -88,6 +90,22 @@ type ChatMessage = {
   content: string | ClientPart[];
 };
 
+function toAnthropicContent(content: string | ClientPart[]): string | Anthropic.ContentBlockParam[] {
+  if (typeof content === "string") return content;
+  const out: Anthropic.ContentBlockParam[] = [];
+  for (const part of content) {
+    if (part.type === "text") {
+      out.push({ type: "text", text: part.text });
+    } else if (part.type === "image_url" && part.image_url?.url) {
+      out.push({
+        type: "image",
+        source: { type: "url", url: part.image_url.url },
+      });
+    }
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("session")?.value;
@@ -96,8 +114,8 @@ export async function POST(req: NextRequest) {
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
     }
 
     const { messages } = await req.json();
@@ -113,51 +131,64 @@ export async function POST(req: NextRequest) {
       getUserAIInstruction(user.id),
       getUserAIModel(user.id),
     ]);
-    const systemPrompt = userInstruction
-      ? `${BASE_SYSTEM_PROMPT}\n\n## USER PREFERENCES (follow these)\n${userInstruction}`
-      : BASE_SYSTEM_PROMPT;
     // resolveChatModel falls back to DEFAULT_CHAT_MODEL if user hasn't picked
-    // one, or if the stored value isn't in the allow-list (e.g. an old model
-    // we removed from the catalog).
+    // one, or if the stored value isn't in the allow-list (e.g. an old OpenAI
+    // model id from before the Claude swap).
     const chatModel = resolveChatModel(userModel);
 
-    // GPT-5 family is more restrictive than GPT-4.x:
-    //   - max_tokens → max_completion_tokens, and the budget is SHARED with
-    //     hidden reasoning tokens. 1500 wasn't enough — the model spent it
-    //     all on reasoning and emitted nothing ("Could not generate a
-    //     response"). Bumping to 4000 and setting reasoning_effort=minimal
-    //     so a chat reply actually reaches the wire.
-    //   - temperature must be the default (1) — any custom value is rejected.
-    const isGpt5Family = chatModel.startsWith("gpt-5");
-    const tunableParams: Record<string, unknown> = isGpt5Family
-      ? { max_completion_tokens: 4000, reasoning_effort: "minimal" }
-      : { max_tokens: 1500, temperature: 0.8 };
+    // System blocks. The big BASE_SYSTEM_PROMPT (with the model catalog) is
+    // identical for every user and every request — we mark its tail with
+    // cache_control so Claude caches it. Subsequent requests pay ~10% of the
+    // base input cost on that ~5-15K token prefix instead of full price. The
+    // per-user instruction goes in a SEPARATE block after the cache breakpoint
+    // so per-user variation doesn't invalidate the shared cache.
+    const systemBlocks: Anthropic.TextBlockParam[] = [
+      {
+        type: "text",
+        text: BASE_SYSTEM_PROMPT,
+        cache_control: { type: "ephemeral" },
+      },
+    ];
+    if (userInstruction) {
+      systemBlocks.push({
+        type: "text",
+        text: `## USER PREFERENCES (follow these)\n${userInstruction}`,
+      });
+    }
 
-    const stream = await openai.chat.completions.create({
+    const anthMessages: Anthropic.MessageParam[] = history.map((m) => ({
+      role: m.role,
+      content: toAnthropicContent(m.content),
+    }));
+
+    const stream = anthropic.messages.stream({
       model: chatModel,
-      stream: true,
-      ...tunableParams,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history.map((m) => ({
-          role: m.role,
-          content: m.content,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        })) as any,
-      ],
+      max_tokens: 2048,
+      system: systemBlocks,
+      messages: anthMessages,
     });
 
     const encoder = new TextEncoder();
     const body = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of stream) {
-            const delta = chunk.choices?.[0]?.delta?.content;
-            if (delta) controller.enqueue(encoder.encode(delta));
-          }
+          // Stream just the text deltas to the client. Other event types
+          // (content_block_start, message_delta, etc) carry metadata we don't
+          // need to forward — the client renders raw text.
+          stream.on("text", (delta: string) => {
+            controller.enqueue(encoder.encode(delta));
+          });
+          await stream.finalMessage();
           controller.close();
         } catch (streamErr) {
-          const msg = streamErr instanceof Error ? streamErr.message : "stream failed";
+          let msg = "stream failed";
+          if (streamErr instanceof Anthropic.RateLimitError) {
+            msg = "Rate limited. Try again in a moment.";
+          } else if (streamErr instanceof Anthropic.APIError) {
+            msg = streamErr.message || `Claude error ${streamErr.status}`;
+          } else if (streamErr instanceof Error) {
+            msg = streamErr.message;
+          }
           controller.enqueue(encoder.encode(`\n\n[Error: ${msg}]`));
           controller.close();
         }
@@ -173,6 +204,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("AI prompt error:", error);
+    if (error instanceof Anthropic.APIError) {
+      return NextResponse.json({ error: error.message }, { status: error.status || 500 });
+    }
     const msg = error instanceof Error ? error.message : "AI prompt generation failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
