@@ -394,10 +394,10 @@ export async function POST(req: NextRequest) {
           if (res) videoConfig.resolution = res;
           const dur = (input.duration as string) || modelInfo.options?.duration?.default;
           if (dur) videoConfig.durationSeconds = parseInt(dur.toString().replace("s", ""));
-          // Veo exposes a generateAudio toggle — defaults to true when the
-          // model declares the option, but the user can turn it off to get a
-          // silent clip (and occasionally bypass flakey audio-path failures).
-          if (modelInfo.options?.generate_audio) {
+          // Veo exposes a generateAudio toggle — Vertex AI only. AI Studio's
+          // generateVideos endpoint rejects the field and always emits audio,
+          // so we drop it on the AI Studio path.
+          if (useVertexAI && modelInfo.options?.generate_audio) {
             videoConfig.generateAudio = input.generate_audio !== undefined
               ? !!input.generate_audio
               : (modelInfo.options.generate_audio.default ?? true);
