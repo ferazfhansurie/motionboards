@@ -952,7 +952,7 @@ export async function POST(req: NextRequest) {
       }
       try {
         // Pick the workflow template + node IDs for this model. Only Wan Animate
-        // Pose-to-Character is wired today; add a switch here for additional
+        // Character Replacement is wired today; add a switch here for additional
         // Comfy workflows later.
         let workflowTemplate: Record<string, unknown>;
         let imageNodeId: string;

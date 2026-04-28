@@ -390,7 +390,7 @@ export const models: AIModel[] = [
 
   {
     id: "wan-video/wan-2.2-animate-replace",
-    name: "Wan 2.2 Animate — Pose to Character",
+    name: "Wan 2.2 Animate — Character Replacement",
     provider: "replicate", type: "v2v", category: "Video",
     description: "Upload a character image and a pose reference video. Wan Animate generates a pose estimation internally and renders your character performing the same motion, preserving camera movement and lighting.",
     cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
@@ -426,9 +426,9 @@ export const models: AIModel[] = [
 
   {
     id: "wan-video/wan-2.2-animate-animation",
-    name: "Wan 2.2 Animate — Character Animation",
+    name: "Wan 2.2 Animate — Reality/Background Change Animation",
     provider: "replicate", type: "v2v", category: "Video",
-    description: "Animate your character image to mimic the motion of a reference video. Unlike Pose to Character (which swaps the performer in the reference scene), this generates a fresh clip of your character performing the motion from scratch.",
+    description: "Animate your character image to mimic the motion of a reference video. Unlike Character Replacement (which swaps the performer in the reference scene), this generates a fresh clip of your character on a brand-new generated background — change the reality, keep the motion.",
     cost: "~RM0.30/s (720p)", creditCost: 150, speed: "~4m", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: false, description: "Optional caption" },
@@ -439,11 +439,11 @@ export const models: AIModel[] = [
       resolution: { values: ["480", "720"], default: "480", label: "Resolution" },
     },
     perSecond: { noAudio720p: 0.30, withAudio720p: 0.30, noAudio4k: 0, withAudio4k: 0 },
-    guide: `**Pose-to-Character vs Character-Animation — pick correctly:**
-- Use **Pose to Character** when you want your character INSIDE the source scene (same background, same camera move).
-- Use **Character Animation** (this one) when you only want the MOTION copied — the output is a fresh clip with your character on a generated background, not the source environment.
+    guide: `**Character Replacement vs Reality/Background Change — pick correctly:**
+- Use **Character Replacement** when you want your character INSIDE the source scene (same background, same camera move).
+- Use **Reality/Background Change Animation** (this one) when you only want the MOTION copied — the output is a fresh clip with your character on a generated background, not the source environment.
 
-**Same constraints as Pose to Character apply:**
+**Same constraints as Character Replacement apply:**
 - One continuous shot, no cuts in the reference video.
 - 5–15s is the sweet spot.
 - Full-body character image if the motion is full-body.
