@@ -1351,10 +1351,22 @@ export function Canvas() {
         );
       })()}
 
-      {/* Zoom preview */}
-      {previewItem && (
-        <ZoomPreview item={previewItem} onClose={() => setPreviewItem(null)} />
-      )}
+      {/* Zoom preview — pass the full chronological list of previewable
+          media (everything except text + drawings) so the lightbox can
+          flip through past/future gens with ←/→. */}
+      {previewItem && (() => {
+        const previewable = items
+          .filter((it) => it.type !== "text" && it.type !== "drawing")
+          .slice()
+          .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+        return (
+          <ZoomPreview
+            items={previewable}
+            initialId={previewItem.id}
+            onClose={() => setPreviewItem(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

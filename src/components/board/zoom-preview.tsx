@@ -1,17 +1,38 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { X, Download, Music, ZoomIn, ZoomOut, RotateCcw, Info, Copy, Check, Scissors } from "lucide-react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { X, Download, Music, ZoomIn, ZoomOut, RotateCcw, Info, Copy, Check, Scissors, ChevronLeft, ChevronRight } from "lucide-react";
 import type { BoardItem } from "@/lib/store";
 import { TrimDialog } from "./trim-dialog";
 
 interface ZoomPreviewProps {
-  item: BoardItem;
+  /** Full list of previewable items in nav order (chronological — older first). */
+  items: BoardItem[];
+  /** Which item to show first. Falls back to items[0] if not found. */
+  initialId: string;
   onClose: () => void;
 }
 
-export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
-  const mediaSrc = item.outputUrl || item.src;
+export function ZoomPreview({ items, initialId, onClose }: ZoomPreviewProps) {
+  // Track the currently-shown item by id so the parent's items list can
+  // resort/refilter under us without us losing our place. If the id is
+  // gone (item deleted while preview open) we fall back to items[0] and
+  // close if even that's gone.
+  const [currentId, setCurrentId] = useState(initialId);
+  const idx = useMemo(() => items.findIndex((i) => i.id === currentId), [items, currentId]);
+  const item = idx >= 0 ? items[idx] : items[0];
+
+  const hasPrev = idx > 0;
+  const hasNext = idx >= 0 && idx < items.length - 1;
+
+  const goPrev = useCallback(() => {
+    if (idx > 0) setCurrentId(items[idx - 1].id);
+  }, [items, idx]);
+  const goNext = useCallback(() => {
+    if (idx >= 0 && idx < items.length - 1) setCurrentId(items[idx + 1].id);
+  }, [items, idx]);
+
+  const mediaSrc = item?.outputUrl || item?.src;
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -20,6 +41,35 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
   const [copied, setCopied] = useState(false);
   const [showTrim, setShowTrim] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Reset zoom/pan/info-panel when navigating to a different item.
+  useEffect(() => {
+    setScale(1);
+    setPos({ x: 0, y: 0 });
+    setShowTrim(false);
+  }, [currentId]);
+
+  // Close if the items list emptied out from under us.
+  useEffect(() => {
+    if (items.length === 0) onClose();
+  }, [items.length, onClose]);
+
+  // Keyboard: ←/→ navigate, Esc closes, i toggles file info, +/- zoom.
+  // Skipped if the user is typing in an input/textarea (e.g. the trim
+  // dialog), so we don't hijack keystrokes.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      const tag = tgt?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tgt?.isContentEditable) return;
+      if (e.key === "ArrowLeft") { e.preventDefault(); goPrev(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); goNext(); }
+      else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      else if (e.key === "i" || e.key === "I") { e.preventDefault(); setShowInfo((v) => !v); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goPrev, goNext, onClose]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation();
@@ -41,6 +91,8 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
 
   const handleMouseUp = useCallback(() => setDragging(false), []);
   const resetZoom = () => { setScale(1); setPos({ x: 0, y: 0 }); };
+
+  if (!item) return null;
 
   const isImage = item.type === "image" || item.type === "psd-layer" || (item.type === "generation" && item.outputType === "image");
   const isVideo = item.type === "video" || (item.type === "generation" && item.outputType === "video");
@@ -77,6 +129,10 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
           {item.prompt && <span className="text-xs text-white/40 truncate max-w-md">{item.prompt}</span>}
         </div>
         <div className="flex items-center gap-1">
+          {/* Position counter — only meaningful when there's >1 item to flip through */}
+          {items.length > 1 && idx >= 0 && (
+            <span className="text-[10px] text-white/40 font-mono mr-2 tabular-nums">{idx + 1} / {items.length}</span>
+          )}
           {isImage && (
             <>
               <button onClick={() => setScale((s) => Math.min(10, s + 0.5))} className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="Zoom in">
@@ -96,7 +152,7 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
           <button
             onClick={() => setShowInfo(!showInfo)}
             className={`p-1.5 rounded-lg transition-colors ${showInfo ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"}`}
-            title="File Info"
+            title="File Info (i)"
           >
             <Info className="h-4 w-4" />
           </button>
@@ -124,7 +180,27 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
       {showTrim && <TrimDialog item={item} onClose={() => setShowTrim(false)} />}
 
       {/* Main content area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Prev / Next buttons — overlaid on the media area, hidden at endpoints */}
+        {hasPrev && (
+          <button
+            onClick={(e) => { e.stopPropagation(); goPrev(); }}
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/5 hover:bg-white/15 text-white/70 hover:text-white transition-colors backdrop-blur-sm"
+            title="Previous (←)"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        )}
+        {hasNext && (
+          <button
+            onClick={(e) => { e.stopPropagation(); goNext(); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/5 hover:bg-white/15 text-white/70 hover:text-white transition-colors backdrop-blur-sm"
+            title="Next (→)"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        )}
+
         {/* Media area */}
         <div
           ref={containerRef}
@@ -139,6 +215,7 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
         >
           {isImage && (
             <img
+              key={item.id}
               src={mediaSrc}
               alt={item.fileName || "Preview"}
               className="max-h-[85vh] max-w-[90vw] rounded-xl select-none"
@@ -153,6 +230,7 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
           )}
           {isVideo && (
             <video
+              key={item.id}
               src={mediaSrc}
               controls
               loop
@@ -165,7 +243,7 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
             <div className="flex flex-col items-center gap-4 rounded-xl bg-[#0d1f30] p-8" onClick={(e) => e.stopPropagation()}>
               <Music className="h-12 w-12 text-[#f26522]" />
               <p className="text-sm text-white">{item.fileName || "Audio"}</p>
-              <audio src={mediaSrc} controls className="w-80" />
+              <audio key={item.id} src={mediaSrc} controls className="w-80" />
             </div>
           )}
         </div>
@@ -287,7 +365,7 @@ export function ZoomPreview({ item, onClose }: ZoomPreviewProps) {
       {/* Bottom hint */}
       {isImage && !showInfo && (
         <div className="text-center py-2 shrink-0">
-          <p className="text-[10px] text-white/20">Scroll to zoom &middot; Click to zoom in &middot; Drag to pan &middot; Press (i) for file info</p>
+          <p className="text-[10px] text-white/20">← / → past &amp; future gens &middot; Scroll to zoom &middot; Click to zoom in &middot; Drag to pan &middot; (i) for file info &middot; Esc to close</p>
         </div>
       )}
     </div>
