@@ -36,6 +36,12 @@ const CHAR_DELAY_JITTER = 35;
 // Pause between lines.
 const LINE_PAUSE = 380;
 
+// Mechanical keyboard tactile click. Two layers per keystroke:
+//   1. CLICK — short high-freq square burst (~3 kHz, 14 ms decay): the
+//      sharp metal-spring click of a tactile switch.
+//   2. THOCK — low sine thump (~170 Hz, 60 ms decay): the bottom-out
+//      hit of the keycap on the plate.
+// Frequencies jitter per keystroke so it doesn't sound like a metronome.
 function playTick(ctxRef: React.MutableRefObject<AudioContext | null>) {
   try {
     if (typeof window === "undefined") return;
@@ -48,17 +54,30 @@ function playTick(ctxRef: React.MutableRefObject<AudioContext | null>) {
     if (!ctx) return;
     if (ctx.state === "suspended") void ctx.resume();
     const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(1700 + Math.random() * 600, now);
-    // Quick attack + exponential decay — feels like a soft mechanical tick.
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.025, now + 0.001);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.05);
+
+    // Layer 1: the click
+    const click = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    click.type = "square";
+    click.frequency.setValueAtTime(2700 + Math.random() * 800, now);
+    clickGain.gain.setValueAtTime(0.0001, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.022, now + 0.001);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.014);
+    click.connect(clickGain).connect(ctx.destination);
+    click.start(now);
+    click.stop(now + 0.02);
+
+    // Layer 2: the thock (slightly delayed so it reads as 'after' the click)
+    const thock = ctx.createOscillator();
+    const thockGain = ctx.createGain();
+    thock.type = "sine";
+    thock.frequency.setValueAtTime(150 + Math.random() * 60, now + 0.004);
+    thockGain.gain.setValueAtTime(0.0001, now + 0.004);
+    thockGain.gain.exponentialRampToValueAtTime(0.05, now + 0.008);
+    thockGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    thock.connect(thockGain).connect(ctx.destination);
+    thock.start(now + 0.004);
+    thock.stop(now + 0.07);
   } catch { /* never block typing on audio errors */ }
 }
 
@@ -123,9 +142,9 @@ export function AIGreetingCard({ isDark, onComplete, skipAnimation }: Props) {
       : CHAR_DELAY_BASE + Math.random() * CHAR_DELAY_JITTER;
     const t = setTimeout(() => {
       setCharIdx((c) => c + 1);
-      // Skip whitespace for the click (sounds odd otherwise) and only every
-      // other char so it's percussive but not chittering.
-      if (ch.trim() && charIdx % 2 === 0) playTick(audioCtxRef);
+      // Mechanical keyboards click on every keystroke. Skip whitespace —
+      // hitting space on most boards is much quieter than letter keys.
+      if (ch.trim()) playTick(audioCtxRef);
     }, delay);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

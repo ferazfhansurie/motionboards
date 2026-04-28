@@ -1217,9 +1217,10 @@ export function PromptBar() {
           `}</style>
         </div>
 
-        {/* Centered prompt */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="pointer-events-auto w-full max-w-xl px-4">
+        {/* Centered prompt — scroll if content exceeds viewport so nothing
+            collides with the bottom toolbar / footer credits. */}
+        <div className="absolute inset-0 flex items-start justify-center pointer-events-none z-20 overflow-y-auto pt-12 md:pt-16 pb-24 md:pb-20">
+          <div className="pointer-events-auto w-full max-w-xl px-4 my-auto">
             {/* Manual ↔ AI Agent toggle — sleek, single accent, no gradient */}
             <div className="flex items-center justify-center mb-5">
               <div className={`inline-flex items-center rounded-full p-0.5 border text-[11px] ${isDark ? "bg-[#0d1117] border-gray-800" : "bg-gray-50 border-gray-200"}`}>
@@ -1472,8 +1473,9 @@ export function PromptBar() {
               <span className="ml-1.5">anywhere on the canvas to create a node</span>
             </p>
 
-            {/* Need help / WhatsApp us / Visit website */}
-            <div className="flex items-center justify-center gap-2 mt-5 flex-wrap">
+            {/* Need help / WhatsApp us / Visit website — extra top margin
+                so this never tucks under the bottom toolbar. */}
+            <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
               <a
                 href="https://wa.me/60112167672?text=Hi%2C%20I%20need%20help%20with%20MotionBoards%20%F0%9F%91%8B"
                 target="_blank"
