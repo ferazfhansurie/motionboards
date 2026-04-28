@@ -925,23 +925,25 @@ export function BoardItemCard({
                 }}
                 placeholder="Type something…"
                 value={editTextValue}
-                onChange={(e) => setEditTextValue(e.target.value)}
+                // Save on every keystroke so the text is never lost if blur
+                // races with anything (formatting toolbar click, canvas
+                // deselect, autosave re-render). Empty-text deletion is
+                // still gated to blur/Escape.
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setEditTextValue(v);
+                  useAppStore.getState().updateItem(item.id, { text: v });
+                }}
                 onBlur={() => {
-                  const trimmed = editTextValue.trim();
-                  if (!trimmed) {
+                  if (!editTextValue.trim()) {
                     useAppStore.getState().removeItem(item.id);
-                  } else {
-                    useAppStore.getState().updateItem(item.id, { text: editTextValue });
                   }
                   setIsEditingText(false);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
-                    const trimmed = editTextValue.trim();
-                    if (!trimmed) {
+                    if (!editTextValue.trim()) {
                       useAppStore.getState().removeItem(item.id);
-                    } else {
-                      useAppStore.getState().updateItem(item.id, { text: editTextValue });
                     }
                     setIsEditingText(false);
                   }
