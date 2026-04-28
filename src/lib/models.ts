@@ -88,7 +88,7 @@ export const models: AIModel[] = [
 - "[Subject] in the style of [reference image], cinematic lighting, film grain" → style transfer.
 - For multi-character scenes: name each person in the prompt and reference images by description.
 
-**Resolution:** 0.5K is fast/cheap for iteration. Bump to 1K or 2K only when locked. 2K is the ceiling — 4K is disabled because Google's render time exceeds our Vercel function timeout.
+**Resolution:** 0.5K is fast/cheap for iteration. Bump to 1K/2K/4K only when locked. 4K takes ~3× longer than 1K and occasionally 503s — see below.
 
 **Common gotchas:**
 - Text inside images often comes out garbled. Prompt explicit text only when essential, otherwise add it in post.
@@ -105,7 +105,7 @@ export const models: AIModel[] = [
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
-      resolution: { values: ["0.5K", "1K", "2K"], default: "1K", label: "Resolution" },
+      resolution: { values: ["0.5K", "1K", "2K", "4K"], default: "1K", label: "Resolution" },
     },
   },
 
