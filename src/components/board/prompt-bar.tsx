@@ -538,18 +538,23 @@ export function PromptBar() {
   };
 
   const handleGenerate = async () => {
-    // AI Agent mode — instead of running the model directly, hand the user's
-    // request to ADletic AI in the panel. ADletic will craft / clarify and
-    // (in the next wave) call generation tools on the user's behalf.
-    if (aiAgentMode) {
+    // AI Agent mode — only takes effect from the empty hero, where the
+    // Manual ↔ AI Agent toggle is the headline UX. Once items exist on the
+    // canvas the user is in "manual mode" by default: the inline prompt bar
+    // at the bottom of the canvas runs the selected model directly. The AI
+    // Agent panel on the right is still available, but you only end up
+    // there by clicking the AI button or via onboarding — never by typing
+    // into the canvas prompt bar.
+    if (aiAgentMode && items.length === 0) {
       const text = prompt.trim();
       if (!text) {
         showToast("Tell ADletic what you want to create", { kind: "info" });
         return;
       }
       // Seed the chat panel with the user's message and open it. The panel
-      // reads pendingChatSeed on mount and auto-sends it as the first turn.
-      useAppStore.getState().setPendingChatSeed(text);
+      // reads pendingChatSeed on mount, creates a fresh chat, fires it as
+      // the first user message, then clears.
+      useAppStore.getState().setPendingChatSeed({ text, forceNewChat: true });
       setAIPromptOpen(true);
       setPrompt("");
       return;
@@ -1092,18 +1097,49 @@ export function PromptBar() {
   // friendly equivalent of dragging or pasting a file.
   const heroFileInputRef = useRef<HTMLInputElement>(null);
   const heroRefInputRef = useRef<HTMLInputElement>(null);
-  // Same as handleHeroFilePick, but also flags the resulting item as an input
-  // reference so the model uses it (i2i / i2v / referenced generation).
+  // Reference image picker. Behaviour depends on mode:
+  //   AI Agent  → upload, drop on canvas, AND open ADletic in a fresh chat
+  //               with the image attached as a reference plus whatever the
+  //               user typed in the prompt box (or nothing, just the image).
+  //   Manual    → upload, drop on canvas, register as inputRef so the
+  //               selected model picks it up on next Generate.
   const handleHeroRefPick = async (file: File) => {
     const beforeIds = useAppStore.getState().items.map((i) => i.id);
     await handleHeroFilePick(file);
-    // Whatever new item appeared on the canvas as a result is the one we want
-    // to register as an inputRef.
     const afterItems = useAppStore.getState().items;
     const newItem = afterItems.find((i) => !beforeIds.includes(i.id));
-    if (newItem) {
-      useAppStore.setState((s) => ({ inputRefs: [...s.inputRefs, newItem.id] }));
+    if (!newItem) return;
+
+    if (aiAgentMode) {
+      // Wait for the background upload to swap the data: URL for a hosted
+      // one. Up to ~6s; if it never finishes we send the data: URL itself
+      // (still works for vision input, just bigger payload).
+      let publicUrl: string | undefined = newItem.src;
+      const isUnfinalized = (u: string | undefined) =>
+        !!u && (u.startsWith("blob:") || u.startsWith("data:"));
+      if (isUnfinalized(publicUrl)) {
+        for (let i = 0; i < 12; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          const fresh = useAppStore.getState().items.find((it) => it.id === newItem.id);
+          if (fresh?.src && !isUnfinalized(fresh.src)) {
+            publicUrl = fresh.src;
+            break;
+          }
+        }
+      }
+      const text = prompt.trim();
+      useAppStore.getState().setPendingChatSeed({
+        text,
+        imageUrl: publicUrl,
+        forceNewChat: true,
+      });
+      setAIPromptOpen(true);
+      setPrompt("");
+      return;
     }
+
+    // Manual mode — register as input ref for the selected model
+    useAppStore.setState((s) => ({ inputRefs: [...s.inputRefs, newItem.id] }));
   };
   const handleHeroFilePick = async (file: File) => {
     if (!file.type.startsWith("image/")) {

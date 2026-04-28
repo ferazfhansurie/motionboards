@@ -293,7 +293,9 @@ export interface AppState {
   aiAgentMode: boolean;
   // Seed message for the AI panel — set by AI Agent mode handoff. Panel
   // consumes it on mount, fires it as the first user message, then clears.
-  pendingChatSeed: string | null;
+  // imageUrl is an optional public URL that gets attached as a reference;
+  // forceNewChat tells the panel to start a fresh chat thread first.
+  pendingChatSeed: { text: string; imageUrl?: string; forceNewChat?: boolean } | null;
 
   // References
   startFrameId: string | null;
@@ -352,7 +354,7 @@ export interface AppState {
   setHistoryOpen: (open: boolean) => void;
   setAIPromptOpen: (open: boolean) => void;
   setAiAgentMode: (on: boolean) => void;
-  setPendingChatSeed: (seed: string | null) => void;
+  setPendingChatSeed: (seed: { text: string; imageUrl?: string; forceNewChat?: boolean } | null) => void;
   setStartFrame: (id: string | null) => void;
   setEndFrame: (id: string | null) => void;
   toggleInputRef: (id: string) => void;

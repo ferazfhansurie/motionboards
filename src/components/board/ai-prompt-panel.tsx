@@ -695,18 +695,29 @@ export function AIPromptPanel() {
 
   // ALL hooks MUST live above the early return — React error #310 fires
   // otherwise (hook count changes between open / closed renders).
-  // handleSend is defined further down inside the open path, so we bridge
-  // through a ref the seed-effect can call into.
-  const handleSendRef = useRef<((overrideText?: string) => void) | null>(null);
+  // handleSend / createNewChat are defined further down inside the open
+  // path, so we bridge through refs the seed-effect can call into.
+  const handleSendRef = useRef<((override?: { text?: string; imageUrl?: string }) => void) | null>(null);
+  const createNewChatRef = useRef<(() => Promise<void>) | null>(null);
   const seedFiredRef = useRef(false);
   useEffect(() => {
     if (!pendingChatSeed) { seedFiredRef.current = false; return; }
-    if (!isAIPromptOpen || !currentChatId || loading) return;
+    if (!isAIPromptOpen || loading) return;
+    // forceNewChat: spin up a fresh chat first, then send. Otherwise we
+    // need a current chat to be ready before we can send.
+    if (!pendingChatSeed.forceNewChat && !currentChatId) return;
     if (seedFiredRef.current) return;
     seedFiredRef.current = true;
     const seed = pendingChatSeed;
     setPendingChatSeed(null);
-    setTimeout(() => { handleSendRef.current?.(seed); }, 30);
+    (async () => {
+      if (seed.forceNewChat && createNewChatRef.current) {
+        await createNewChatRef.current();
+      }
+      setTimeout(() => {
+        handleSendRef.current?.({ text: seed.text, imageUrl: seed.imageUrl });
+      }, 30);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingChatSeed, isAIPromptOpen, currentChatId, loading]);
 
@@ -890,22 +901,27 @@ export function AIPromptPanel() {
     }
   };
 
-  const handleSend = async (overrideText?: string) => {
-    // overrideText is set when the AI Agent toggle hands a request off from
-    // the empty hero — bypasses the input/attachments path entirely.
+  const handleSend = async (overrideText?: string, overrideImageUrl?: string) => {
+    // overrides are set when the AI Agent toggle / Reference button hands
+    // a request off from the empty hero — bypasses the input/attachments
+    // path entirely. overrideImageUrl is treated as a single attachment.
     const text = (overrideText ?? input).trim();
-    if ((!text && attachments.length === 0) || loading || !currentChatId) return;
+    const overrideImages = overrideImageUrl ? [overrideImageUrl] : [];
+    const hasOverrideAttachment = overrideImages.length > 0;
+    if ((!text && attachments.length === 0 && !hasOverrideAttachment) || loading || !currentChatId) return;
     if (overLimit || isUploading || hasUploadError) return;
 
-    const userMsg: Message = attachments.length > 0
-      ? {
-          role: "user",
-          content: [
-            ...(text ? [{ type: "text" as const, text }] : []),
-            ...attachments.map((a) => ({ type: "image_url" as const, image_url: { url: a.url } })),
-          ],
-        }
-      : { role: "user", content: text };
+    const userMsg: Message =
+      attachments.length > 0 || hasOverrideAttachment
+        ? {
+            role: "user",
+            content: [
+              ...(text ? [{ type: "text" as const, text }] : []),
+              ...overrideImages.map((url) => ({ type: "image_url" as const, image_url: { url } })),
+              ...attachments.map((a) => ({ type: "image_url" as const, image_url: { url: a.url } })),
+            ],
+          }
+        : { role: "user", content: text };
 
     let history = [...messages, userMsg];
     setMessages(history);
@@ -1001,7 +1017,8 @@ export function AIPromptPanel() {
 
   // Wire the bridge ref so the seed-effect (declared above the early
   // return) can invoke the latest handleSend closure.
-  handleSendRef.current = handleSend;
+  handleSendRef.current = (override) => handleSend(override?.text, override?.imageUrl);
+  createNewChatRef.current = createNewChat;
 
   const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);

@@ -1,47 +1,55 @@
 "use client";
 
-// Animated greeting bubble for the AI Agent onboarding. Appears above the
-// empty-hero textarea when AI Agent mode is active and the user hasn't seen
-// the greeting in this session (gated by sessionStorage so it shows once
-// per tab open, not on every render).
+// ADletic onboarding — short, two-step interactive flow:
 //
-// Effects:
-//   - Typewriter animation, character-by-character with jittered delays so
-//     it feels human, not metronomic.
-//   - Subtle WebAudio "tick" on every other character. Volume is very low
-//     (gain 0.025) and frequency is randomised slightly so it doesn't
-//     sound robotic. Browsers gate AudioContext behind a user gesture —
-//     this card mounts AFTER the user clicks the AI Agent toggle, so the
-//     toggle click counts as the gesture and audio is unlocked.
-//   - Blinking cursor while typing; fades out once the line ends.
+//   1. ADletic types "Yo — what should I call you?" → name input.
+//   2. Then "Nice. What brings you here, <name>?" → 4 use-case chips.
+//   3. Goal-tailored closer + "What are we making today?".
 //
-// Skips the animation entirely (just shows static text) if the user has
-// the prefers-reduced-motion media query set.
+// Captured values persist (mb_user_name, mb_user_goal). Returning users
+// with both stored just see "Welcome back, <name>. What are we making
+// today?" — single line, no inputs.
+//
+// Mechanical-keyboard tick on every non-whitespace character. Audio is
+// unlocked by the user clicking the AI Agent toggle (or any prior gesture)
+// before this card mounts, so the AudioContext can resume freely.
+//
+// Animation gated by a session flag so the typewriter only plays once per
+// tab — re-renders show the full text instantly. If the tab is refreshed
+// mid-flow, the input/chips for the current stage render immediately.
 
 import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 
-const GREETING_LINES = [
-  "Yo — I'm ADletic 👋",
-  "Tell me what you want to create. A video. A poster. A storyboard. Anything.",
-  "I'll pick the right AI model, ask for what I need, and run it for you.",
-  "So — what are we building today?",
-];
-
+const NAME_STORAGE_KEY = "mb_user_name";
+const GOAL_STORAGE_KEY = "mb_user_goal";
 const SESSION_FLAG = "motionboards_adletic_greeted";
 
-// Per-character delay (ms). Lower = faster typing.
 const CHAR_DELAY_BASE = 22;
 const CHAR_DELAY_JITTER = 35;
-// Pause between lines.
-const LINE_PAUSE = 380;
+const LINE_PAUSE = 320;
 
-// Mechanical keyboard tactile click. Two layers per keystroke:
-//   1. CLICK — short high-freq square burst (~3 kHz, 14 ms decay): the
-//      sharp metal-spring click of a tactile switch.
-//   2. THOCK — low sine thump (~170 Hz, 60 ms decay): the bottom-out
-//      hit of the keycap on the plate.
-// Frequencies jitter per keystroke so it doesn't sound like a metronome.
+type Goal = "ads" | "social" | "storyboard" | "explore";
+
+const GOAL_OPTIONS: { id: Goal; label: string }[] = [
+  { id: "ads", label: "Ads" },
+  { id: "social", label: "Social posts" },
+  { id: "storyboard", label: "Storyboards" },
+  { id: "explore", label: "Just exploring" },
+];
+
+const GOAL_PITCH: Record<Goal, string> = {
+  ads: "Sweet — products and ad concepts are my thing.",
+  social: "Solid — reels, posts, all of it.",
+  storyboard: "Love that — I'll lay out scenes frame by frame.",
+  explore: "Cool — take it for a spin.",
+};
+
+function isGoal(g: string): g is Goal {
+  return g === "ads" || g === "social" || g === "storyboard" || g === "explore";
+}
+
+// Mechanical keyboard tactile click — sharp metal click + low keycap thock.
 function playTick(ctxRef: React.MutableRefObject<AudioContext | null>) {
   try {
     if (typeof window === "undefined") return;
@@ -55,7 +63,6 @@ function playTick(ctxRef: React.MutableRefObject<AudioContext | null>) {
     if (ctx.state === "suspended") void ctx.resume();
     const now = ctx.currentTime;
 
-    // Layer 1: the click
     const click = ctx.createOscillator();
     const clickGain = ctx.createGain();
     click.type = "square";
@@ -67,7 +74,6 @@ function playTick(ctxRef: React.MutableRefObject<AudioContext | null>) {
     click.start(now);
     click.stop(now + 0.02);
 
-    // Layer 2: the thock (slightly delayed so it reads as 'after' the click)
     const thock = ctx.createOscillator();
     const thockGain = ctx.createGain();
     thock.type = "sine";
@@ -83,15 +89,38 @@ function playTick(ctxRef: React.MutableRefObject<AudioContext | null>) {
 
 interface Props {
   isDark: boolean;
-  onComplete?: () => void;
-  // When true, render the full greeting instantly without animation.
   skipAnimation?: boolean;
 }
 
-export function AIGreetingCard({ isDark, onComplete, skipAnimation }: Props) {
-  // Snapshot the "should animate" decision once on mount so re-renders
-  // (caused by typing into the textarea below us) don't restart the
-  // typewriter mid-stream.
+type Stage =
+  | "asking_name"
+  | "awaiting_name"
+  | "asking_goal"
+  | "awaiting_goal"
+  | "saying_hi";
+
+export function AIGreetingCard({ isDark, skipAnimation }: Props) {
+  // Read existing name + goal once on mount so we can pick up mid-flow.
+  const initialNameRef = useRef<string | null>(null);
+  const initialGoalRef = useRef<string | null>(null);
+  if (initialNameRef.current === null) {
+    if (typeof window !== "undefined") {
+      try { initialNameRef.current = localStorage.getItem(NAME_STORAGE_KEY) || ""; } catch { initialNameRef.current = ""; }
+    } else {
+      initialNameRef.current = "";
+    }
+  }
+  if (initialGoalRef.current === null) {
+    if (typeof window !== "undefined") {
+      try { initialGoalRef.current = localStorage.getItem(GOAL_STORAGE_KEY) || ""; } catch { initialGoalRef.current = ""; }
+    } else {
+      initialGoalRef.current = "";
+    }
+  }
+  const hasNameOnMount = !!initialNameRef.current;
+  const hasGoalOnMount = !!initialGoalRef.current && isGoal(initialGoalRef.current);
+
+  // Snapshot animate decision once so re-renders don't replay the typewriter.
   const animateRef = useRef<boolean | null>(null);
   if (animateRef.current === null) {
     let alreadySeen = false;
@@ -105,28 +134,83 @@ export function AIGreetingCard({ isDark, onComplete, skipAnimation }: Props) {
   }
   const shouldAnimate = animateRef.current;
 
-  const [lineIdx, setLineIdx] = useState(shouldAnimate ? 0 : GREETING_LINES.length);
-  const [charIdx, setCharIdx] = useState(shouldAnimate ? 0 : 0);
-  const [done, setDone] = useState(!shouldAnimate);
+  const [name, setName] = useState<string>(initialNameRef.current || "");
+  const [goal, setGoal] = useState<Goal | "">(
+    isGoal(initialGoalRef.current || "") ? (initialGoalRef.current as Goal) : "",
+  );
+  // Initial stage: returning users with both stored skip to the welcome
+  // line; partial-state visitors resume at the next missing step. When the
+  // typewriter is suppressed (refresh mid-flow / reduced motion), jump
+  // directly to the awaiting stage so the input/chips render right away.
+  const [stage, setStage] = useState<Stage>(() => {
+    if (hasNameOnMount && hasGoalOnMount) return "saying_hi";
+    if (shouldAnimate) {
+      return hasNameOnMount ? "asking_goal" : "asking_name";
+    }
+    return hasNameOnMount ? "awaiting_goal" : "awaiting_name";
+  });
+  const [nameInput, setNameInput] = useState("");
+
+  // Build the line list for the current stage. Awaiting stages keep the
+  // previous question visible so the input/chips appear with context.
+  const lines = (() => {
+    if (stage === "asking_name" || stage === "awaiting_name") {
+      return ["Yo — what should I call you?"];
+    }
+    if (stage === "asking_goal" || stage === "awaiting_goal") {
+      return [`Nice. What brings you here${name ? `, ${name}` : ""}?`];
+    }
+    if (stage === "saying_hi") {
+      if (hasNameOnMount && hasGoalOnMount) {
+        return [`Welcome back, ${name}. What are we making today?`];
+      }
+      if (goal && isGoal(goal)) {
+        return [GOAL_PITCH[goal], "What are we making today?"];
+      }
+      return [`Nice — let's go, ${name}.`, "What are we making today?"];
+    }
+    return [] as string[];
+  })();
+
+  const [lineIdx, setLineIdx] = useState(shouldAnimate ? 0 : lines.length);
+  const [charIdx, setCharIdx] = useState(0);
+  const [linesDone, setLinesDone] = useState(!shouldAnimate);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  // Mark the greeting as seen as soon as it starts, so a fast reload
-  // doesn't replay it.
+  // Mark greeting seen once it starts so a fast reload doesn't replay.
   useEffect(() => {
     if (!shouldAnimate) return;
     try { sessionStorage.setItem(SESSION_FLAG, "true"); } catch {}
   }, [shouldAnimate]);
 
-  // Drive the typewriter. Each tick advances either one character or moves
-  // to the next line after a brief pause.
+  // Reset typewriter cursors on transitions to "asking_*" / "saying_hi".
+  // Awaiting stages keep cursors at the end of the previous question so
+  // the typewriter doesn't replay the line under the input/chips.
   useEffect(() => {
-    if (!shouldAnimate || done) return;
-    if (lineIdx >= GREETING_LINES.length) {
-      setDone(true);
-      onComplete?.();
+    if (!shouldAnimate) {
+      setLineIdx(lines.length);
+      setLinesDone(true);
       return;
     }
-    const line = GREETING_LINES[lineIdx];
+    if (stage === "awaiting_name" || stage === "awaiting_goal") return;
+    setLineIdx(0);
+    setCharIdx(0);
+    setLinesDone(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
+
+  // Drive the typewriter for the current `lines`.
+  useEffect(() => {
+    if (!shouldAnimate || linesDone) return;
+    if (lineIdx >= lines.length) {
+      setLinesDone(true);
+      // Hand off to next interactive stage once typing finishes.
+      if (stage === "asking_name") setStage("awaiting_name");
+      else if (stage === "asking_goal") setStage("awaiting_goal");
+      // saying_hi stays — terminal.
+      return;
+    }
+    const line = lines[lineIdx];
     if (charIdx >= line.length) {
       const t = setTimeout(() => {
         setLineIdx((i) => i + 1);
@@ -135,27 +219,39 @@ export function AIGreetingCard({ isDark, onComplete, skipAnimation }: Props) {
       return () => clearTimeout(t);
     }
     const ch = line.charAt(charIdx);
-    // Slow down at punctuation for a more natural cadence
     const punctuation = ch === "." || ch === "," || ch === "?" || ch === "!";
     const delay = punctuation
       ? CHAR_DELAY_BASE + 200
       : CHAR_DELAY_BASE + Math.random() * CHAR_DELAY_JITTER;
     const t = setTimeout(() => {
       setCharIdx((c) => c + 1);
-      // Mechanical keyboards click on every keystroke. Skip whitespace —
-      // hitting space on most boards is much quieter than letter keys.
       if (ch.trim()) playTick(audioCtxRef);
     }, delay);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineIdx, charIdx, shouldAnimate, done]);
+  }, [lineIdx, charIdx, shouldAnimate, linesDone, stage]);
 
-  // Build what's visible so far
+  const submitName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    try { localStorage.setItem(NAME_STORAGE_KEY, trimmed); } catch {}
+    setName(trimmed);
+    setNameInput("");
+    setStage(shouldAnimate ? "asking_goal" : "awaiting_goal");
+  };
+
+  const submitGoal = (g: Goal) => {
+    try { localStorage.setItem(GOAL_STORAGE_KEY, g); } catch {}
+    setGoal(g);
+    setStage("saying_hi");
+  };
+
+  // Build visible text up to current cursor. Math.min guards against a
+  // brief render where lineIdx is stale relative to a shrinking lines array
+  // during stage transitions.
   const renderedLines: string[] = [];
-  for (let i = 0; i < lineIdx; i++) renderedLines.push(GREETING_LINES[i]);
-  if (lineIdx < GREETING_LINES.length) {
-    renderedLines.push(GREETING_LINES[lineIdx].slice(0, charIdx));
-  }
+  for (let i = 0; i < Math.min(lineIdx, lines.length); i++) renderedLines.push(lines[i]);
+  if (lineIdx < lines.length) renderedLines.push(lines[lineIdx].slice(0, charIdx));
 
   return (
     <div className="flex items-start gap-2.5 p-1">
@@ -179,12 +275,61 @@ export function AIGreetingCard({ isDark, onComplete, skipAnimation }: Props) {
           {renderedLines.map((line, i) => (
             <p key={i} className="whitespace-pre-wrap">
               {line}
-              {!done && i === renderedLines.length - 1 && (
+              {!linesDone && i === renderedLines.length - 1 && (
                 <span className="inline-block w-[2px] h-[1em] -mb-[2px] ml-0.5 bg-[#f26522] animate-pulse align-middle" />
               )}
             </p>
           ))}
         </div>
+
+        {/* Step 1 — name capture */}
+        {stage === "awaiting_name" && (
+          <form
+            onSubmit={(e) => { e.preventDefault(); submitName(); }}
+            className="mt-2 pointer-events-auto flex items-center gap-2"
+          >
+            <input
+              autoFocus
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Your name…"
+              maxLength={40}
+              className={`flex-1 text-[12.5px] rounded-lg px-3 py-1.5 border focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 transition-all ${isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+            />
+            <button
+              type="submit"
+              disabled={!nameInput.trim()}
+              className={`text-[11px] font-semibold rounded-lg px-3 py-1.5 transition-colors ${
+                nameInput.trim()
+                  ? "bg-[#f26522] text-white hover:bg-[#d9541a]"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              Save
+            </button>
+          </form>
+        )}
+
+        {/* Step 2 — use-case chips */}
+        {stage === "awaiting_goal" && (
+          <div className="mt-2 pointer-events-auto flex flex-wrap gap-1.5">
+            {GOAL_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => submitGoal(opt.id)}
+                className={`text-[11px] font-medium rounded-full px-2.5 py-1 border transition-colors ${
+                  isDark
+                    ? "bg-[#161b22] border-gray-700 text-gray-200 hover:bg-[#1f2630] hover:border-[#f26522]/40"
+                    : "bg-white border-gray-200 text-[#0d1117] hover:bg-[#fff5ee] hover:border-[#f26522]/40"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
