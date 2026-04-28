@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
@@ -467,8 +467,9 @@ export function BoardItemCard({
   }, [autoEditItemId, item.id, item.type, item.text, setAutoEditItemId]);
 
   // While editing, grow the textarea + the box height to fit the content
-  // so the user always sees what they're typing instead of a clipped scrollbar.
-  useEffect(() => {
+  // BEFORE the next paint so a paste of long text doesn't flash outside the
+  // box. useLayoutEffect runs synchronously after DOM mutations.
+  useLayoutEffect(() => {
     if (!isEditingText) return;
     const ta = textareaRef.current;
     if (!ta) return;
@@ -595,7 +596,14 @@ export function BoardItemCard({
         left: item.x,
         top: item.y,
         width: item.width,
-        ...(item.type === "text" ? { height: item.height } : {}),
+        // While editing a text item, use minHeight so the outer div can grow
+        // with the content (paste of long text would otherwise spill below
+        // the stale item.height before the height-grow effect runs). Once
+        // editing ends, item.height has been live-updated to match content
+        // so the locked height is correct.
+        ...(item.type === "text"
+          ? (isEditingText ? { minHeight: item.height } : { height: item.height })
+          : {}),
         zIndex: isSelected ? 50 : 1,
         WebkitTouchCallout: "none", // suppress iOS native long-press callout
       }}
