@@ -556,11 +556,9 @@ export async function POST(req: NextRequest) {
         let userMsg = raw;
         let status = 500;
         if (/503|UNAVAILABLE|high demand/i.test(raw)) {
-          // Capacity spike on Google's side, usually only at higher resolutions.
-          // 2K runs on a different pool and almost always works.
-          const res = (input.resolution as string) || "";
-          const lower4k = /4k/i.test(res) ? " Try dropping resolution to 2K — 4K hits Google's capacity ceiling first." : " Try again in a minute.";
-          userMsg = "Google's image servers are busy right now." + lower4k;
+          // Transient capacity spike on Google's side. The auto-retry above
+          // catches most; this fires only when both attempts fail.
+          userMsg = "Google's image servers are busy right now. Try again in a minute.";
           status = 503;
         } else if (/RESOURCE_EXHAUSTED|429|quota/i.test(raw)) {
           userMsg = "Image model is rate-limited right now. Wait a minute and try again.";
