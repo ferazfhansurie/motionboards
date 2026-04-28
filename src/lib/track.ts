@@ -29,7 +29,9 @@ export function track(eventName: string, properties?: Record<string, unknown>): 
   const payload = {
     eventName,
     anonId: ensureAnonId(),
-    pathname: window.location.pathname + window.location.search,
+    // Pathname only — strip query string so the same logical page (e.g.
+    // /generate vs /generate?fbclid=...) doesn't fragment into N rows.
+    pathname: window.location.pathname,
     referrer: document.referrer || undefined,
     properties,
   };

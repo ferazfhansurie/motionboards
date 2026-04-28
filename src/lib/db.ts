@@ -277,15 +277,19 @@ export async function getEventCounts(rangeDays: number | null): Promise<EventCou
     const since = rangeDays === null
       ? new Date("1970-01-01")
       : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+    // Exclude admin users (role='admin' OR the operator email) so the funnel
+    // reflects real visitor behaviour, not the team browsing their own site.
     const rows = await sql`
       SELECT
-        event_name,
+        e.event_name,
         COUNT(*)::int AS count,
-        COUNT(DISTINCT anon_id)::int AS unique_anons,
-        COUNT(DISTINCT user_id)::int AS unique_users
-      FROM mb_events
-      WHERE created_at >= ${since}
-      GROUP BY event_name
+        COUNT(DISTINCT e.anon_id)::int AS unique_anons,
+        COUNT(DISTINCT e.user_id)::int AS unique_users
+      FROM mb_events e
+      LEFT JOIN mb_users u ON u.id = e.user_id
+      WHERE e.created_at >= ${since}
+        AND (u.id IS NULL OR (u.role <> 'admin' AND LOWER(u.email) <> LOWER(${ADMIN_EMAIL})))
+      GROUP BY e.event_name
       ORDER BY count DESC
     `;
     return rows.map((r) => ({
@@ -311,14 +315,22 @@ export async function getTopPaths(rangeDays: number | null, limit = 20): Promise
     const since = rangeDays === null
       ? new Date("1970-01-01")
       : new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+    // SPLIT_PART strips any leftover query string from older rows that were
+    // captured before we stopped including window.location.search — so
+    // /generate?fbclid=... folds back into /generate.
+    // Admin traffic excluded here too.
     const rows = await sql`
       SELECT
-        pathname,
+        SPLIT_PART(e.pathname, '?', 1) AS pathname,
         COUNT(*)::int AS count,
-        COUNT(DISTINCT COALESCE(user_id, anon_id))::int AS unique_visitors
-      FROM mb_events
-      WHERE created_at >= ${since} AND event_name = 'page_view' AND pathname IS NOT NULL
-      GROUP BY pathname
+        COUNT(DISTINCT COALESCE(e.user_id, e.anon_id))::int AS unique_visitors
+      FROM mb_events e
+      LEFT JOIN mb_users u ON u.id = e.user_id
+      WHERE e.created_at >= ${since}
+        AND e.event_name = 'page_view'
+        AND e.pathname IS NOT NULL
+        AND (u.id IS NULL OR (u.role <> 'admin' AND LOWER(u.email) <> LOWER(${ADMIN_EMAIL})))
+      GROUP BY SPLIT_PART(e.pathname, '?', 1)
       ORDER BY count DESC
       LIMIT ${limit}
     `;
