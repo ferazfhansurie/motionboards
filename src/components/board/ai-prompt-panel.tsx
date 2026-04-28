@@ -693,6 +693,23 @@ export function AIPromptPanel() {
     }
   };
 
+  // ALL hooks MUST live above the early return — React error #310 fires
+  // otherwise (hook count changes between open / closed renders).
+  // handleSend is defined further down inside the open path, so we bridge
+  // through a ref the seed-effect can call into.
+  const handleSendRef = useRef<((overrideText?: string) => void) | null>(null);
+  const seedFiredRef = useRef(false);
+  useEffect(() => {
+    if (!pendingChatSeed) { seedFiredRef.current = false; return; }
+    if (!isAIPromptOpen || !currentChatId || loading) return;
+    if (seedFiredRef.current) return;
+    seedFiredRef.current = true;
+    const seed = pendingChatSeed;
+    setPendingChatSeed(null);
+    setTimeout(() => { handleSendRef.current?.(seed); }, 30);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingChatSeed, isAIPromptOpen, currentChatId, loading]);
+
   if (!isAIPromptOpen) return null;
 
   // Total size cap for pending attachments (raw file bytes, before upload).
@@ -982,21 +999,9 @@ export function AIPromptPanel() {
     }
   };
 
-  // AI Agent handoff: when the empty hero hands a request to ADletic AI it
-  // sets pendingChatSeed in the store. Consume it once the panel is open and
-  // a chat is ready, then clear the seed.
-  const seedFiredRef = useRef(false);
-  useEffect(() => {
-    if (!pendingChatSeed) { seedFiredRef.current = false; return; }
-    if (!isAIPromptOpen || !currentChatId || loading) return;
-    if (seedFiredRef.current) return;
-    seedFiredRef.current = true;
-    const seed = pendingChatSeed;
-    setPendingChatSeed(null);
-    // Defer one tick so any pending state writes (open, current chat) settle.
-    setTimeout(() => { handleSend(seed); }, 30);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingChatSeed, isAIPromptOpen, currentChatId, loading]);
+  // Wire the bridge ref so the seed-effect (declared above the early
+  // return) can invoke the latest handleSend closure.
+  handleSendRef.current = handleSend;
 
   const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
