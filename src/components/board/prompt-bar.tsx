@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, Fragment } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   WandSparkles,
   Loader2,
@@ -1205,141 +1205,26 @@ export function PromptBar() {
     tempImg.src = dataUri;
   };
 
-  // Empty-canvas backdrop. Two layers:
-  //   1. heroBigText — two horizontal marquee rows matching the
-  //      adleticagency landing page's bigtext block. Top row is the stat
-  //      line ("7+ MODELS · 16+ WORKFLOWS · …") with solid muted fill.
-  //      Bottom row is the model lineup ("SORA · VEO · KLING · …")
-  //      rendered as stencil outlines (text-stroke only, transparent
-  //      fill), alternating brand orange and muted gray. Same CSS tokens
-  //      as WaitlistPage.css `.mb-bigtext-row`.
-  //   2. heroImages — sample renders in the corners + mid-edges, each
-  //      labelled with the same stencil style above it. Eight slots
-  //      (h1–h8) to fill the background without crowding the centre.
-  // Both layers sit behind the prompt UI (z-10) at very low contrast so
-  // the headline + prompt + pills stay the focal point.
-  const heroStatPhrases = ["7+ MODELS", "16+ WORKFLOWS", "5× CHEAPER", "TOP UP & GENERATE"];
-  // accent flag toggles per-span — matches `.row2 span.accent` rule on
-  // the source: every other model gets the orange stencil stroke.
-  const heroModelTokens: { text: string; accent: boolean }[] = [
-    { text: "SORA",        accent: true  },
-    { text: "VEO",         accent: false },
-    { text: "KLING",       accent: true  },
-    { text: "SEEDANCE",    accent: false },
-    { text: "HAILUO",      accent: true  },
-    { text: "WAN",         accent: false },
-    { text: "NANO BANANA", accent: true  },
-    { text: "FLUX",        accent: false },
-  ];
-
+  // Empty-canvas backdrop — four sample renders, one per corner, with
+  // small stenciled labels above. Kept deliberately minimal: the prompt
+  // UI is the focal point, the cards are atmosphere. (Earlier iterations
+  // had two marquee rows of giant text + 8 image cards; pulled back to
+  // 4 cards for less visual noise on small screens.)
   const heroImages = [
-    // Corners — anchor the layout
     { src: "/hero/h1.jpg", label: "Nano Banana 2", x: "4%",  y: "16%", w: 130, delay: 0.0 },
     { src: "/hero/h4.jpg", label: "Veo 3.1",       x: "84%", y: "14%", w: 140, delay: 0.1 },
     { src: "/hero/h3.jpg", label: "FLUX Schnell",  x: "5%",  y: "64%", w: 120, delay: 0.2 },
     { src: "/hero/h6.jpg", label: "Seedance 2.0",  x: "82%", y: "66%", w: 130, delay: 0.3 },
-    // Mid-edge fillers — break up the empty space without crowding centre
-    { src: "/hero/h2.jpg", label: "Kling 2.5",     x: "1%",  y: "38%", w: 100, delay: 0.35 },
-    { src: "/hero/h5.jpg", label: "Sora 2",        x: "88%", y: "37%", w: 105, delay: 0.40 },
-    { src: "/hero/h7.jpg", label: "Hailuo 02",     x: "12%", y: "82%", w: 90,  delay: 0.45 },
-    { src: "/hero/h8.jpg", label: "Wan 2.5",       x: "84%", y: "84%", w: 95,  delay: 0.50 },
   ];
 
   // Centered hero prompt for empty canvas
   if (isCanvasEmpty) {
     return (
       <>
-        {/* Editorial decoration — two horizontal marquee rows of big
-            uppercase text (matches adleticagency landing page's
-            .mb-bigtext block exactly) plus eight sample renders around
-            the edges. Both layers sit behind the prompt UI. */}
+        {/* Editorial decoration — four sample-render cards in the
+            corners with small stenciled labels above. Sits behind the
+            prompt UI at low contrast. */}
         <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-          {/* Layer 1a: top row — solid muted stat phrases, orange
-              bullets between. Slow leftward scroll. */}
-          <div
-            className="absolute left-0 right-0 overflow-hidden"
-            style={{ top: "6%", transform: "rotate(-1.5deg)" }}
-          >
-            <div
-              className="flex items-center gap-8 whitespace-nowrap"
-              style={{
-                width: "max-content",
-                animation: "mbMarqueeLeft 60s linear infinite",
-              }}
-            >
-              {/* Doubled content keeps the loop seamless. */}
-              {[0, 1].map((dup) => (
-                <Fragment key={dup}>
-                  {heroStatPhrases.map((p, i) => (
-                    <Fragment key={`stat-${dup}-${i}`}>
-                      <span
-                        className="font-black uppercase select-none"
-                        style={{
-                          fontSize: "clamp(2.5rem, 7vw, 6rem)",
-                          letterSpacing: "-0.04em",
-                          lineHeight: 1,
-                          color: isDark ? "rgba(255,255,255,0.06)" : "rgba(13,17,23,0.06)",
-                        }}
-                      >
-                        {p}
-                      </span>
-                      <span
-                        className="font-black select-none"
-                        style={{
-                          fontSize: "clamp(1.5rem, 4vw, 3rem)",
-                          color: "#f26522",
-                          opacity: 0.55,
-                        }}
-                      >
-                        •
-                      </span>
-                    </Fragment>
-                  ))}
-                </Fragment>
-              ))}
-            </div>
-          </div>
-
-          {/* Layer 1b: bottom row — stenciled model names. Same speed
-              other direction so the two rows feel coupled. */}
-          <div
-            className="absolute left-0 right-0 overflow-hidden"
-            style={{ bottom: "5%", transform: "rotate(-1.5deg)" }}
-          >
-            <div
-              className="flex items-center gap-10 whitespace-nowrap"
-              style={{
-                width: "max-content",
-                animation: "mbMarqueeRight 65s linear infinite",
-              }}
-            >
-              {[0, 1].map((dup) => (
-                <Fragment key={dup}>
-                  {heroModelTokens.map((m, i) => (
-                    <span
-                      key={`model-${dup}-${i}`}
-                      className="font-black uppercase select-none"
-                      style={{
-                        fontSize: "clamp(2.5rem, 7vw, 6rem)",
-                        letterSpacing: "-0.04em",
-                        lineHeight: 1,
-                        color: m.accent
-                          ? "transparent"
-                          : (isDark ? "rgba(255,255,255,0.04)" : "rgba(13,17,23,0.04)"),
-                        WebkitTextStroke: m.accent
-                          ? "2px rgba(242,101,34,0.30)"
-                          : `1px ${isDark ? "rgba(255,255,255,0.10)" : "rgba(13,17,23,0.10)"}`,
-                      }}
-                    >
-                      {m.text}
-                    </span>
-                  ))}
-                </Fragment>
-              ))}
-            </div>
-          </div>
-
-          {/* Layer 2: sample-render cards with stenciled labels above. */}
           {heroImages.map((img, i) => (
             <div
               key={i}
@@ -1378,11 +1263,6 @@ export function PromptBar() {
           ))}
           <style>{`
             @keyframes heroFadeIn { from { opacity: 0; } to { opacity: 0.55; } }
-            @keyframes mbMarqueeLeft  { from { transform: translateX(0); }       to { transform: translateX(-50%); } }
-            @keyframes mbMarqueeRight { from { transform: translateX(-50%); }    to { transform: translateX(0); } }
-            @media (prefers-reduced-motion: reduce) {
-              [style*="mbMarqueeLeft"], [style*="mbMarqueeRight"] { animation: none !important; }
-            }
           `}</style>
         </div>
 
@@ -1541,40 +1421,26 @@ export function PromptBar() {
                 </button>
               </div>
             </div>
-            {/* Model generation options */}
-            <div className="flex justify-center">
-              {renderOptionPills()}
-            </div>
+            {/* Model generation options — only in Manual mode. In AI Agent
+                mode ADletic decides aspect ratio / resolution per request. */}
+            {!aiAgentMode && (
+              <div className="flex justify-center">
+                {renderOptionPills()}
+              </div>
+            )}
 
-            {/* Upload to canvas — separate from the in-chat reference button:
-                this drops the image as a regular board item without flagging
-                it as an input ref for the model. */}
-            <div className="flex justify-center mt-3">
-              <input
-                ref={heroFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleHeroFilePick(f);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => heroFileInputRef.current?.click()}
-                title="Upload an image directly to the canvas"
-                className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[11px] font-medium border transition-colors active:opacity-70 ${
-                  isDark
-                    ? "text-gray-300 border-gray-700 bg-[#161b22] hover:border-[#f26522] hover:text-[#f26522]"
-                    : "text-gray-600 border-gray-200 bg-white hover:border-[#f26522] hover:text-[#f26522]"
-                }`}
-              >
-                <Upload className="h-3.5 w-3.5" />
-                Upload to canvas
-              </button>
-            </div>
+            {/* Hidden file input still wired for canvas-paste / drop flows. */}
+            <input
+              ref={heroFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleHeroFilePick(f);
+                e.target.value = "";
+              }}
+            />
 
             {/* Other boards — quick switcher when canvas is empty. Skips the
                 current (empty) board, hides the row entirely if the user
@@ -1611,40 +1477,8 @@ export function PromptBar() {
               </div>
             )}
 
-            {/* Suggestion pills — Flora-style sleek dark capsules with icons */}
-            <div className="flex flex-wrap gap-2 mt-4 justify-center">
-              {[
-                { label: "Storyboard an ad", text: "Build me a 30-second storyboard for a coffee ad", icon: <LayoutGrid className="h-3 w-3" /> },
-                { label: "Animate an image", text: "Animate this image into a 5-second clip with subtle camera push-in", icon: <FileImage className="h-3 w-3" /> },
-                { label: "Generate a hero poster", text: "Generate a cinematic neon-noir poster, 16:9", icon: <Sparkles className="h-3 w-3" /> },
-              ].map((s) => (
-                <button
-                  key={s.label}
-                  onClick={() => setPrompt(s.text)}
-                  className={`group flex items-center gap-1.5 text-[11px] px-3.5 py-2 rounded-full border transition-all ${isDark ? "text-gray-300 border-gray-800 bg-[#0d1117]/60 hover:border-gray-600" : "text-gray-700 border-gray-200 bg-white/60 hover:border-gray-400"}`}
-                >
-                  <span className={isDark ? "text-gray-500" : "text-gray-400"}>{s.icon}</span>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-
-            {/* OR / double-click hint — Flora-style discoverability cue */}
-            <div className="flex items-center justify-center gap-3 mt-6">
-              <div className={`h-px flex-1 max-w-[60px] ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-              <span className={`text-[10px] uppercase tracking-[0.2em] font-medium ${isDark ? "text-gray-600" : "text-gray-400"}`}>or</span>
-              <div className={`h-px flex-1 max-w-[60px] ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-            </div>
-            <p className={`text-center text-[11px] mt-3 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ${isDark ? "bg-[#161b22] text-gray-300 border border-gray-800" : "bg-gray-100 text-gray-700 border border-gray-200"}`}>
-                Double-click
-              </span>
-              <span className="ml-1.5">anywhere on the canvas to create a node</span>
-            </p>
-
-            {/* Need help / WhatsApp us / Visit website — extra top margin
-                so this never tucks under the bottom toolbar. */}
-            <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
+            {/* Need help / WhatsApp us / Visit website */}
+            <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
               <a
                 href="https://wa.me/60112167672?text=Hi%2C%20I%20need%20help%20with%20MotionBoards%20%F0%9F%91%8B"
                 target="_blank"
