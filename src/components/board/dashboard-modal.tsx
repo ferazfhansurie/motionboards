@@ -352,7 +352,11 @@ export function ProfilePanel() {
                           . RM10/mo adds 10 credits every cycle.
                         </>
                       ) : (
-                        <>RM10/mo. Adds 10 credits the moment it renews. Cancel anytime.</>
+                        <>
+                          <span className="line-through opacity-60">RM100</span>{" "}
+                          <span className="text-[#f26522] font-bold">RM10/mo</span>
+                          {" "}· limited time. Adds 10 credits the moment it renews. Cancel anytime.
+                        </>
                       )}
                     </p>
                   </div>

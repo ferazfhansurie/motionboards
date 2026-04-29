@@ -78,11 +78,19 @@ export default function SignupPage() {
           <img src="/logo.jpg" alt="MotionBoards" className="h-16 w-auto rounded-lg" />
         </div>
 
+        <div className="flex justify-center mb-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#f26522]/10 border border-[#f26522]/30 text-[10px] font-bold uppercase tracking-wider text-[#f26522]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#f26522] animate-pulse" />
+            Limited time · 90% off
+          </span>
+        </div>
         <h1 className="text-2xl font-bold text-[#0d1117] text-center mb-1">
           Subscribe to MotionBoards
         </h1>
-        <p className="text-sm text-gray-400 text-center mb-6">
-          RM10/month — every AI model, every workflow, one subscription
+        <p className="text-sm text-gray-500 text-center mb-6">
+          <span className="line-through text-gray-400">RM100/month</span>
+          <span className="text-[#f26522] font-semibold"> RM10/month</span>
+          {" "}— every AI model, every workflow, one subscription
         </p>
 
         {cancelled && (
@@ -107,8 +115,9 @@ export default function SignupPage() {
               <h2 className="text-lg font-bold text-[#0d1117]">MotionBoards Monthly</h2>
             </div>
             <div className="text-right shrink-0">
+              <p className="text-[11px] text-gray-400 line-through leading-none mb-0.5">RM100</p>
               <p className="text-3xl font-black text-[#0d1117] leading-none">RM10</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">/ month</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">/ month · limited time</p>
             </div>
           </div>
           <ul className="space-y-2">
@@ -173,7 +182,7 @@ export default function SignupPage() {
             ) : (
               <>
                 <Zap className="h-4 w-4" />
-                Subscribe RM10/month
+                Claim RM10/month <span className="text-white/70 line-through ml-1 text-[11px] font-medium">RM100</span>
               </>
             )}
           </button>
