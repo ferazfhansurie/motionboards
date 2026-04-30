@@ -272,6 +272,34 @@ export function AIPromptPanel() {
   // Board selection for "Optimize from canvas" — default all boards selected
   const [includedBoardIds, setIncludedBoardIds] = useState<string[] | null>(null);
 
+  // ── MCP connectors ──────────────────────────────────────────────────
+  // User-provided MCP servers (e.g. Higgsfield) get forwarded to Claude
+  // on every chat turn. List is loaded when the settings panel opens
+  // and saved as a single PUT with the full array. Tokens for existing
+  // entries are NEVER round-tripped to the client — the API echoes them
+  // back as a `hasAuthorizationToken: boolean`. To preserve a token on
+  // edit we send the literal sentinel "__keep__" in its place.
+  type ClientMcpConnector = {
+    id: string;
+    name: string;
+    url: string;
+    hasAuthorizationToken: boolean;
+    enabled: boolean;
+    // Local-only: when the user pastes a fresh token in the editor,
+    // we stash it here so the next save sends it through. Empty string
+    // means "explicitly clear the token". Undefined means "no change —
+    // send __keep__ on save".
+    pendingToken?: string;
+  };
+  const [mcpConnectors, setMcpConnectors] = useState<ClientMcpConnector[]>([]);
+  const [mcpLoading, setMcpLoading] = useState(false);
+  const [mcpSaving, setMcpSaving] = useState(false);
+  const [mcpStatus, setMcpStatus] = useState<string | null>(null);
+  // Currently-edited row id (or "new") so the inline editor only opens
+  // for one row at a time.
+  const [mcpEditingId, setMcpEditingId] = useState<string | null>(null);
+  const [mcpDraft, setMcpDraft] = useState<{ name: string; url: string; token: string }>({ name: "", url: "", token: "" });
+
   // Helper: get generation prompts from a specific board (using live state.items
   // for the active board since state.boards[activeBoardId].items may be stale).
   const getBoardPrompts = useCallback((boardId: string): string[] => {
@@ -307,6 +335,158 @@ export function AIPromptPanel() {
       // noop
     }
   }, []);
+
+  // ── MCP connector handlers ──────────────────────────────────────────
+  const loadMcpConnectors = useCallback(async () => {
+    setMcpLoading(true);
+    try {
+      const res = await fetch("/api/mcp-connectors");
+      const data = await res.json();
+      if (Array.isArray(data.connectors)) {
+        setMcpConnectors(data.connectors as ClientMcpConnector[]);
+      }
+    } catch {
+      // noop — if it fails the panel just shows an empty list
+    } finally {
+      setMcpLoading(false);
+    }
+  }, []);
+
+  // Persist the current `mcpConnectors` array back to the server. Any
+  // entry with `pendingToken === undefined` keeps its existing token via
+  // the "__keep__" sentinel; pendingToken="" clears it; any other string
+  // overwrites.
+  const saveMcpConnectors = async (next: ClientMcpConnector[]) => {
+    setMcpSaving(true);
+    setMcpStatus(null);
+    try {
+      const payload = {
+        connectors: next.map((c) => ({
+          id: c.id,
+          name: c.name,
+          url: c.url,
+          enabled: c.enabled,
+          authorizationToken:
+            c.pendingToken === undefined
+              ? (c.hasAuthorizationToken ? "__keep__" : "")
+              : c.pendingToken,
+        })),
+      };
+      const res = await fetch("/api/mcp-connectors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (Array.isArray(data.connectors)) {
+        setMcpConnectors(data.connectors as ClientMcpConnector[]);
+      }
+      setMcpStatus("Saved");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save";
+      setMcpStatus(msg);
+    } finally {
+      setMcpSaving(false);
+      setTimeout(() => setMcpStatus(null), 2500);
+    }
+  };
+
+  const beginEditingConnector = (c: ClientMcpConnector | null) => {
+    if (c) {
+      setMcpEditingId(c.id);
+      setMcpDraft({ name: c.name, url: c.url, token: "" });
+    } else {
+      setMcpEditingId("new");
+      setMcpDraft({ name: "", url: "", token: "" });
+    }
+  };
+
+  // Pre-fill the editor for a Higgsfield connector — single click and the
+  // user only has to paste their bearer token (or leave blank if they're
+  // testing without auth).
+  const beginAddHiggsfield = () => {
+    setMcpEditingId("new");
+    setMcpDraft({ name: "Higgsfield", url: "https://mcp.higgsfield.ai/mcp", token: "" });
+  };
+
+  const cancelMcpEdit = () => {
+    setMcpEditingId(null);
+    setMcpDraft({ name: "", url: "", token: "" });
+  };
+
+  const commitMcpDraft = async () => {
+    const name = mcpDraft.name.trim();
+    const url = mcpDraft.url.trim();
+    if (!name || !url) {
+      setMcpStatus("Name and URL required");
+      setTimeout(() => setMcpStatus(null), 2500);
+      return;
+    }
+    if (!/^https:\/\//i.test(url)) {
+      setMcpStatus("URL must start with https://");
+      setTimeout(() => setMcpStatus(null), 2500);
+      return;
+    }
+    let next: ClientMcpConnector[];
+    if (mcpEditingId === "new") {
+      next = [
+        ...mcpConnectors,
+        {
+          id: `mcp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          name,
+          url,
+          hasAuthorizationToken: !!mcpDraft.token,
+          enabled: true,
+          pendingToken: mcpDraft.token || undefined,
+        },
+      ];
+    } else {
+      next = mcpConnectors.map((c) =>
+        c.id === mcpEditingId
+          ? {
+              ...c,
+              name,
+              url,
+              // Empty draft.token means "no change" on edit (the placeholder
+              // hints that). The user clears explicitly via the trash icon
+              // on the token row instead.
+              ...(mcpDraft.token ? { pendingToken: mcpDraft.token, hasAuthorizationToken: true } : {}),
+            }
+          : c,
+      );
+    }
+    setMcpEditingId(null);
+    setMcpDraft({ name: "", url: "", token: "" });
+    await saveMcpConnectors(next);
+  };
+
+  const toggleMcpEnabled = async (id: string) => {
+    const next = mcpConnectors.map((c) =>
+      c.id === id ? { ...c, enabled: !c.enabled } : c,
+    );
+    setMcpConnectors(next);
+    await saveMcpConnectors(next);
+  };
+
+  const removeMcpConnector = async (id: string) => {
+    const target = mcpConnectors.find((c) => c.id === id);
+    if (target && !window.confirm(`Remove "${target.name}"? ADletic will stop calling this MCP.`)) {
+      return;
+    }
+    const next = mcpConnectors.filter((c) => c.id !== id);
+    setMcpConnectors(next);
+    await saveMcpConnectors(next);
+  };
+
+  // Load connectors when the settings panel opens. Cheap call; we keep
+  // it inline with loadInstruction's pattern.
+  useEffect(() => {
+    if (showSettings) {
+      loadMcpConnectors();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSettings]);
 
   const saveInstruction = async () => {
     setInstructionSaving(true);
@@ -1293,6 +1473,206 @@ export function AIPromptPanel() {
                   <p className={`mt-1 text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                     {CHAT_MODELS.find((m) => m.id === chatModel)?.description || ""}
                   </p>
+                </div>
+
+                {/* ── MCP Connectors ─────────────────────────────────
+                    Per-user MCP servers forwarded to Claude on every
+                    chat turn. Each entry: name + https URL + optional
+                    bearer token. Higgsfield gets a one-click preset.
+                    See /api/mcp-connectors for the storage shape. */}
+                <div className={`mb-3 pt-3 border-t ${isDark ? "border-gray-800" : "border-gray-100"}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className={`text-[10px] font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                      Connectors (MCP)
+                    </label>
+                    <span className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                      {mcpConnectors.filter((c) => c.enabled).length}/{mcpConnectors.length} enabled
+                    </span>
+                  </div>
+                  <p className={`text-[10px] mb-2 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                    Plug third-party MCP servers (Higgsfield, custom) into ADletic. Tools they expose become callable from chat.
+                  </p>
+
+                  {mcpLoading && mcpConnectors.length === 0 ? (
+                    <div className={`flex items-center justify-center py-3 text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                      Loading…
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {mcpConnectors.map((c) => {
+                        const isEditing = mcpEditingId === c.id;
+                        return (
+                          <div
+                            key={c.id}
+                            className={`rounded-lg border ${isEditing ? "ring-2 ring-[#f26522]/20" : ""} ${isDark ? "bg-[#0d1117] border-gray-800" : "bg-white border-gray-200"}`}
+                          >
+                            {!isEditing && (
+                              <div className="flex items-center gap-2 px-2.5 py-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleMcpEnabled(c.id)}
+                                  title={c.enabled ? "Disable — won't be sent to Claude" : "Enable"}
+                                  className={`shrink-0 h-3.5 w-6 rounded-full transition-colors relative ${c.enabled ? "bg-[#f26522]" : isDark ? "bg-gray-700" : "bg-gray-300"}`}
+                                >
+                                  <span
+                                    className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white shadow transition-all ${c.enabled ? "left-3" : "left-0.5"}`}
+                                  />
+                                </button>
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-[11px] font-semibold truncate ${isDark ? "text-white" : "text-[#0d1117]"} ${!c.enabled ? "opacity-50" : ""}`}>
+                                    {c.name}
+                                    {c.hasAuthorizationToken && (
+                                      <span className="ml-1.5 text-[8px] uppercase tracking-wider px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-500 align-middle">
+                                        auth
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className={`text-[9px] truncate font-mono ${isDark ? "text-gray-500" : "text-gray-400"} ${!c.enabled ? "opacity-50" : ""}`}>
+                                    {c.url}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => beginEditingConnector(c)}
+                                  className={`shrink-0 p-1 rounded transition-colors ${isDark ? "text-gray-500 hover:text-white hover:bg-white/5" : "text-gray-400 hover:text-[#0d1117] hover:bg-gray-100"}`}
+                                  title="Edit"
+                                >
+                                  <SettingsIcon className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeMcpConnector(c.id)}
+                                  className={`shrink-0 p-1 rounded transition-colors ${isDark ? "text-gray-500 hover:text-red-400 hover:bg-red-500/5" : "text-gray-400 hover:text-red-500 hover:bg-red-50"}`}
+                                  title="Remove"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                            {isEditing && (
+                              <div className="p-2.5 space-y-1.5">
+                                <input
+                                  type="text"
+                                  value={mcpDraft.name}
+                                  onChange={(e) => setMcpDraft({ ...mcpDraft, name: e.target.value })}
+                                  placeholder="Higgsfield"
+                                  className={`w-full text-[11px] rounded-md border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 ${isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+                                />
+                                <input
+                                  type="url"
+                                  value={mcpDraft.url}
+                                  onChange={(e) => setMcpDraft({ ...mcpDraft, url: e.target.value })}
+                                  placeholder="https://mcp.higgsfield.ai/mcp"
+                                  className={`w-full text-[11px] font-mono rounded-md border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 ${isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+                                />
+                                <input
+                                  type="password"
+                                  value={mcpDraft.token}
+                                  onChange={(e) => setMcpDraft({ ...mcpDraft, token: e.target.value })}
+                                  placeholder={c.hasAuthorizationToken ? "Bearer token (paste to rotate, leave blank to keep)" : "Bearer token (optional)"}
+                                  autoComplete="off"
+                                  className={`w-full text-[11px] font-mono rounded-md border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 ${isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+                                />
+                                <div className="flex items-center justify-end gap-1.5 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={cancelMcpEdit}
+                                    className={`text-[10px] px-2 py-1 rounded transition-colors ${isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-500 hover:bg-gray-100"}`}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={commitMcpDraft}
+                                    disabled={mcpSaving}
+                                    className="text-[10px] font-semibold px-2.5 py-1 rounded bg-[#f26522] text-white hover:bg-[#d9541a] disabled:opacity-50 transition-colors"
+                                  >
+                                    {mcpSaving ? "Saving…" : "Save"}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Inline editor for the new entry */}
+                      {mcpEditingId === "new" && (
+                        <div className={`rounded-lg border ring-2 ring-[#f26522]/20 p-2.5 space-y-1.5 ${isDark ? "bg-[#0d1117] border-gray-800" : "bg-white border-gray-200"}`}>
+                          <input
+                            type="text"
+                            value={mcpDraft.name}
+                            onChange={(e) => setMcpDraft({ ...mcpDraft, name: e.target.value })}
+                            placeholder="Connector name (e.g. Higgsfield)"
+                            autoFocus
+                            className={`w-full text-[11px] rounded-md border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 ${isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+                          />
+                          <input
+                            type="url"
+                            value={mcpDraft.url}
+                            onChange={(e) => setMcpDraft({ ...mcpDraft, url: e.target.value })}
+                            placeholder="https://mcp.example.com/mcp"
+                            className={`w-full text-[11px] font-mono rounded-md border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 ${isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+                          />
+                          <input
+                            type="password"
+                            value={mcpDraft.token}
+                            onChange={(e) => setMcpDraft({ ...mcpDraft, token: e.target.value })}
+                            placeholder="Bearer token (optional)"
+                            autoComplete="off"
+                            className={`w-full text-[11px] font-mono rounded-md border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#f26522]/20 ${isDark ? "bg-[#161b22] border-gray-700 text-white placeholder-gray-500" : "bg-gray-50 border-gray-200 text-[#0d1117] placeholder-gray-400"}`}
+                          />
+                          <div className="flex items-center justify-end gap-1.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={cancelMcpEdit}
+                              className={`text-[10px] px-2 py-1 rounded transition-colors ${isDark ? "text-gray-400 hover:bg-white/5" : "text-gray-500 hover:bg-gray-100"}`}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={commitMcpDraft}
+                              disabled={mcpSaving}
+                              className="text-[10px] font-semibold px-2.5 py-1 rounded bg-[#f26522] text-white hover:bg-[#d9541a] disabled:opacity-50 transition-colors"
+                            >
+                              {mcpSaving ? "Saving…" : "Add"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add buttons — Higgsfield preset + generic */}
+                  {mcpEditingId === null && (
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <button
+                        type="button"
+                        onClick={beginAddHiggsfield}
+                        className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors ${isDark ? "border-gray-700 bg-[#0d1117] text-gray-200 hover:border-[#f26522] hover:text-[#f26522]" : "border-gray-200 bg-white text-[#0d1117] hover:border-[#f26522] hover:text-[#f26522]"}`}
+                        title="Pre-filled with mcp.higgsfield.ai/mcp"
+                      >
+                        <Sparkles className="h-2.5 w-2.5" />
+                        Add Higgsfield
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => beginEditingConnector(null)}
+                        className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors ${isDark ? "border-gray-700 bg-[#0d1117] text-gray-300 hover:bg-white/5" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}
+                      >
+                        <Plus className="h-2.5 w-2.5" />
+                        Custom
+                      </button>
+                      <div className="flex-1" />
+                      {mcpStatus && (
+                        <span className={`text-[9px] ${mcpStatus.toLowerCase().includes("fail") || mcpStatus.toLowerCase().includes("required") || mcpStatus.toLowerCase().includes("must") ? "text-red-500" : "text-emerald-500"}`}>
+                          {mcpStatus}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <label className={`block text-[10px] font-semibold uppercase tracking-wide mb-1.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>

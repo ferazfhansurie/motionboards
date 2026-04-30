@@ -1279,6 +1279,89 @@ export async function setUserAIModel(userId: string, model: string): Promise<voi
   await sql`UPDATE mb_users SET ai_model = ${model} WHERE id = ${userId}`;
 }
 
+// --- Per-user MCP connectors ---
+//
+// Users can plug their own MCP servers into ADletic's Claude calls — e.g.
+// Higgsfield's hosted MCP at https://mcp.higgsfield.ai/mcp. Each entry is
+// passed straight through to `messages.stream({ mcp_servers: [...] })`
+// when it's `enabled`.
+//
+// Stored as a JSON array on mb_users.mcp_connectors_json. Same lazy-
+// migration pattern as ai_instruction. Capped at 16 entries per user so
+// a corrupt save can't blow up the request payload.
+
+export interface McpConnector {
+  id: string;                       // stable React/UI id (uuid-ish)
+  name: string;                     // friendly label for the user
+  url: string;                      // MCP server URL (must be https://)
+  authorizationToken?: string;      // optional bearer the agent forwards
+  enabled: boolean;                 // disabled connectors are skipped at request time
+}
+
+const MAX_CONNECTORS_PER_USER = 16;
+
+let mcpConnectorsColumnInitialized = false;
+async function ensureMcpConnectorsColumn(): Promise<void> {
+  if (mcpConnectorsColumnInitialized) return;
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS mcp_connectors_json TEXT`;
+  mcpConnectorsColumnInitialized = true;
+}
+
+function parseConnectorsBlob(raw: string | null | undefined): McpConnector[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((c, i): McpConnector | null => {
+        if (!c || typeof c !== "object") return null;
+        const url = String(c.url || "").trim();
+        const name = String(c.name || "").trim();
+        if (!url || !name) return null;
+        return {
+          id: String(c.id || `mcp_${Date.now()}_${i}`),
+          name,
+          url,
+          authorizationToken: c.authorizationToken ? String(c.authorizationToken) : undefined,
+          enabled: c.enabled !== false, // default true if missing
+        };
+      })
+      .filter((c): c is McpConnector => c !== null)
+      .slice(0, MAX_CONNECTORS_PER_USER);
+  } catch {
+    return [];
+  }
+}
+
+export async function getUserMcpConnectors(userId: string): Promise<McpConnector[]> {
+  await ensureMcpConnectorsColumn();
+  const rows = await sql`SELECT mcp_connectors_json FROM mb_users WHERE id = ${userId}`;
+  if (rows.length === 0) return [];
+  return parseConnectorsBlob(rows[0].mcp_connectors_json as string | null);
+}
+
+export async function setUserMcpConnectors(userId: string, connectors: McpConnector[]): Promise<void> {
+  await ensureMcpConnectorsColumn();
+  // Validate + sanitise on the way in. Reject http:// (must be https) so a
+  // user pasting a local dev URL can't silently leak prompts to clear-text.
+  const cleaned: McpConnector[] = [];
+  for (const raw of connectors.slice(0, MAX_CONNECTORS_PER_USER)) {
+    const url = String(raw.url || "").trim();
+    const name = String(raw.name || "").trim();
+    if (!url || !name) continue;
+    if (!/^https:\/\//i.test(url)) continue;
+    cleaned.push({
+      id: String(raw.id || `mcp_${Date.now()}_${cleaned.length}`),
+      name: name.slice(0, 64),
+      url: url.slice(0, 512),
+      authorizationToken: raw.authorizationToken ? String(raw.authorizationToken).slice(0, 4096) : undefined,
+      enabled: raw.enabled !== false,
+    });
+  }
+  const payload = JSON.stringify(cleaned);
+  await sql`UPDATE mb_users SET mcp_connectors_json = ${payload} WHERE id = ${userId}`;
+}
+
 // --- Board version history ---
 //
 // Periodic snapshots of the user's full board state so they can recover from

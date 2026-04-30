@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getUserFromToken, getUserAIInstruction, getUserAIModel } from "@/lib/db";
+import { getUserFromToken, getUserAIInstruction, getUserAIModel, getUserMcpConnectors } from "@/lib/db";
 import { models } from "@/lib/models";
 import { resolveChatModel } from "@/lib/chat-models";
 import { toAnthropicTools } from "@/lib/agent-tools";
@@ -173,11 +173,35 @@ export async function POST(req: NextRequest) {
     // can chain through several turns and we don't want to lose context.
     const history = (messages.slice(-20) as ChatMessage[]);
 
-    const [userInstruction, userModel] = await Promise.all([
+    const [userInstruction, userModel, userMcpConnectors] = await Promise.all([
       getUserAIInstruction(user.id),
       getUserAIModel(user.id),
+      getUserMcpConnectors(user.id),
     ]);
     const chatModel = resolveChatModel(userModel);
+
+    // Translate the user's enabled MCP connectors into the Anthropic
+    // `mcp_servers` payload shape. The SDK doesn't type this field yet on
+    // the standard messages.stream() — we attach it via a typed cast and
+    // pass `anthropic-beta: mcp-client-2025-04-04` as an extra header so
+    // the API accepts it. Disabled connectors are filtered out so a user
+    // can park-and-toggle without removing entries.
+    type AnthropicMcpServer = {
+      type: "url";
+      url: string;
+      name: string;
+      authorization_token?: string;
+    };
+    const mcpServers: AnthropicMcpServer[] = userMcpConnectors
+      .filter((c) => c.enabled && /^https:\/\//i.test(c.url))
+      .map((c) => ({
+        type: "url" as const,
+        url: c.url,
+        // Anthropic wants names lower-snake-case-ish (alphanumeric + _-.).
+        // Normalise so a user-friendly "Higgsfield · Personal" still works.
+        name: c.name.toLowerCase().replace(/[^a-z0-9_.\-]+/g, "_").slice(0, 64) || "mcp",
+        ...(c.authorizationToken ? { authorization_token: c.authorizationToken } : {}),
+      }));
 
     // System blocks. The big BASE_SYSTEM_PROMPT (with model catalog) is
     // identical for every user and every request — mark its tail with
@@ -203,13 +227,26 @@ export async function POST(req: NextRequest) {
       content: toAnthropicContent(m.content),
     }));
 
-    const stream = getAnthropic().messages.stream({
+    // Build the stream args. mcp_servers is only included when the user
+    // has at least one enabled connector — keeps requests for users who
+    // don't use connectors identical to the previous (cache-friendly)
+    // shape.
+    const streamArgs: Record<string, unknown> = {
       model: chatModel,
       max_tokens: 4096,
       system: systemBlocks,
       tools: ANTHROPIC_TOOLS,
       messages: anthMessages,
-    });
+    };
+    const streamOptions: Record<string, unknown> = {};
+    if (mcpServers.length > 0) {
+      streamArgs.mcp_servers = mcpServers;
+      streamOptions.headers = { "anthropic-beta": "mcp-client-2025-04-04" };
+    }
+    const stream = getAnthropic().messages.stream(
+      streamArgs as Parameters<Anthropic["messages"]["stream"]>[0],
+      streamOptions,
+    );
 
     const encoder = new TextEncoder();
 
