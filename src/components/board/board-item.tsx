@@ -7,6 +7,7 @@ import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
 import { askShareToCommunity, pickFolder, showToast, updateToast } from "@/lib/ui-store";
+import { useInViewport } from "@/lib/use-in-viewport";
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
@@ -179,11 +180,27 @@ const loadedImageCache = new Set<string>();
 // trigger the canvas item drag.
 function UploadedVideoPreview({ src, height }: { src: string; height?: number }) {
   const [playing, setPlaying] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  // iOS: kick off metadata load explicitly when src arrives.
+  // Defer metadata load until the card is on/near the viewport. With many
+  // videos on a canvas, simultaneous metadata fetches saturate the browser's
+  // per-host connection cap and visible videos starve.
+  const inView = useInViewport(wrapRef, "600px");
+
+  // iOS Safari is lazy about loading video metadata — explicit .load() kicks
+  // it off, and after metadata arrives we seek a hair past zero to force the
+  // first frame to actually paint (Safari otherwise leaves the element black
+  // until the user hits play).
   useEffect(() => {
+    if (!inView) return;
     try { videoRef.current?.load(); } catch { /* ignore */ }
-  }, [src]);
+  }, [src, inView]);
+
+  const onLoadedMetadata = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    try { if (v.currentTime === 0) v.currentTime = 0.001; } catch { /* ignore */ }
+  };
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -198,22 +215,25 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
   };
 
   return (
-    <div className="relative" style={{ height }}>
-      <video
-        ref={videoRef}
-        src={src}
-        className="h-full w-full object-cover"
-        muted={!playing}
-        loop
-        playsInline
-        controls={playing}
-        preload="metadata"
-        draggable={false}
-        onContextMenu={(e) => e.preventDefault()}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
-      />
+    <div ref={wrapRef} className="relative bg-black/5" style={{ height }}>
+      {inView && (
+        <video
+          ref={videoRef}
+          src={src}
+          className="h-full w-full object-cover"
+          muted={!playing}
+          loop
+          playsInline
+          controls={playing}
+          preload="metadata"
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+          onLoadedMetadata={onLoadedMetadata}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
+        />
+      )}
       {!playing && (
         <button
           type="button"
@@ -234,21 +254,39 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
   const [loaded, setLoaded] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [errored, setErrored] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // iOS Safari is lazy about loading video metadata — explicit .load() kicks it
-  // off, and we listen on loadedmetadata (fires earlier than loadeddata).
-  // Also: a 4s safety timer flips the placeholder away even if neither event
-  // fires, so the user gets a play button instead of a perpetual spinner.
+  // Lazy: don't even mount the <video> element until the card is in/near
+  // viewport. With 4+ generated videos on a canvas all racing for browser
+  // connection slots, off-screen ones starve the visible ones — this was
+  // exactly what the user saw as "loading is sooo slow." 600px margin so
+  // they're ready by the time scroll catches up.
+  const inView = useInViewport(wrapRef, "600px");
+
+  // iOS Safari needs an explicit .load() to start metadata fetch, plus a
+  // tiny seek (currentTime = 0.001) AFTER metadata arrives to actually
+  // paint the first frame — without the seek the element stays black even
+  // though metadata is loaded. 1.5s safety timer (was 4s) so a stalled
+  // metadata fetch shows the play button quickly instead of perpetual
+  // spinner; the video can still play once it eventually finishes loading.
   useEffect(() => {
+    if (!inView) return;
     setLoaded(false);
     setErrored(false);
     const v = videoRef.current;
     if (!v) return;
     try { v.load(); } catch { /* ignore */ }
-    const t = setTimeout(() => setLoaded(true), 4000);
+    const t = setTimeout(() => setLoaded(true), 1500);
     return () => clearTimeout(t);
-  }, [item.outputUrl]);
+  }, [item.outputUrl, inView]);
+
+  const onLoadedMetadata = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    try { if (v.currentTime === 0) v.currentTime = 0.001; } catch { /* ignore */ }
+    setLoaded(true);
+  };
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -264,13 +302,13 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
 
   return (
     <div
-      className="relative"
-      style={{ minHeight: loaded ? undefined : item.height || 120 }}
+      ref={wrapRef}
+      className="relative bg-black/5"
+      style={{ minHeight: item.height || 120 }}
     >
       {!loaded && !errored && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-[1]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-[1] pointer-events-none">
           <Loader2 className="h-5 w-5 text-[#f26522] animate-spin" />
-          <p className="text-[10px] text-gray-400">Loading video...</p>
         </div>
       )}
       {errored && (
@@ -283,25 +321,27 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
           >Retry</button>
         </div>
       )}
-      <video
-        ref={videoRef}
-        src={item.outputUrl}
-        className={`w-full block ${loaded && !errored ? "" : "opacity-0"}`}
-        muted={!playing}
-        loop
-        playsInline
-        controls={playing}
-        preload="metadata"
-        draggable={false}
-        onContextMenu={(e) => e.preventDefault()}
-        onLoadedMetadata={() => setLoaded(true)}
-        onLoadedData={() => setLoaded(true)}
-        onCanPlay={() => setLoaded(true)}
-        onError={() => setErrored(true)}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
-      />
+      {inView && (
+        <video
+          ref={videoRef}
+          src={item.outputUrl}
+          className="w-full block"
+          muted={!playing}
+          loop
+          playsInline
+          controls={playing}
+          preload="metadata"
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+          onLoadedMetadata={onLoadedMetadata}
+          onLoadedData={() => setLoaded(true)}
+          onCanPlay={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onMouseDown={(e) => { if (playing) e.stopPropagation(); }}
+        />
+      )}
       {loaded && !errored && !playing && (
         <button
           type="button"

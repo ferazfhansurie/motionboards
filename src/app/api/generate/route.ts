@@ -45,6 +45,21 @@ function mimeKind(mime: string | null | undefined): "image" | "video" | "audio" 
   return "other";
 }
 
+// Fallback when Content-Type is missing / generic (R2 buckets sometimes
+// store octet-stream, Veo's GCS URLs occasionally come back without the
+// header). Inspect the file extension on the URL path. Returns "other"
+// when we can't tell — the type checker treats "other" as "skip" rather
+// than "reject," matching the original conservative behavior.
+function kindFromUrlExtension(url: string): "image" | "video" | "audio" | "other" {
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|bmp|avif|tiff?|heic|heif)$/.test(path)) return "image";
+    if (/\.(mp4|mov|webm|m4v|avi|mkv|3gp|ogv)$/.test(path)) return "video";
+    if (/\.(mp3|wav|ogg|m4a|aac|flac|opus)$/.test(path)) return "audio";
+  } catch { /* fall through */ }
+  return "other";
+}
+
 // For each file-typed input, confirm the bytes actually match the declared
 // slot type (image/video/audio). Canvas lets users drag any item into any
 // slot, and without this check an MP4 tagged as an image blows up deep in
@@ -76,9 +91,14 @@ async function validateInputTypes(
       }
     }
 
-    const actual = mimeKind(mime);
+    let actual = mimeKind(mime);
+    // If Content-Type is missing or generic (octet-stream), fall back to
+    // the URL extension. Without this, an image stored in R2 with no
+    // explicit Content-Type sails through validation as "other" → skipped
+    // → forwarded to the provider, where it fails with an opaque error.
+    if (actual === "other") actual = kindFromUrlExtension(url);
     if (actual !== "other" && actual !== inp.type) {
-      return `Input "${inp.description}" needs ${inp.type === "audio" ? "an audio file" : `a ${inp.type}`}, but you tagged a ${mime || actual} file.`;
+      return `Input "${inp.description}" needs ${inp.type === "audio" ? "an audio file" : `a ${inp.type}`}, but you tagged a ${mime || actual} file. Drag a ${inp.type} onto the canvas and tag it as the ${inp.description.toLowerCase()}.`;
     }
   }
   return null;
@@ -418,13 +438,28 @@ export async function POST(req: NextRequest) {
               : (modelInfo.options.generate_audio.default ?? true);
           }
 
+          // Pick a sane image mime: prefer the response header, fall back to
+          // the URL extension. Vertex rejects with an opaque error when the
+          // declared mime doesn't match the actual bytes — and a number of
+          // R2/blob paths come back without a Content-Type header at all.
+          const imageMimeFromUrl = (u: string): string => {
+            const ext = kindFromUrlExtension(u);
+            if (ext !== "image") return "image/png";
+            const lower = u.toLowerCase();
+            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+            if (lower.endsWith(".webp")) return "image/webp";
+            if (lower.endsWith(".gif")) return "image/gif";
+            return "image/png";
+          };
+
           // Build image input for I2V / S2E (first frame)
           let imageInput: { imageBytes: string; mimeType: string } | undefined;
           const imgUrl = (input.image_url || input.first_frame_url) as string | undefined;
           if (imgUrl) {
             const imgRes = await fetch(imgUrl);
             const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-            const mimeType = imgRes.headers.get("content-type") || "image/png";
+            const headerMime = imgRes.headers.get("content-type");
+            const mimeType = headerMime && headerMime.startsWith("image/") ? headerMime : imageMimeFromUrl(imgUrl);
             imageInput = { imageBytes: imgBuffer.toString("base64"), mimeType };
           }
 
@@ -433,7 +468,8 @@ export async function POST(req: NextRequest) {
           if (lastFrameUrl) {
             const lastRes = await fetch(lastFrameUrl);
             const lastBuffer = Buffer.from(await lastRes.arrayBuffer());
-            const lastMime = lastRes.headers.get("content-type") || "image/png";
+            const lastHeaderMime = lastRes.headers.get("content-type");
+            const lastMime = lastHeaderMime && lastHeaderMime.startsWith("image/") ? lastHeaderMime : imageMimeFromUrl(lastFrameUrl);
             videoConfig.lastFrame = { imageBytes: lastBuffer.toString("base64"), mimeType: lastMime };
           }
 
