@@ -2459,3 +2459,147 @@ export async function getCommunityLeaderboard(limit = 10): Promise<LeaderboardEn
     };
   });
 }
+
+// ============================================================================
+// API keys
+//
+// Lets non-browser clients (MCP servers, scripts, automations) authenticate
+// against MotionBoards using a bearer token instead of the session cookie.
+//
+// Storage:
+//   mb_api_keys (id, user_id, name, prefix, key_hash, created_at, last_used_at, revoked_at)
+//
+// Token format: `mb_<32 random hex>`. The full token is shown to the user
+// exactly once at creation. We store only the sha256 hash + a short prefix
+// for display. Revocation is soft (set revoked_at) so the audit trail stays.
+// ============================================================================
+
+export interface ApiKey {
+  id: string;
+  userId: string;
+  name: string;
+  prefix: string;          // safe to display, e.g. "mb_a1b2c3d4…"
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+const MAX_API_KEYS_PER_USER = 16;
+
+let apiKeysTableInitialized = false;
+async function ensureApiKeysTable(): Promise<void> {
+  if (apiKeysTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_api_keys (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_api_keys_user_idx ON mb_api_keys(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS mb_api_keys_hash_idx ON mb_api_keys(key_hash) WHERE revoked_at IS NULL`;
+  apiKeysTableInitialized = true;
+}
+
+function rowToApiKey(row: SqlRow): ApiKey {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    name: row.name as string,
+    prefix: row.prefix as string,
+    createdAt: (row.created_at as Date).toISOString(),
+    lastUsedAt: row.last_used_at ? (row.last_used_at as Date).toISOString() : null,
+    revokedAt: row.revoked_at ? (row.revoked_at as Date).toISOString() : null,
+  };
+}
+
+function hashApiKey(rawKey: string): string {
+  return createHash("sha256").update(rawKey).digest("hex");
+}
+
+/**
+ * Create a new API key. Returns the full plaintext token ONCE — caller must
+ * surface it to the user immediately and never store it.
+ */
+export async function createApiKey(
+  userId: string,
+  name: string,
+): Promise<{ apiKey: ApiKey; fullKey: string } | { error: string }> {
+  await ensureApiKeysTable();
+
+  const trimmedName = name.trim().slice(0, 64) || "Unnamed key";
+
+  const existing = await sql`
+    SELECT COUNT(*)::int AS n FROM mb_api_keys
+    WHERE user_id = ${userId} AND revoked_at IS NULL
+  `;
+  if ((existing[0]?.n as number) >= MAX_API_KEYS_PER_USER) {
+    return { error: `Limit of ${MAX_API_KEYS_PER_USER} active keys per account reached. Revoke an old key first.` };
+  }
+
+  const random = randomBytes(16).toString("hex");
+  const fullKey = `mb_${random}`;
+  const prefix = `${fullKey.slice(0, 9)}…`;
+  const keyHash = hashApiKey(fullKey);
+
+  const id = `apikey_${Date.now()}_${randomBytes(4).toString("hex")}`;
+
+  const rows = await sql`
+    INSERT INTO mb_api_keys (id, user_id, name, prefix, key_hash)
+    VALUES (${id}, ${userId}, ${trimmedName}, ${prefix}, ${keyHash})
+    RETURNING *
+  `;
+
+  return { apiKey: rowToApiKey(rows[0]), fullKey };
+}
+
+/**
+ * Resolve an API key to a User. Bumps last_used_at so the user can see when
+ * each key was last active. Returns undefined if the key is unknown, revoked,
+ * or the user is gone.
+ */
+export async function getUserFromApiKey(rawKey: string): Promise<User | undefined> {
+  if (!rawKey || !rawKey.startsWith("mb_")) return undefined;
+  await ensureApiKeysTable();
+
+  const keyHash = hashApiKey(rawKey);
+  const rows = await sql`
+    SELECT user_id FROM mb_api_keys
+    WHERE key_hash = ${keyHash} AND revoked_at IS NULL
+    LIMIT 1
+  `;
+  if (rows.length === 0) return undefined;
+
+  const userId = rows[0].user_id as string;
+
+  // Fire-and-forget last_used_at bump
+  sql`UPDATE mb_api_keys SET last_used_at = NOW() WHERE key_hash = ${keyHash}`.catch(() => {});
+
+  return getUserById(userId);
+}
+
+export async function listApiKeys(userId: string): Promise<ApiKey[]> {
+  await ensureApiKeysTable();
+  const rows = await sql`
+    SELECT * FROM mb_api_keys
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+  `;
+  return rows.map(rowToApiKey);
+}
+
+export async function revokeApiKey(userId: string, keyId: string): Promise<boolean> {
+  await ensureApiKeysTable();
+  const rows = await sql`
+    UPDATE mb_api_keys
+    SET revoked_at = NOW()
+    WHERE id = ${keyId} AND user_id = ${userId} AND revoked_at IS NULL
+    RETURNING id
+  `;
+  return rows.length > 0;
+}

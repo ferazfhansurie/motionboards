@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { neon } from "@neondatabase/serverless";
 
 function getSql() {
   return neon(process.env.DATABASE_URL!);
 }
 
-// GET — load boards for authenticated user
+// GET — load boards for authenticated user (cookie OR API key)
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get("session")?.value;
-    if (!token) return NextResponse.json({}, { status: 401 });
-
-    const user = await getUserFromToken(token);
+    const user = await requireUser(req);
     if (!user) return NextResponse.json({}, { status: 401 });
 
     const rows = await getSql()`SELECT data FROM mb_boards WHERE user_id = ${user.id}`;
@@ -25,15 +22,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST — save boards for authenticated user. Accepts both raw JSON and
-// gzip-encoded JSON (Content-Encoding: gzip). Gzip is what the client sends
-// for big boards so they fit under Vercel's 4 MB request body cap.
+// POST — save boards for authenticated user (cookie OR API key). Accepts both
+// raw JSON and gzip-encoded JSON (Content-Encoding: gzip). Gzip is what the
+// client sends for big boards so they fit under Vercel's 4 MB request body cap.
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get("session")?.value;
-    if (!token) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-
-    const user = await getUserFromToken(token);
+    const user = await requireUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     let data: unknown;

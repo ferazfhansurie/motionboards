@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken, getSubscription } from "@/lib/db";
+import { getSubscription } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("session")?.value;
-  if (!token) {
-    return NextResponse.json({ user: null }, { status: 401 });
-  }
-  const user = await getUserFromToken(token);
+  const user = await requireUser(req);
   if (!user) {
     return NextResponse.json({ user: null }, { status: 401 });
   }

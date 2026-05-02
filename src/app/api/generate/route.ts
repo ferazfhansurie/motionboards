@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, createGeneration, finalizeGeneration, getUserFromToken, putFile, getFile, chargeForGeneration } from "@/lib/db";
+import { getSettings, createGeneration, finalizeGeneration, putFile, getFile, chargeForGeneration } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { estimateChargeForModel } from "@/lib/pricing";
 import { models } from "@/lib/models";
 import { submitPrompt, uploadFromUrl } from "@/lib/comfy";
@@ -85,11 +86,9 @@ async function validateInputTypes(
 
 export async function POST(req: NextRequest) {
   try {
-    // Auth check
-    const token = req.cookies.get("session")?.value;
-    if (!token) return NextResponse.json({ error: "Not authenticated. Please login." }, { status: 401 });
-    const user = await getUserFromToken(token);
-    if (!user) return NextResponse.json({ error: "Session expired. Please login again." }, { status: 401 });
+    // Auth check (cookie OR Bearer API key)
+    const user = await requireUser(req);
+    if (!user) return NextResponse.json({ error: "Not authenticated. Please login or pass a valid Bearer API key." }, { status: 401 });
 
     const body = await req.json();
     const { prompt, model: modelId, inputImage, inputImages, inputVideo, startFrame, endFrame, inputAudio, generationOptions } = body;

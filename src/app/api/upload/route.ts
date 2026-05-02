@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
-import { getUserFromToken } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 
 export const maxDuration = 300;
 
@@ -19,9 +19,7 @@ export const maxDuration = 300;
 // no boundaries, no SDK.
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get("session")?.value;
-    if (!token) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    const user = await getUserFromToken(token);
+    const user = await requireUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     if (!process.env.BLOB_READ_WRITE_TOKEN) {

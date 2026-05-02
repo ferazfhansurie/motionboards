@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, finalizeGeneration, getUserFromToken, putFile, chargeForGeneration } from "@/lib/db";
+import { getSettings, finalizeGeneration, putFile, chargeForGeneration } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { models } from "@/lib/models";
 import { downloadOutput, getHistoryOutputs, getJobStatus, pickOutputFile } from "@/lib/comfy";
 
@@ -58,9 +59,7 @@ function humanizeVeoError(raw: string): string {
 // provider in the catalog is synchronous and returns the result from /api/generate.
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get("session")?.value;
-    if (!token) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    const user = await getUserFromToken(token);
+    const user = await requireUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const requestId = req.nextUrl.searchParams.get("requestId");

@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Save, Eye, EyeOff, Loader2, CheckCircle, ExternalLink, ArrowLeft, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Save, Eye, EyeOff, Loader2, CheckCircle, ExternalLink, ArrowLeft, Trash2, Copy, Plus, KeyRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { imgCacheClear } from "@/lib/image-cache";
+
+interface ApiKeySummary {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -25,6 +34,76 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("ai-generation");
   const [clearing, setClearing] = useState(false);
   const [cleared, setCleared] = useState(false);
+
+  // API key management
+  const [mbApiKeys, setMbApiKeys] = useState<ApiKeySummary[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [justCreatedFullKey, setJustCreatedFullKey] = useState<string | null>(null);
+  const [copiedJustCreated, setCopiedJustCreated] = useState(false);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  const refreshApiKeys = useCallback(async () => {
+    try {
+      const res = await fetch("/api/api-keys");
+      if (!res.ok) return;
+      const data = await res.json();
+      setMbApiKeys(Array.isArray(data?.keys) ? data.keys : []);
+    } catch (err) {
+      console.error("Failed to load API keys:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === "api-keys") {
+      void refreshApiKeys();
+    }
+  }, [activeSection, refreshApiKeys]);
+
+  const handleCreateApiKey = async () => {
+    setCreatingKey(true);
+    setJustCreatedFullKey(null);
+    setCopiedJustCreated(false);
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newKeyName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || "Failed to create API key");
+        return;
+      }
+      setJustCreatedFullKey(data.fullKey);
+      setNewKeyName("");
+      await refreshApiKeys();
+    } finally {
+      setCreatingKey(false);
+    }
+  };
+
+  const handleCopyFullKey = async () => {
+    if (!justCreatedFullKey) return;
+    try {
+      await navigator.clipboard.writeText(justCreatedFullKey);
+      setCopiedJustCreated(true);
+      setTimeout(() => setCopiedJustCreated(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleRevokeApiKey = async (id: string) => {
+    if (!confirm("Revoke this key? Anything using it will stop working immediately.")) return;
+    setRevokingId(id);
+    try {
+      await fetch(`/api/api-keys?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      await refreshApiKeys();
+    } finally {
+      setRevokingId(null);
+    }
+  };
 
   const handleClearCache = async () => {
     setClearing(true);
@@ -111,6 +190,16 @@ export default function SettingsPage() {
               onClick={() => setActiveSection("ai-generation")}
             >
               AI Generation
+            </button>
+            <button
+              className={`mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${
+                activeSection === "api-keys"
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:bg-white/5 hover:text-white/60"
+              }`}
+              onClick={() => setActiveSection("api-keys")}
+            >
+              API Keys
             </button>
             <button
               className={`mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${
@@ -321,6 +410,127 @@ export default function SettingsPage() {
                   )}
                 </Button>
               </>
+            )}
+
+            {activeSection === "api-keys" && (
+              <div className="space-y-5">
+                <div>
+                  <Label className="text-white">Personal API keys</Label>
+                  <p className="text-xs text-white/40 mt-1">
+                    Use these to call the MotionBoards API from MCP servers, scripts, or automations. Pass as <code className="rounded bg-white/5 px-1 py-0.5 text-[11px] text-white/60">Authorization: Bearer mb_…</code> on any request. Your account&apos;s credit balance funds every call. Revoke any key at any time.
+                  </p>
+                </div>
+
+                {/* Just-created key reveal */}
+                {justCreatedFullKey && (
+                  <div className="rounded-lg border border-green-400/30 bg-green-400/5 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-green-300">Your new API key — copy it now</p>
+                        <p className="mt-1 text-[11px] text-white/50">
+                          You won&apos;t be able to see it again. If you lose it, revoke this key and create a new one.
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <code className="flex-1 truncate rounded bg-black/40 px-2 py-1.5 font-mono text-xs text-white">
+                            {justCreatedFullKey}
+                          </code>
+                          <button
+                            onClick={handleCopyFullKey}
+                            className="flex items-center gap-1 rounded bg-white/10 px-2 py-1.5 text-xs text-white hover:bg-white/20"
+                          >
+                            {copiedJustCreated ? <CheckCircle className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                            <span>{copiedJustCreated ? "Copied" : "Copy"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Create new key */}
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+                  <Label className="text-white text-xs">Create new key</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Name (e.g. claude-code laptop, n8n production)"
+                      value={newKeyName}
+                      onChange={(e) => setNewKeyName(e.target.value)}
+                      maxLength={64}
+                      className="flex-1 border-white/10 bg-black/30 text-white placeholder:text-white/30"
+                    />
+                    <Button
+                      onClick={handleCreateApiKey}
+                      disabled={creatingKey}
+                      className="bg-[#f26522] text-white hover:bg-[#d9541a]"
+                    >
+                      {creatingKey ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Plus className="mr-1 h-4 w-4" />
+                          Create
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* List existing keys */}
+                <div className="space-y-2">
+                  <Label className="text-white text-xs">Active keys</Label>
+                  {mbApiKeys.length === 0 ? (
+                    <p className="text-xs text-white/40">No keys yet. Create one above.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {mbApiKeys.map((k) => (
+                        <div
+                          key={k.id}
+                          className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
+                            k.revokedAt
+                              ? "border-white/5 bg-white/[0.02] opacity-50"
+                              : "border-white/10 bg-white/5"
+                          }`}
+                        >
+                          <KeyRound className="h-4 w-4 shrink-0 text-white/40" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-white truncate">{k.name}</span>
+                              {k.revokedAt && (
+                                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
+                                  revoked
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-white/40 font-mono mt-0.5">
+                              {k.prefix}
+                              <span className="ml-2 text-white/30">
+                                created {new Date(k.createdAt).toLocaleDateString()}
+                                {k.lastUsedAt && (
+                                  <> · last used {new Date(k.lastUsedAt).toLocaleDateString()}</>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          {!k.revokedAt && (
+                            <button
+                              onClick={() => handleRevokeApiKey(k.id)}
+                              disabled={revokingId === k.id}
+                              className="rounded p-1.5 text-white/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                              title="Revoke"
+                            >
+                              {revokingId === k.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
             {activeSection === "general" && (
