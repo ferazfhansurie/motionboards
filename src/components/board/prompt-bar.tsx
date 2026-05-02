@@ -841,6 +841,11 @@ export function PromptBar() {
       const endFrameUrl = await resolveUrl(endItem);
       const inputAudioUrl = await resolveUrl(audioItem);
 
+      // Capture the moment we started so a later recovery probe (see
+      // `recoverFromHistory` below) can ignore stale generations and only
+      // accept ones created after this click.
+      const generateStartedAt = new Date().toISOString();
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -873,9 +878,9 @@ export function PromptBar() {
       }
 
       if (!res.ok) {
-        useAppStore.getState().removeItem(genItem.id);
+        // Auth gate: still a hard redirect, no item to recover.
         if (res.status === 401) {
-          // User tried to generate without an account — high-intent moment.
+          useAppStore.getState().removeItem(genItem.id);
           track("generate_gated", {
             model: selectedModel?.id,
             modelName: selectedModel?.name,
@@ -884,11 +889,80 @@ export function PromptBar() {
           window.location.href = "/signup";
           return;
         }
+
         const msg = data.error || "Generation failed";
         // 429s and safety blocks get a longer toast so the actionable hint
         // stays on screen long enough to read.
         const durationMs = res.status === 429 ? 8000 : 6000;
         showToast(msg, { kind: "error", durationMs });
+
+        // Recovery: synchronous providers (Nano Banana 2 4K is the worst
+        // offender — 60–120s GPU runs) routinely complete server-side but
+        // lose the response on the way back through Vercel's edge proxy or
+        // a flaky network. Before we declare failure, poll the user's recent
+        // generations for a completed match created after this click. If
+        // the work landed in the DB, attach its outputUrl to this canvas
+        // item so the user actually sees what they paid for.
+        useAppStore.getState().updateItem(genItem.id, {
+          status: "processing",
+          progressText: "Recovering...",
+        });
+
+        const recoverFromHistory = async (): Promise<boolean> => {
+          // Up to ~60s of polling: the upstream may still be finishing.
+          const deadline = Date.now() + 60_000;
+          while (Date.now() < deadline) {
+            try {
+              const url = `/api/generations/recent?model=${encodeURIComponent(selectedModel.id)}&since=${encodeURIComponent(generateStartedAt)}&limit=5`;
+              const histRes = await fetch(url, { cache: "no-store" });
+              if (histRes.ok) {
+                const histJson = await histRes.json().catch(() => ({}));
+                const candidates = (histJson.generations as Array<{ status: string; outputUrl?: string | null; prompt?: string | null }> | undefined) || [];
+                const match = candidates.find(
+                  (g) => g.status === "completed" && g.outputUrl && (g.prompt || "") === (prompt || ""),
+                );
+                if (match && match.outputUrl) {
+                  useAppStore.getState().updateItem(genItem.id, {
+                    status: "completed",
+                    outputUrl: match.outputUrl,
+                    cost: getEstimatedCost(selectedModel, generationOptions),
+                    progressText: undefined,
+                    error: undefined,
+                  });
+                  if (outputType === "image") {
+                    const img = new window.Image();
+                    img.onload = () => {
+                      const maxW = 250;
+                      const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+                      useAppStore.getState().updateItem(genItem.id, {
+                        width: Math.round(img.naturalWidth * scale),
+                        height: Math.round(img.naturalHeight * scale),
+                      });
+                    };
+                    img.src = match.outputUrl;
+                  }
+                  return true;
+                }
+              }
+            } catch {
+              // ignore and retry
+            }
+            await new Promise((r) => setTimeout(r, 3000));
+          }
+          return false;
+        };
+
+        const recovered = await recoverFromHistory();
+        if (!recovered) {
+          // Couldn't find a completed match — leave the item on canvas as
+          // failed so the user can retry / inspect / right-click recover
+          // instead of having it silently disappear.
+          useAppStore.getState().updateItem(genItem.id, {
+            status: "failed",
+            error: msg,
+            progressText: undefined,
+          });
+        }
         return;
       }
 
