@@ -978,14 +978,26 @@ export async function POST(req: NextRequest) {
           if (input.first_frame_url) repInput.image = input.first_frame_url;
           if (input.last_frame_url) repInput.last_frame_image = input.last_frame_url;
 
-          // Seedance 2.0 Omni: pass reference_images array. Multi-reference
-          // mode for character consistency + multi-subject scenes. Mutually
-          // exclusive with the singular `image` field — omit `image` so the
-          // upstream classifier picks the omni-reference path.
+          // Seedance 2.0 multi-reference (Omni) routing.
+          //
+          // Replicate's Seedance API treats `reference_images` as mutually
+          // exclusive with the first/last-frame `image` fields. We only want
+          // to flip into omni mode when the user actually wants it, i.e.:
+          //   - the model is omni-only (no first-frame slot declared), OR
+          //   - the user attached MORE than one reference image
+          //
+          // Otherwise a single-image I2V run silently switches to omni mode
+          // and the character of the output changes — refs are interpreted
+          // as role-tagged assets instead of a literal first frame.
           const refImages = input.reference_images as string[] | undefined;
           if (refImages && refImages.length > 0) {
-            repInput.reference_images = refImages;
-            delete repInput.image;
+            const isOmniOnly = !input.image_url && !input.first_frame_url && !input.last_frame_url;
+            const isMultiRef = refImages.length > 1;
+            if (isOmniOnly || isMultiRef) {
+              repInput.reference_images = refImages;
+              delete repInput.image;
+              delete repInput.last_frame_image;
+            }
           }
         }
 

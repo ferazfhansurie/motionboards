@@ -315,10 +315,11 @@ export const models: AIModel[] = [
     id: "bytedance/seedance-2.0",
     name: "Seedance 2.0",
     provider: "replicate", type: "t2v", category: "Video",
-    description: "ByteDance Seedance 2.0 on Replicate. Multimodal cinematic video with native audio, realistic physics, director-level camera control.",
+    description: "ByteDance Seedance 2.0 on Replicate. Multimodal cinematic video with native audio, realistic physics, director-level camera control. Optionally attach up to 9 reference images and tag them in the prompt as [Image1], [Image2]...",
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
+      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as [Image1], [Image2]...", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
@@ -333,11 +334,12 @@ export const models: AIModel[] = [
     id: "bytedance/seedance-2.0/i2v",
     name: "Seedance 2.0 I2V",
     provider: "replicate", type: "i2v", category: "Video",
-    description: "Seedance 2.0 image-to-video on Replicate. Animate a character or product shot into a cinematic clip with native audio.",
+    description: "Seedance 2.0 image-to-video on Replicate. Animate a character or product shot into a cinematic clip with native audio. Attach extra refs to switch into multi-image Omni mode and tag them as [Image1], [Image2]...",
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 10 },
+      { name: "image_url", type: "image", required: true, description: "Image to animate (used as the first frame when no extra refs are attached)", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as [Image1], [Image2]...", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
