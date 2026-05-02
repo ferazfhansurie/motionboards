@@ -76,18 +76,47 @@ async function validateInputTypes(
     const url = input[inp.name];
     if (typeof url !== "string" || !url) continue;
 
+    // Reject browser-only URLs immediately. The client's resolveUrl waits +
+    // retries upload, but if it gives up we'd otherwise forward a blob:/data:
+    // URL to the provider (Replicate, Vertex) which then fails with a
+    // confusing "couldn't fetch input" error.
+    if (url.startsWith("blob:") || url.startsWith("data:")) {
+      return `Input "${inp.description}" hasn't finished uploading yet. Wait a moment, then try generate again — or drag the file again if it's been more than a few seconds.`;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      return `Input "${inp.description}" has an invalid URL. Re-upload or re-tag the file on the canvas.`;
+    }
+
     let mime: string | null = null;
     const ownId = extractOwnFileId(url, origin);
     if (ownId) {
       const file = await getFile(ownId);
-      if (!file) continue; // let downstream report the missing file
+      if (!file) {
+        return `Input "${inp.description}" points to a file that no longer exists. Re-upload it.`;
+      }
       mime = file.mimeType;
     } else {
+      // External URL — confirm Replicate/Vertex/etc. can actually fetch it.
+      // We HEAD from the server (server-to-server, ignores CORS). A 404 or
+      // network error here means the provider would also fail, so we'd
+      // rather surface a clear message now than have it bounce back as a
+      // generic "input fetch failed" 5 minutes later.
       try {
         const headRes = await fetch(url, { method: "HEAD" });
-        mime = headRes.headers.get("content-type");
+        if (!headRes.ok) {
+          // Some CDNs (Vercel Blob, certain S3 configs) return 405 on HEAD
+          // even though GET works. Don't reject on 405 — only on 4xx that
+          // imply the resource itself is gone.
+          if (headRes.status === 404 || headRes.status === 410) {
+            return `Input "${inp.description}" returned ${headRes.status} — the file isn't reachable. Re-upload or re-tag.`;
+          }
+          // Other non-OK statuses: continue (might still be fetchable by GET).
+        } else {
+          mime = headRes.headers.get("content-type");
+        }
       } catch {
-        continue;
+        // Network error — let the downstream provider try; it'll surface a
+        // clearer error if the URL really is dead.
       }
     }
 
@@ -138,6 +167,15 @@ export async function POST(req: NextRequest) {
     const needsPrompt = modelInfo.inputs.some((inp) => inp.type === "text" && inp.required);
     if (needsPrompt && (!prompt || !prompt.trim())) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
+    // Server-side cap so non-browser callers (Bearer-token API clients) and
+    // race conditions in the client char counter can't push past the model's
+    // limit. Replicate's Seedance rejects prompts over 2000 chars with an
+    // opaque error.
+    const promptText = (typeof prompt === "string" ? prompt : "").trim();
+    const cappedPrompt = modelInfo.maxPromptChars && promptText.length > modelInfo.maxPromptChars
+      ? promptText.slice(0, modelInfo.maxPromptChars)
+      : promptText;
+
     const settings = getSettings();
 
     // Build input
@@ -158,7 +196,7 @@ export async function POST(req: NextRequest) {
     const allImages = Array.isArray(inputImages) ? inputImages as string[] : [];
 
     for (const inp of textInputs) {
-      if (prompt && prompt.trim()) input[inp.name] = prompt.trim();
+      if (cappedPrompt) input[inp.name] = cappedPrompt;
     }
 
     if (modelInfo.type === "s2e") {
@@ -954,12 +992,35 @@ export async function POST(req: NextRequest) {
         });
         const predData = await predRes.json() as Record<string, unknown>;
         if (!predRes.ok) {
-          // Replicate returns either a string "detail" or a structured error object
+          // Replicate returns either a string "detail" or a structured error
+          // object. Pull the most specific message available, then translate
+          // a few common ones into plain-English toasts so users actually
+          // know what to change instead of seeing a JSON blob.
           let errMsg = "Replicate submission failed";
           if (typeof predData.detail === "string") errMsg = predData.detail;
-          else if (predData.detail && typeof predData.detail === "object") errMsg = JSON.stringify(predData.detail);
-          else if (typeof predData.error === "string") errMsg = predData.error;
-          console.error("[Replicate] Submission rejected", predRes.status, JSON.stringify(predData).slice(0, 500));
+          else if (predData.detail && typeof predData.detail === "object") {
+            // Validation errors are usually { detail: [{ loc, msg, type }, ...] }
+            // Pull the first msg + loc so the user can tell which field is bad.
+            const detailArr = predData.detail as unknown;
+            if (Array.isArray(detailArr) && detailArr.length > 0) {
+              const first = detailArr[0] as { loc?: string[]; msg?: string };
+              const where = Array.isArray(first.loc) ? first.loc.filter((p) => p !== "body" && p !== "input").join(".") : "";
+              errMsg = where ? `${first.msg || "Invalid input"} (${where})` : (first.msg || JSON.stringify(detailArr).slice(0, 240));
+            } else {
+              errMsg = JSON.stringify(predData.detail).slice(0, 400);
+            }
+          } else if (typeof predData.error === "string") errMsg = predData.error;
+
+          // Common-case translations
+          if (/no such image|model.*does not exist|404/i.test(errMsg)) {
+            errMsg = `Replicate doesn't recognize the model "${replicateModel}". The provider may have renamed or removed it — please pick another model.`;
+          } else if (/insufficient credit|payment required|402/i.test(errMsg)) {
+            errMsg = "Replicate account is out of credit. Top up at replicate.com/account/billing.";
+          } else if (/rate ?limit|429/i.test(errMsg)) {
+            errMsg = "Replicate is rate-limiting us right now. Wait ~30 seconds and try again.";
+          }
+
+          console.error("[Replicate] Submission rejected", predRes.status, "model:", replicateModel, "input:", JSON.stringify(repInput).slice(0, 500), "response:", JSON.stringify(predData).slice(0, 800));
           await finalizeGeneration(generation.id, { status: "failed", error: errMsg });
           return NextResponse.json({ error: errMsg }, { status: 400 });
         }
