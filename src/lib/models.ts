@@ -411,6 +411,71 @@ Pass up to 9 reference images, then tag them in the prompt as \`[Image1]\`, \`[I
 - If your I2V run keeps getting flagged with E005 sensitive-content, switch to Omni`,
   },
 
+  // ────────────────────────────────────────────────────────────────────
+  // Seedance 2.0 Pro — Dreamina direct (ByteDance Ark). Same model the
+  // Replicate entries above route to, but called directly. Cheaper at
+  // volume, supports 1080p, and uses @ImageN syntax (not [ImageN]) for
+  // multi-ref tagging.
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: "dreamina-seedance-2-0-260128",
+    name: "Seedance 2.0 Pro",
+    provider: "byteplus", type: "t2v", category: "Video",
+    description: "Seedance 2.0 Pro on Dreamina direct (ByteDance Ark). Multimodal cinematic video with native audio, supports 1080p. Optionally attach up to 9 reference images and tag them in the prompt as @Image1, @Image2...",
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
+      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 1.5, withAudio4k: 1.5 },
+  },
+
+  {
+    id: "dreamina-seedance-2-0-260128/i2v",
+    name: "Seedance 2.0 Pro I2V",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Seedance 2.0 Pro image-to-video on Dreamina direct. Animate a still into a cinematic clip with native audio. Attach extra refs to switch into multi-image Omni mode and tag them as @Image1, @Image2...",
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How the image should animate" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate (used as the first frame when no extra refs are attached)", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 1.5, withAudio4k: 1.5 },
+  },
+
+  {
+    id: "dreamina-seedance-2-0-260128/s2e",
+    name: "Seedance 2.0 Pro S2E",
+    provider: "byteplus", type: "s2e", category: "Video",
+    description: "Seedance 2.0 Pro start-to-end on Dreamina direct. Provide a start frame and an end frame; Ark animates the transition with native audio.",
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 10 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 1.5, withAudio4k: 1.5 },
+  },
+
   // Seedance 2.0 Fast — hosted on ByteDance Ark (Dreamina direct). Cheaper
   // and quicker than the Replicate-hosted Seedance entries; uses @ImageN
   // syntax (not [ImageN]) for multi-ref tagging in prompts.
