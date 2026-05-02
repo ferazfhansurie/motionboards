@@ -155,7 +155,7 @@ export function ModelPanel() {
         {/* Footer hint */}
         <div className={`px-3 py-2 text-[9px] text-center ${isDark ? "border-t border-gray-800 text-gray-600" : "border-t border-gray-100 text-gray-400"}`}>
           {activeCategory === "Image" && "Top 2 cheapest image models"}
-          {activeCategory === "Video" && "Top 2 cheapest video models (with i2v / s2e variants)"}
+          {activeCategory === "Video" && "Top 2 cheapest video models (with i2v / s2e / omni variants)"}
           {activeCategory === "Sound Effects" && "Ambient sound, SFX, music — text-to-audio"}
           {activeCategory === "Voice" && "Text-to-speech and voice cloning"}
         </div>
