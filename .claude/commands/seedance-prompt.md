@@ -74,24 +74,35 @@ For effects that need to happen mid-clip, drop them in brackets at the moment th
 
 ## Multi-reference mode (the yaroflasher pattern)
 
-Seedance 2.0 Pro accepts up to **12 reference images** in a single I2V run, addressed inline as `@Image1`, `@Image2`, … `@ImageN`. This is the move that separates one-shot generations from finished ad work — the entire arc of a 10–12s spot lives in one prompt with the cast and props locked in by reference.
+Seedance 2.0 supports multi-image references in a single run — the entire arc of a 10–12s spot lives in one prompt with the cast and props locked in. **The exact syntax depends on which provider hosts the model.**
 
-**The pattern that yaroflasher (Yaro Flasher, founder of Motion Design School / FlashBoards) uses on his canvas:**
+| Provider | Model on MotionBoards | Max images | Reference syntax |
+|---|---|---|---|
+| **Replicate** (omni) | **`Seedance 2.0 Omni`** | up to 9 | `[Image1]`, `[Image2]` (brackets) |
+| Replicate (basic I2V) | `Seedance 2.0 I2V` | 1 only | n/a — one source frame |
+| Volcengine / ByteDance Ark | (currently disabled in MotionBoards) | up to 12 | `@Image1`, `@Image2` (at-sign) |
 
-1. **Top of prompt — reference manifest.** One sentence per image, what it locks. Always start with `Use @Image1 as the …` and explicitly say what to preserve (face / wardrobe / car geometry / paint condition / logo).
+**On MotionBoards, use `Seedance 2.0 Omni` and bracket notation.** The basic `Seedance 2.0 I2V` model only takes one source image; `@Image2..@ImageN` syntax in its prompt is just text the model ignores — and worse, the `@` token can trip Replicate's safety classifier as a suspected adversarial pattern.
+
+If you see an `E005 / sensitive content` rejection on `Seedance 2.0 I2V` despite a clean prompt, switch to `Seedance 2.0 Omni`. The Omni mode treats refs as role-tagged assets (its documented use case), so the classifier path is generally more permissive on real-photo character refs.
+
+**The pattern that yaroflasher (Yaro Flasher, founder of Motion Design School / FlashBoards) uses on his canvas — adapted for Replicate's bracket syntax:**
+
+1. **Top of prompt — reference manifest.** One sentence per image, what it locks. Always start with `Use [Image1] as the …` and explicitly say what to preserve (face / wardrobe / car geometry / paint condition / logo).
 2. **Middle — the arc.** One unbroken cinematic sentence per beat, no hard cuts, camera move per beat, pacing words.
 3. **Bottom — constraints.** Hard `do not` lines for the things Seedance loves to break: blending two characters' faces, drifting paint colors, opening mouths to "speak," changing wardrobe mid-shot, adding pedestrians, branding inside the live action.
 
-**Reference manifest skeleton:**
+**Reference manifest skeleton (Replicate Omni — bracket syntax):**
 
 ```
-Use @Image1 as [character A's] face, hairline, [distinguishing feature].
-Use @Image2 as [character A's] wardrobe only — do not use as a reference for any [other thing].
-Use @Image3 as [character B's] face and wardrobe identity.
-Use @Image4 only at the very end as the [logo / title] reference — never inside the live action.
-Use @Image5 as the master staging backplate — preserve [composition / colors / car positions]
-exactly throughout the video. The cabins are empty in @Image5; populate them as follows.
+Use [Image1] as [character A's] face, hairline, [distinguishing feature].
+Use [Image2] as [character B's] face and wardrobe identity.
+Use [Image3] only at the very end as the [logo / title] reference — never inside the live action.
+Use [Image4] as the master staging backplate — preserve [composition / colors / car positions]
+exactly throughout the video. The cabins are empty in [Image4]; populate them as follows.
 ```
+
+(On Volcengine-direct integrations, swap `[ImageN]` for `@ImageN` — same pattern, different syntax.)
 
 **Identity lock language that actually works** (use verbatim):
 - "preserve [her shoulder-length wavy brown hair, white v-neck lace top, gold pendant] exactly"
