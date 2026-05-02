@@ -5,9 +5,12 @@ import { Canvas } from "@/components/board/canvas";
 import { MultiTabLockout } from "@/components/board/multi-tab-lockout";
 import { Loader2 } from "lucide-react";
 import { track } from "@/lib/track";
+import { useAppStore, startTabHeartbeat, stopTabHeartbeat } from "@/lib/store";
 
 export default function GeneratePage() {
   const [ready, setReady] = useState(false);
+  const [authedUserId, setAuthedUserId] = useState<string | null>(null);
+  const setCanvasMounted = useAppStore((s) => s.setCanvasMounted);
 
   useEffect(() => {
     // Engaged-user signal. Separates "saw the ad → bounced" from
@@ -23,6 +26,7 @@ export default function GeneratePage() {
         // Store auth status globally for gating actions
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (window as any).__mb_user = data.user || null;
+        setAuthedUserId(data?.user?.id || null);
       })
       .catch(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +34,20 @@ export default function GeneratePage() {
       })
       .finally(() => setReady(true));
   }, []);
+
+  // Single-tab session lock — the heartbeat (and the saveToDb gate that
+  // depends on `canvasMounted`) is canvas-only. Visiting /media or other
+  // pages doesn't take a slot, so the user can keep those open in as
+  // many tabs as they want without seeing the multi-tab modal.
+  useEffect(() => {
+    if (!authedUserId) return;
+    setCanvasMounted(true);
+    startTabHeartbeat();
+    return () => {
+      stopTabHeartbeat();
+      setCanvasMounted(false);
+    };
+  }, [authedUserId, setCanvasMounted]);
 
   if (!ready) {
     return (

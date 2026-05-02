@@ -356,6 +356,12 @@ export interface AppState {
     detectedAt: number;
   } | null;
   takeoverInProgress: boolean;
+  // True only while the canvas page (`/generate`) is mounted. Other pages
+  // (media library, dashboard, etc.) read the store but never push canvas
+  // state changes to /api/boards — so they don't need to participate in
+  // the single-tab lock. Toggled by canvas.tsx on mount/unmount; gates
+  // the saveToDb subscriber + heartbeat lifecycle.
+  canvasMounted: boolean;
 
   // Undo/Redo
   undoStack: BoardItem[][];
@@ -435,6 +441,7 @@ export interface AppState {
   setFoldersOpen: (open: boolean) => void;
   setMultiTabLockout: (info: AppState["multiTabLockout"]) => void;
   setTakeoverInProgress: (v: boolean) => void;
+  setCanvasMounted: (v: boolean) => void;
   pushUndo: () => void;
   undo: () => void;
   redo: () => void;
@@ -504,6 +511,7 @@ export const useAppStore = create<AppState>((set) => {
   isFoldersOpen: false,
   multiTabLockout: null,
   takeoverInProgress: false,
+  canvasMounted: false,
   undoStack: [],
   redoStack: [],
 
@@ -581,6 +589,7 @@ export const useAppStore = create<AppState>((set) => {
   setFoldersOpen: (isFoldersOpen) => set({ isFoldersOpen }),
   setMultiTabLockout: (multiTabLockout) => set({ multiTabLockout }),
   setTakeoverInProgress: (takeoverInProgress) => set({ takeoverInProgress }),
+  setCanvasMounted: (canvasMounted) => set({ canvasMounted }),
 
   addItem: (item) => set((s) => ({
     undoStack: [...s.undoStack.slice(-49), s.items],
@@ -1163,10 +1172,17 @@ useAppStore.subscribe((state) => {
   // hash and a 2-hour minimum interval so it only persists meaningful
   // changes (see createAutoSnapshot).
   //
-  // ALSO skipped while another tab/device owns the session lock — see
-  // multiTabLockout. A non-owner tab autosaving its (likely stale) state
-  // is exactly the bug the lock prevents.
-  if (dbLoadedOnce && !state.multiTabLockout) {
+  // Three guards:
+  //   - dbLoadedOnce      — wait until initial DB load finishes, otherwise
+  //                         we'd race-write before reading.
+  //   - !multiTabLockout  — another /generate tab owns the session; their
+  //                         state is canonical, ours would clobber.
+  //   - canvasMounted     — only the canvas page actually edits boards.
+  //                         A media-library tab toggling theme shouldn't
+  //                         POST stale boards back to the DB — that was
+  //                         a real path that overwrote canvas edits made
+  //                         by a sibling /generate tab.
+  if (dbLoadedOnce && !state.multiTabLockout && state.canvasMounted) {
     if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
     dbSaveTimeout = setTimeout(() => {
       saveToDb(state);
@@ -1248,10 +1264,12 @@ if (typeof window !== "undefined") {
       e.preventDefault();
       e.returnValue = "A generation is still running. Leaving may interrupt it.";
     }
-    // Skip the DB sync entirely if another tab owns the lock — its state is
-    // canonical and ours would just clobber it. LS save still ran above so
-    // local progress isn't thrown away if the user reopens later.
-    if (!state.multiTabLockout) {
+    // Skip the DB sync if (a) another tab owns the lock — its state is
+    // canonical and ours would just clobber it, OR (b) the canvas page is
+    // not currently mounted — non-canvas tabs (media, dashboard, etc.)
+    // hold a snapshot from initial load and shouldn't echo it back to DB
+    // on close. LS save still ran above so local progress isn't lost.
+    if (!state.multiTabLockout && state.canvasMounted) {
       // Try to save to DB via sendBeacon (works during page unload).
       // Strip data:/blob: URIs the same way saveToDb does — sendBeacon can't set
       // Content-Encoding for gzip, so the body must be small enough to fit
@@ -1334,17 +1352,13 @@ if (typeof window !== "undefined") {
         });
       }
 
-      // Begin the single-tab heartbeat now that we know which user we are.
-      // Same-browser duplicates surface immediately via BroadcastChannel;
-      // cross-device duplicates are caught on the next 5s server heartbeat.
-      // We await the FIRST ping before kicking off the DB load below — that
-      // way, if we're a non-owner tab, multiTabLockout is set before the
-      // load chain has a chance to write our (probably stale) local state
-      // back to the DB.
-      const heartbeatStarted = startTabHeartbeat();
+      // The single-tab heartbeat used to start here, but the lock only
+      // applies to the canvas page (`/generate`). Other pages don't write
+      // boards, so multi-tab there is harmless. The canvas itself starts
+      // the heartbeat on mount via startTabHeartbeat() — see canvas.tsx.
 
       // Load from DB
-      return heartbeatStarted.then(() => fetch("/api/boards"))
+      return fetch("/api/boards")
         .then((r) => r.json())
         .then((data) => {
           if (data?.boards?.length > 0) {
@@ -1378,11 +1392,18 @@ if (typeof window !== "undefined") {
               initialLoadedState?.boards?.length
             ) {
               dbLoadedOnce = true;
-              // Don't echo local state back to the DB if another tab owns the
-              // session — we'd clobber its work. The lockout modal blocks the
-              // user; if they "Take over" we'll resync from DB at that point.
-              if (!useAppStore.getState().multiTabLockout) {
-                saveToDb(useAppStore.getState());
+              // Catch-up write: push genuinely-newer local state to DB.
+              // Two gates:
+              //   - !multiTabLockout: another /generate tab owns the slot.
+              //     Their state is canonical, ours would clobber.
+              //   - canvasMounted: only the canvas page is allowed to write
+              //     /api/boards. A media-library tab loaded with old LS
+              //     should never overwrite a sibling /generate tab's state.
+              //     If canvas mounts later, the next state change will
+              //     trigger the regular debounced saveToDb anyway.
+              const s = useAppStore.getState();
+              if (!s.multiTabLockout && s.canvasMounted) {
+                saveToDb(s);
               }
               return;
             }
@@ -1445,7 +1466,7 @@ async function pingHeartbeat(action: "heartbeat" | "claim" = "heartbeat"): Promi
   }
 }
 
-function startTabHeartbeat(): Promise<void> {
+export function startTabHeartbeat(): Promise<void> {
   if (heartbeatTimer) return Promise.resolve(); // already running
   // Same-browser detection via BroadcastChannel — instant, no server round-trip.
   // Catches the common case of "user opened the same site in a second tab".
@@ -1482,6 +1503,34 @@ function startTabHeartbeat(): Promise<void> {
     pingHeartbeat();
   }, TAB_HEARTBEAT_MS);
   return first;
+}
+
+// Stop heartbeating + release the lock. Called when the canvas page
+// unmounts (user navigated to /media, /dashboard, etc.) so a sibling
+// tab on /generate can take over immediately instead of waiting out the
+// 30s server-side TTL. Also clears any lockout state since the modal
+// belongs to the canvas alone.
+export function stopTabHeartbeat(): void {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+  if (broadcastChannel) {
+    try { broadcastChannel.postMessage({ type: "bye", tabId: TAB_ID }); } catch {}
+    try { broadcastChannel.close(); } catch {}
+    broadcastChannel = null;
+  }
+  // Best-effort release. fetch() rather than sendBeacon() — we're not in
+  // a page-unload context so the browser won't have any reason to drop it.
+  fetch("/api/active-tab", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tabId: TAB_ID, action: "release" }),
+    keepalive: true,
+  }).catch(() => {});
+  // Reset state. If the user comes back to the canvas, startTabHeartbeat
+  // re-claims (or surfaces the modal) on first ping.
+  useAppStore.setState({ multiTabLockout: null });
 }
 
 // Force-claim the slot from another tab. Surfaces as the "Take over here"
