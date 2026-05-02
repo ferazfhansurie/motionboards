@@ -1689,28 +1689,60 @@ export function PromptBar() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleGenerate(); }
               }}
+              maxLength={selectedModel?.maxPromptChars}
               className={`w-full text-xs placeholder-gray-400 px-3 pt-1 pb-1 resize-none leading-5 bg-transparent focus:outline-none flex-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}
               style={{ minHeight: boxMinH, maxHeight: 500 }}
             />
 
-            {/* Bottom bar — cost + generate */}
-            <div className="flex items-center justify-between px-2.5 pb-2 pt-1 shrink-0">
-              {selectedModel && <span className="text-[9px] text-gray-400">{getEstimatedCost(selectedModel, generationOptions)}</span>}
-              {!selectedModel && <span />}
-              <button
-                type="button"
-                disabled={!selectedModel}
-                onClick={handleGenerate}
-                className={`flex items-center justify-center h-6 w-6 rounded-full transition-colors ${
-                  !selectedModel
-                    ? "bg-gray-300 text-gray-400 cursor-not-allowed"
-                    : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer"
-                }`}
-                title="Generate (Ctrl+Enter)"
-              >
-                <WandSparkles className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            {/* Bottom bar — cost + char counter + generate */}
+            {(() => {
+              // Per-model char limits live on the model in src/lib/models.ts
+              // (e.g. Seedance 2.0 = 2000). When a model declares one we render
+              // a live counter and visually warn from 80% on; the textarea's
+              // maxLength already hard-blocks at the cap so the counter never
+              // shows a "real" overflow — but we still display it as the user
+              // approaches so they see the ceiling coming.
+              const cap = selectedModel?.maxPromptChars;
+              const len = prompt.length;
+              const overWarnThreshold = cap ? len >= cap * 0.8 : false;
+              const atCap = cap ? len >= cap : false;
+              const counterColor = !cap
+                ? "text-gray-400"
+                : atCap
+                  ? "text-red-500"
+                  : overWarnThreshold
+                    ? "text-amber-500"
+                    : "text-gray-400";
+              return (
+                <div className="flex items-center justify-between px-2.5 pb-2 pt-1 shrink-0">
+                  <div className="flex items-center gap-2">
+                    {selectedModel && <span className="text-[9px] text-gray-400">{getEstimatedCost(selectedModel, generationOptions)}</span>}
+                    {selectedModel && cap && (
+                      <span
+                        className={`text-[9px] tabular-nums ${counterColor}`}
+                        title={atCap ? `${selectedModel.name} caps prompts at ${cap} characters — anything longer would be silently truncated by the provider.` : `Prompt limit for ${selectedModel.name}: ${cap} characters.`}
+                      >
+                        {len.toLocaleString()} / {cap.toLocaleString()}
+                      </span>
+                    )}
+                    {!selectedModel && <span />}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!selectedModel}
+                    onClick={handleGenerate}
+                    className={`flex items-center justify-center h-6 w-6 rounded-full transition-colors ${
+                      !selectedModel
+                        ? "bg-gray-300 text-gray-400 cursor-not-allowed"
+                        : "bg-[#f26522] text-white hover:bg-[#d9541a] cursor-pointer"
+                    }`}
+                    title="Generate (Ctrl+Enter)"
+                  >
+                    <WandSparkles className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

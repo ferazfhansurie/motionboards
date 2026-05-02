@@ -1,0 +1,13 @@
+Use the attached image as reference for: two Honda Civics being the SAME exact model with different paint, the rugged faded yellow paint on the right Civic, the mirror-glass midnight-emerald on the left Civic, the pearl white Mazda 2 in the middle, the golden-hour Kuala Lumpur backdrop with KLCC silhouette, the empty street, the camera angle, and overall lookdev.
+
+Regenerate the same three cars in the same arrangement and paint finishes, but FIX the intersection staging:
+
+1. The three cars must clearly be STOPPED at a red traffic light, not floating in the middle of an intersection.
+2. Add a freshly painted white stop line across the asphalt right in front of the cars' front bumpers, all three bumpers aligned at the line.
+3. Add a painted white pedestrian zebra crosswalk immediately in the foreground between camera and stop line, running horizontally across the bottom of the frame.
+4. Move the traffic-light pole forward to the cars' intersection - either a tall pole on the right edge of frame at the cars' position, or an overhead gantry directly above them. Red signal clearly illuminated.
+5. Show the avenue continuing behind the cars (lane markings, kerbs, pavement, palm-lined sidewalks framing both sides) so it reads as "they came from back there, stopped here," not "staged in the middle of nowhere."
+
+Preserve everything else from the source: the two Civics' identical geometry, emerald and yellow paint conditions, the Mazda 2, KL backdrop, golden-hour light, empty cabins, camera angle.
+
+Anamorphic 2.39:1 in 16:9, premium editorial automotive cinema, shallow DOF, 35mm grain, warm-cool contrast. No text, no logos, no decals, no ESP Wrapz branding, no pedestrians.

@@ -1,0 +1,303 @@
+{
+  "411": {
+    "inputs": {
+      "samples": [
+        "451:481",
+        0
+      ],
+      "vae": [
+        "451:413",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "414": {
+    "inputs": {
+      "fps": [
+        "421",
+        2
+      ],
+      "images": [
+        "411",
+        0
+      ],
+      "audio": [
+        "421",
+        1
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "415": {
+    "inputs": {
+      "filename_prefix": "video/ComfyUI",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "414",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "420": {
+    "inputs": {
+      "file": "gsc_input_video_3_2.mp4",
+      "video-preview": ""
+    },
+    "class_type": "LoadVideo",
+    "_meta": {
+      "title": "Load Video"
+    }
+  },
+  "421": {
+    "inputs": {
+      "video": [
+        "420",
+        0
+      ]
+    },
+    "class_type": "GetVideoComponents",
+    "_meta": {
+      "title": "Get Video Components"
+    }
+  },
+  "422": {
+    "inputs": {
+      "detect_hand": "enable",
+      "detect_body": "enable",
+      "detect_face": "enable",
+      "resolution": 512,
+      "bbox_detector": "yolox_l.onnx",
+      "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
+      "scale_stick_for_xinsr_cn": "disable",
+      "image": [
+        "421",
+        0
+      ]
+    },
+    "class_type": "DWPreprocessor",
+    "_meta": {
+      "title": "DWPose Estimator"
+    }
+  },
+  "470": {
+    "inputs": {
+      "fps": [
+        "421",
+        2
+      ],
+      "images": [
+        "422",
+        0
+      ],
+      "audio": [
+        "421",
+        1
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "479": {
+    "inputs": {
+      "image": "gsc_input_image_3_2.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Reference Image"
+    }
+  },
+  "451:407": {
+    "inputs": {
+      "text": "Running in a washing salon.",
+      "clip": [
+        "451:412",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "451:409": {
+    "inputs": {
+      "text": "static, blurry details, subtitles, style, artwork, painting, image, still, overall grayish tone, worst quality, low quality, JPEG compression artifacts, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fused fingers, frozen frame, cluttered background, three legs, too many people in the background, walking backward.",
+      "clip": [
+        "451:412",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "451:431": {
+    "inputs": {
+      "crop": "center",
+      "clip_vision": [
+        "451:445",
+        0
+      ],
+      "image": [
+        "421",
+        0
+      ]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "CLIP Vision Encode"
+    }
+  },
+  "451:400": {
+    "inputs": {
+      "seed": 166084212342096,
+      "steps": 6,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "451:403",
+        0
+      ],
+      "positive": [
+        "451:399",
+        0
+      ],
+      "negative": [
+        "451:399",
+        1
+      ],
+      "latent_image": [
+        "451:399",
+        2
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "451:444": {
+    "inputs": {
+      "unet_name": "Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "451:412": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "451:413": {
+    "inputs": {
+      "vae_name": "Wan2_1_VAE_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "451:445": {
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": {
+      "title": "Load CLIP Vision"
+    }
+  },
+  "451:399": {
+    "inputs": {
+      "width": 768,
+      "height": 1376,
+      "length": 73,
+      "batch_size": 1,
+      "continue_motion_max_frames": 1,
+      "video_frame_offset": 0,
+      "positive": [
+        "451:407",
+        0
+      ],
+      "negative": [
+        "451:409",
+        0
+      ],
+      "vae": [
+        "451:413",
+        0
+      ],
+      "clip_vision_output": [
+        "451:431",
+        0
+      ],
+      "reference_image": [
+        "479",
+        0
+      ],
+      "pose_video": [
+        "422",
+        0
+      ]
+    },
+    "class_type": "WanAnimateToVideo",
+    "_meta": {
+      "title": "WanAnimateToVideo"
+    }
+  },
+  "451:403": {
+    "inputs": {
+      "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "451:444",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "451:481": {
+    "inputs": {
+      "trim_amount": [
+        "451:399",
+        3
+      ],
+      "samples": [
+        "451:400",
+        0
+      ]
+    },
+    "class_type": "TrimVideoLatent",
+    "_meta": {
+      "title": "TrimVideoLatent"
+    }
+  }
+}

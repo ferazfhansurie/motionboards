@@ -1279,6 +1279,102 @@ export async function setUserAIModel(userId: string, model: string): Promise<voi
   await sql`UPDATE mb_users SET ai_model = ${model} WHERE id = ${userId}`;
 }
 
+// --- Single-tab session lock ---
+//
+// Users were silently losing canvas state when they had MotionBoards open in
+// multiple tabs / devices: each tab autosaves its own (possibly stale) state
+// every 2s, so the last writer wins and the others' edits get clobbered. To
+// prevent that, every tab heartbeats a unique tab id; whichever tab claims
+// the slot first owns saves until it goes silent for >TAB_OWNER_TTL_MS, after
+// which any other tab can take over. Non-owner tabs surface a modal and stop
+// firing autosaves so they can't damage the owner's work.
+
+export const TAB_OWNER_TTL_MS = 30_000; // 30s — heartbeat is every 5s, so 6 misses = considered abandoned
+
+let activeTabColumnsInitialized = false;
+async function ensureActiveTabColumns(): Promise<void> {
+  if (activeTabColumnsInitialized) return;
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS active_tab_id TEXT`;
+  await sql`ALTER TABLE mb_users ADD COLUMN IF NOT EXISTS active_tab_seen_at TIMESTAMPTZ`;
+  activeTabColumnsInitialized = true;
+}
+
+export interface ActiveTabInfo {
+  ownerTabId: string | null;
+  ownerSeenAt: number; // ms epoch, 0 if never
+  isYou: boolean;       // true if the caller's tabId matches the current owner
+}
+
+// Heartbeat from a tab. If the slot is empty, expired, or already held by
+// `tabId`, the slot is (re)claimed and `seen_at = NOW()`. Otherwise the
+// existing owner is left alone and we just report it back. Atomic via a
+// single UPDATE with a guard in the WHERE clause.
+export async function heartbeatActiveTab(userId: string, tabId: string): Promise<ActiveTabInfo> {
+  await ensureActiveTabColumns();
+
+  // Atomic claim: claim the slot if it's free, expired, OR already mine.
+  const claimed = await sql`
+    UPDATE mb_users
+    SET active_tab_id = ${tabId}, active_tab_seen_at = NOW()
+    WHERE id = ${userId}
+      AND (
+        active_tab_id IS NULL
+        OR active_tab_id = ${tabId}
+        OR active_tab_seen_at IS NULL
+        OR active_tab_seen_at < NOW() - (${TAB_OWNER_TTL_MS} || ' milliseconds')::interval
+      )
+    RETURNING active_tab_id, active_tab_seen_at
+  `;
+
+  if (claimed.length > 0) {
+    const seenAt = claimed[0].active_tab_seen_at as Date | null;
+    return {
+      ownerTabId: claimed[0].active_tab_id as string,
+      ownerSeenAt: seenAt ? seenAt.getTime() : Date.now(),
+      isYou: true,
+    };
+  }
+
+  // Couldn't claim — read the current owner.
+  const rows = await sql`
+    SELECT active_tab_id, active_tab_seen_at FROM mb_users WHERE id = ${userId}
+  `;
+  if (rows.length === 0) {
+    return { ownerTabId: null, ownerSeenAt: 0, isYou: false };
+  }
+  const seenAt = rows[0].active_tab_seen_at as Date | null;
+  return {
+    ownerTabId: (rows[0].active_tab_id as string | null) || null,
+    ownerSeenAt: seenAt ? seenAt.getTime() : 0,
+    isYou: false,
+  };
+}
+
+// Force-claim the slot even if another tab currently holds it. Used by the
+// "Take over here" button on the multi-tab modal. The previous owner will see
+// the mismatch on its next heartbeat and lock its own UI.
+export async function forceClaimActiveTab(userId: string, tabId: string): Promise<ActiveTabInfo> {
+  await ensureActiveTabColumns();
+  await sql`
+    UPDATE mb_users
+    SET active_tab_id = ${tabId}, active_tab_seen_at = NOW()
+    WHERE id = ${userId}
+  `;
+  return { ownerTabId: tabId, ownerSeenAt: Date.now(), isYou: true };
+}
+
+// Best-effort release on tab close — called via sendBeacon during unload so
+// the next tab can take the slot immediately instead of waiting for the
+// 30s TTL to expire.
+export async function releaseActiveTab(userId: string, tabId: string): Promise<void> {
+  await ensureActiveTabColumns();
+  await sql`
+    UPDATE mb_users
+    SET active_tab_id = NULL, active_tab_seen_at = NULL
+    WHERE id = ${userId} AND active_tab_id = ${tabId}
+  `;
+}
+
 // --- Per-user MCP connectors ---
 //
 // Users can plug their own MCP servers into ADletic's Claude calls — e.g.

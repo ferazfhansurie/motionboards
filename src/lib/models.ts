@@ -61,6 +61,46 @@ export interface AIModel {
   // (e.g. Seedance Fast, which lives on ByteDance Ark not Replicate).
   disabled?: boolean;
   disabledReason?: string;
+  // Maximum prompt length (characters) the upstream provider accepts for
+  // the `prompt` text input. Enforced client-side in the prompt bar before
+  // dispatching a generation, so the user sees a live counter and a clean
+  // error before we waste a paid API call. Empty = no known limit (no UI
+  // counter shown).
+  //
+  // SOURCING POLICY:
+  //   Each value below MUST be either a) verified from the provider's
+  //   official docs, or b) a reproducible user-hit limit (e.g. an upstream
+  //   wrapper truncation message). Don't guess — if unknown, leave
+  //   undefined and let the model run uncapped until we hit a real wall.
+  //
+  // Verified caps (with source):
+  //   - Seedance 2.0 (T2V/I2V/S2E, ByteDance Ark wrapper): 2000 chars,
+  //     confirmed by the wrapper's own truncation message:
+  //     "Prompt length N exceeds 2000 characters, truncating to 2000".
+  //   - GPT Image 2 (OpenAI): 32000 chars, per OpenAI API reference
+  //     (developers.openai.com/api/reference/resources/images).
+  //   - Nano Banana 2 / Gemini 3.1 Flash Image (Google): 131072 INPUT
+  //     TOKENS (~524k chars) per OpenRouter / Firebase docs. We cap UI
+  //     counter at 8000 because past that quality plateaus and the user
+  //     should be in a different tool (we count chars, not tokens).
+  //   - FLUX Schnell (Black Forest Labs): T5 encoder hard cap at 256
+  //     tokens (vs FLUX-dev's 512). ~4 chars/token = ~1024 chars.
+  //
+  // Models intentionally LEFT UNDEFINED (no published char cap found, and
+  // no user-hit upstream rejection yet — per the sourcing policy):
+  //   - Veo 3.1 Lite/Fast (T2V/I2V/S2E): Google docs only give best-
+  //     practice word counts (200-500 words), no hard cap.
+  //   - Wan 2.2 Animate (replace + animation): no published cap.
+  //   - Sync Lipsync 2 / 2 Pro: prompt is short style guidance ("person
+  //     speaking naturally"); no published cap.
+  //   - MMAudio, Stable Audio 2.5, MiniMax Music, ACE-Step: audio gen
+  //     models with prompt-quality guidance but no published char cap.
+  //   - tts-1, fish-voice-clone-tts: TTS — `prompt` IS the text being
+  //     spoken, conceptually different; no UI cap.
+  //   - Demucs: audio source separation, no text prompt at all.
+  // When any of these throws an upstream truncation, capture the cap and
+  // add it here with the source.
+  maxPromptChars?: number;
   // Practical usage guide — markdown rendered in the model details dialog.
   // Cover what works, what doesn't, common gotchas, and example prompts.
   // Keep it actionable: "use 5–10s clips", "no cuts inside the source video",
@@ -98,7 +138,7 @@ export const models: AIModel[] = [
 **Use it as the start of a chain:** generate keyframes here → tag into Veo I2V or Seedance I2V to animate.`,
     provider: "gemini", type: "t2i", category: "Image",
     description: "Google's Gemini 3.1 Flash Image. Fast, photoreal, and the current price/quality leader.",
-    cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true,
+    cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true, maxPromptChars: 8000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
       { name: "image_urls", type: "image", required: false, description: "Reference images (optional)", maxMB: 7 },
@@ -114,7 +154,7 @@ export const models: AIModel[] = [
     name: "ChatGPT Image 2",
     provider: "openai", type: "t2i", category: "Image",
     description: "OpenAI's gpt-image-2 — state-of-the-art image generation and editing. Strong prompt following, readable text, flexible sizes. Optional reference image turns it into an editor.",
-    cost: "~RM0.25", creditCost: 25, speed: "~25s", stable: true,
+    cost: "~RM0.25", creditCost: 25, speed: "~25s", stable: true, maxPromptChars: 32000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
       { name: "image_url", type: "image", required: false, description: "Reference image to edit (optional)", maxMB: 20 },
@@ -129,7 +169,7 @@ export const models: AIModel[] = [
     name: "FLUX Schnell",
     provider: "replicate", type: "t2i", category: "Image",
     description: "Black Forest Labs FLUX.1 [schnell]. 4-step distilled, ~1s per image on Replicate.",
-    cost: "~RM0.02", creditCost: 2, speed: "~3s", stable: true,
+    cost: "~RM0.02", creditCost: 2, speed: "~3s", stable: true, maxPromptChars: 1024,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
     ],
@@ -276,7 +316,7 @@ export const models: AIModel[] = [
     name: "Seedance 2.0",
     provider: "replicate", type: "t2v", category: "Video",
     description: "ByteDance Seedance 2.0 on Replicate. Multimodal cinematic video with native audio, realistic physics, director-level camera control.",
-    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
     ],
@@ -294,7 +334,7 @@ export const models: AIModel[] = [
     name: "Seedance 2.0 I2V",
     provider: "replicate", type: "i2v", category: "Video",
     description: "Seedance 2.0 image-to-video on Replicate. Animate a character or product shot into a cinematic clip with native audio.",
-    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 10 },
@@ -313,7 +353,7 @@ export const models: AIModel[] = [
     name: "Seedance 2.0 S2E",
     provider: "replicate", type: "s2e", category: "Video",
     description: "Seedance 2.0 start-to-end on Replicate. Give it a start frame + end frame and it animates the transition with native audio.",
-    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },

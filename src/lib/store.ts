@@ -39,6 +39,22 @@ function loadSavedState(): Partial<SavedState> | null {
   }
 }
 
+// Captured ONCE when the module first loads — before the Zustand subscriber has
+// a chance to fire saveToLocalStorage() and overwrite localStorage with a fresh
+// `savedAt = Date.now()`. Without this, every page reload makes the LS timestamp
+// look like "now," and the cross-device conflict resolver in the DB-load chain
+// will *always* prefer the local copy — even when the DB holds newer state from
+// another tab/device. The race actually played out in production: opening the
+// canvas the day after a heavy generation session would clobber the DB with the
+// stale browser-local state, taking every snapshot's content with it.
+const initialLoadedState: Partial<SavedState> | null =
+  typeof window !== "undefined" ? loadSavedState() : null;
+const initialLoadedSavedAt: number = initialLoadedState?.savedAt || 0;
+const initialLoadedItemCount: number = (initialLoadedState?.boards || []).reduce(
+  (sum, b) => sum + (Array.isArray(b.items) ? b.items.length : 0),
+  0
+);
+
 function getCurrentBoards(state: AppState): Board[] {
   return state.boards.map((b) =>
     b.id === state.activeBoardId
@@ -328,6 +344,19 @@ export interface AppState {
   // Folders panel
   isFoldersOpen: boolean;
 
+  // Single-tab session lock — set by the heartbeat poll when another tab
+  // (same browser or different device) currently owns the session. While
+  // this is true, autosaves are paused and the canvas surfaces a blocking
+  // modal. Cleared as soon as the heartbeat returns isYou=true again
+  // (either the other tab closed and we reclaimed the slot, or the user
+  // hit "Take over here").
+  multiTabLockout: {
+    ownerTabId: string;
+    ownerSeenAt: number;
+    detectedAt: number;
+  } | null;
+  takeoverInProgress: boolean;
+
   // Undo/Redo
   undoStack: BoardItem[][];
   redoStack: BoardItem[][];
@@ -404,6 +433,8 @@ export interface AppState {
   restoreBoardsSnapshot: (snapshot: unknown) => void;
   setConnectingFromId: (id: string | null) => void;
   setFoldersOpen: (open: boolean) => void;
+  setMultiTabLockout: (info: AppState["multiTabLockout"]) => void;
+  setTakeoverInProgress: (v: boolean) => void;
   pushUndo: () => void;
   undo: () => void;
   redo: () => void;
@@ -420,8 +451,10 @@ const initialBoard: Board = {
 };
 
 export const useAppStore = create<AppState>((set) => {
-  // Load saved state
-  const saved = loadSavedState();
+  // Reuse the module-init snapshot so we don't double-read localStorage
+  // (and so the captured initialLoadedSavedAt above stays consistent with
+  // the boards we hydrate the store from here).
+  const saved = initialLoadedState;
   const startBoard = saved?.boards?.[0]
     ? (saved.boards.find((b) => b.id === saved.activeBoardId) || saved.boards[0])
     : initialBoard;
@@ -469,6 +502,8 @@ export const useAppStore = create<AppState>((set) => {
   autoConnectGenerations: typeof window !== "undefined" ? localStorage.getItem("motionboards_autoconnect") !== "false" : true,
   connectingFromId: null,
   isFoldersOpen: false,
+  multiTabLockout: null,
+  takeoverInProgress: false,
   undoStack: [],
   redoStack: [],
 
@@ -544,6 +579,8 @@ export const useAppStore = create<AppState>((set) => {
     }),
   setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
   setFoldersOpen: (isFoldersOpen) => set({ isFoldersOpen }),
+  setMultiTabLockout: (multiTabLockout) => set({ multiTabLockout }),
+  setTakeoverInProgress: (takeoverInProgress) => set({ takeoverInProgress }),
 
   addItem: (item) => set((s) => ({
     undoStack: [...s.undoStack.slice(-49), s.items],
@@ -1005,6 +1042,16 @@ let dbSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let lsSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let dbLoadedOnce = false; // prevent overwriting DB before initial load completes
 
+// --- Single-tab session lock ---
+//
+// Each tab generates this id once at module load and pings /api/active-tab
+// every 5s to claim ownership of the user's session. Non-owner tabs see a
+// modal and stop firing autosaves so they can't clobber the owner's state.
+// See lib/db.ts heartbeatActiveTab() for the matching server logic.
+export const TAB_ID = `tab_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+const TAB_BROADCAST_CHANNEL = "motionboards_tab";
+const TAB_HEARTBEAT_MS = 5000;
+
 // Auto-snapshot: piggybacks on the autosave flow. We try to save a version
 // after every DB save, but only actually POST when:
 //   1. The content has changed since the previous snapshot (hash dedupe)
@@ -1115,7 +1162,11 @@ useAppStore.subscribe((state) => {
   // Version snapshot tries to piggyback on this; it's deduped by content
   // hash and a 2-hour minimum interval so it only persists meaningful
   // changes (see createAutoSnapshot).
-  if (dbLoadedOnce) {
+  //
+  // ALSO skipped while another tab/device owns the session lock — see
+  // multiTabLockout. A non-owner tab autosaving its (likely stale) state
+  // is exactly the bug the lock prevents.
+  if (dbLoadedOnce && !state.multiTabLockout) {
     if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
     dbSaveTimeout = setTimeout(() => {
       saveToDb(state);
@@ -1197,13 +1248,58 @@ if (typeof window !== "undefined") {
       e.preventDefault();
       e.returnValue = "A generation is still running. Leaving may interrupt it.";
     }
-    // Try to save to DB via sendBeacon (works during page unload)
-    const boards = getCurrentBoards(state);
-    const blob = new Blob(
-      [JSON.stringify({ boards, activeBoardId: state.activeBoardId, selectedModelId: state.selectedModelId, savedAt: Date.now() })],
-      { type: "application/json" }
-    );
-    navigator.sendBeacon("/api/boards", blob);
+    // Skip the DB sync entirely if another tab owns the lock — its state is
+    // canonical and ours would just clobber it. LS save still ran above so
+    // local progress isn't thrown away if the user reopens later.
+    if (!state.multiTabLockout) {
+      // Try to save to DB via sendBeacon (works during page unload).
+      // Strip data:/blob: URIs the same way saveToDb does — sendBeacon can't set
+      // Content-Encoding for gzip, so the body must be small enough to fit
+      // Vercel's 4.5 MB cap on its own. Without this, a board with even one
+      // pasted data: image silently failed to flush on close and the next
+      // session loaded yesterday's pre-paste state.
+      const boards = getCurrentBoards(state).map((b) => ({
+        ...b,
+        items: b.items.map((item) => ({
+          ...item,
+          src: stripUnfinalized(item.src),
+          outputUrl: stripUnfinalized(item.outputUrl),
+        })),
+      }));
+      const beaconJson = JSON.stringify({
+        boards,
+        activeBoardId: state.activeBoardId,
+        selectedModelId: state.selectedModelId,
+        savedAt: Date.now(),
+        tabId: TAB_ID,
+      });
+      // Last-resort guard: if the stripped body is still > 4 MB, sendBeacon
+      // would 413 silently. Skip rather than producing the same data loss the
+      // beacon was supposed to prevent. The 2s debounced saveToDb running just
+      // before this almost always covers the same content via gzip.
+      if (beaconJson.length <= 4 * 1024 * 1024) {
+        const blob = new Blob([beaconJson], { type: "application/json" });
+        navigator.sendBeacon("/api/boards", blob);
+      }
+    }
+
+    // Release the tab lock so a sibling tab can take over immediately
+    // instead of waiting out the 30s TTL. Beacons survive page unload.
+    try {
+      const releaseBlob = new Blob(
+        [JSON.stringify({ tabId: TAB_ID, action: "release" })],
+        { type: "application/json" }
+      );
+      navigator.sendBeacon("/api/active-tab", releaseBlob);
+    } catch {}
+
+    // Same-browser tabs find out instantly via BroadcastChannel — no need to
+    // wait for the next 5s server heartbeat to clear the modal.
+    try {
+      const ch = new BroadcastChannel(TAB_BROADCAST_CHANNEL);
+      ch.postMessage({ type: "bye", tabId: TAB_ID });
+      ch.close();
+    } catch {}
   });
 }
 
@@ -1238,23 +1334,56 @@ if (typeof window !== "undefined") {
         });
       }
 
+      // Begin the single-tab heartbeat now that we know which user we are.
+      // Same-browser duplicates surface immediately via BroadcastChannel;
+      // cross-device duplicates are caught on the next 5s server heartbeat.
+      // We await the FIRST ping before kicking off the DB load below — that
+      // way, if we're a non-owner tab, multiTabLockout is set before the
+      // load chain has a chance to write our (probably stale) local state
+      // back to the DB.
+      const heartbeatStarted = startTabHeartbeat();
+
       // Load from DB
-      return fetch("/api/boards")
+      return heartbeatStarted.then(() => fetch("/api/boards"))
         .then((r) => r.json())
         .then((data) => {
           if (data?.boards?.length > 0) {
-            const localState = loadSavedState();
-            const localSavedAt = localState?.savedAt || 0;
+            // CRITICAL: use the timestamp captured at module init, NOT a fresh
+            // localStorage read. By the time this DB fetch resolves, the store
+            // subscriber has likely rewritten LS with a `savedAt = Date.now()`
+            // — even though no real content change happened — and re-reading
+            // here would make local always look newer than DB. The captured
+            // value reflects the *last actual content save* before this page
+            // load began.
+            const localSavedAt = initialLoadedSavedAt;
             const dbSavedAt = data.savedAt || 0;
+            const dbItemCount = (data.boards || []).reduce(
+              (sum: number, b: Board) => sum + (Array.isArray(b.items) ? b.items.length : 0),
+              0
+            );
 
-            // If we just reset for a fresh device, ALWAYS take the DB state —
-            // otherwise the store subscriber would have already written a
-            // fresh local `savedAt` while this fetch was in flight, and the
-            // timestamp comparison below would incorrectly favor local.
-            // For continuing-device loads, prefer whichever side is newer.
-            if (!isFreshDevice && localSavedAt > dbSavedAt && localState?.boards?.length) {
+            // Trust the timestamp comparison, but add a defensive tiebreaker:
+            // if DB has materially more items than local AND the DB save is
+            // recent (within 7 days), prefer DB. This catches the edge case
+            // where a different tab/device flushed bigger state to the DB
+            // while this browser was idle, and the local LS is stale.
+            const dbHasMoreItems = dbItemCount > initialLoadedItemCount && dbItemCount > 0;
+            const dbIsRecent = dbSavedAt > 0 && Date.now() - dbSavedAt < 7 * 24 * 60 * 60 * 1000;
+            const dbWinsByItemCount = dbHasMoreItems && dbIsRecent;
+
+            if (
+              !isFreshDevice &&
+              localSavedAt > dbSavedAt &&
+              !dbWinsByItemCount &&
+              initialLoadedState?.boards?.length
+            ) {
               dbLoadedOnce = true;
-              saveToDb(useAppStore.getState());
+              // Don't echo local state back to the DB if another tab owns the
+              // session — we'd clobber its work. The lockout modal blocks the
+              // user; if they "Take over" we'll resync from DB at that point.
+              if (!useAppStore.getState().multiTabLockout) {
+                saveToDb(useAppStore.getState());
+              }
               return;
             }
 
@@ -1278,4 +1407,126 @@ if (typeof window !== "undefined") {
         });
     })
     .catch(() => { dbLoadedOnce = true; });
+}
+
+// --- Tab heartbeat / lockout machinery ---
+
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let broadcastChannel: BroadcastChannel | null = null;
+
+async function pingHeartbeat(action: "heartbeat" | "claim" = "heartbeat"): Promise<void> {
+  try {
+    const res = await fetch("/api/active-tab", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tabId: TAB_ID, action }),
+      // Don't let cached response masquerade as a fresh check
+      cache: "no-store",
+    });
+    if (!res.ok) return;
+    const data: { ownerTabId: string | null; ownerSeenAt: number; isYou: boolean } = await res.json();
+    const current = useAppStore.getState().multiTabLockout;
+    if (data.isYou) {
+      // We own the slot — clear any prior lockout (e.g., other tab closed).
+      if (current) useAppStore.setState({ multiTabLockout: null });
+    } else if (data.ownerTabId && data.ownerTabId !== TAB_ID) {
+      // Someone else owns it. Lock down this tab.
+      useAppStore.setState({
+        multiTabLockout: {
+          ownerTabId: data.ownerTabId,
+          ownerSeenAt: data.ownerSeenAt,
+          detectedAt: Date.now(),
+        },
+      });
+    }
+  } catch {
+    // Network error — keep the previous state. Better to over-trust the
+    // current lockout decision than to ping/pong on flaky connections.
+  }
+}
+
+function startTabHeartbeat(): Promise<void> {
+  if (heartbeatTimer) return Promise.resolve(); // already running
+  // Same-browser detection via BroadcastChannel — instant, no server round-trip.
+  // Catches the common case of "user opened the same site in a second tab".
+  // Cross-device cases still rely on the 5s /api/active-tab poll below.
+  if (typeof BroadcastChannel !== "undefined") {
+    try {
+      broadcastChannel = new BroadcastChannel(TAB_BROADCAST_CHANNEL);
+      broadcastChannel.postMessage({ type: "hello", tabId: TAB_ID });
+      broadcastChannel.addEventListener("message", (e) => {
+        const msg = e.data as { type?: string; tabId?: string } | null;
+        if (!msg || !msg.tabId || msg.tabId === TAB_ID) return;
+        if (msg.type === "hello" || msg.type === "heartbeat") {
+          // Another tab said hi. The one who claimed the server slot first
+          // wins; the other will see ownership mismatch on the next ping
+          // and lock itself down. We just nudge our own ping to happen
+          // immediately rather than waiting up to 5s for confirmation.
+          pingHeartbeat();
+        } else if (msg.type === "bye") {
+          // Other tab closed cleanly — re-check ownership so the modal
+          // (if any) clears as soon as the slot is reclaimable.
+          pingHeartbeat();
+        }
+      });
+    } catch {
+      broadcastChannel = null;
+    }
+  }
+
+  // First ping returns its promise — caller awaits it before kicking off any
+  // path that might write to the DB, so non-owner tabs get their lockout
+  // flag set before they have a chance to clobber the owner's state.
+  const first = pingHeartbeat();
+  heartbeatTimer = setInterval(() => {
+    pingHeartbeat();
+  }, TAB_HEARTBEAT_MS);
+  return first;
+}
+
+// Force-claim the slot from another tab. Surfaces as the "Take over here"
+// button on the multi-tab modal. After a successful claim, the previous
+// owner sees the mismatch on its next 5s heartbeat and shows the same modal.
+export async function takeOverTabLock(): Promise<boolean> {
+  useAppStore.setState({ takeoverInProgress: true });
+  try {
+    const res = await fetch("/api/active-tab", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tabId: TAB_ID, action: "claim" }),
+      cache: "no-store",
+    });
+    if (!res.ok) return false;
+    const data: { ownerTabId: string | null; isYou: boolean } = await res.json();
+    if (data.isYou) {
+      useAppStore.setState({ multiTabLockout: null });
+      // Pull whatever the other tab last saved, then resume autosaves.
+      try {
+        const boardsRes = await fetch("/api/boards", { cache: "no-store" });
+        if (boardsRes.ok) {
+          const data2 = await boardsRes.json();
+          if (data2?.boards?.length > 0) {
+            const board = data2.boards.find((b: Board) => b.id === data2.activeBoardId) || data2.boards[0];
+            useAppStore.setState({
+              boards: data2.boards,
+              activeBoardId: data2.activeBoardId || data2.boards[0].id,
+              items: board.items || [],
+              connections: board.connections || [],
+              panX: board.panX || 0,
+              panY: board.panY || 0,
+              zoom: board.zoom || 1,
+              boardName: board.name || "Board 1",
+              selectedModelId: data2.selectedModelId || null,
+            });
+          }
+        }
+      } catch {}
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  } finally {
+    useAppStore.setState({ takeoverInProgress: false });
+  }
 }

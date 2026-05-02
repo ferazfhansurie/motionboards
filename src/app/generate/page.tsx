@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Canvas } from "@/components/board/canvas";
+import { MultiTabLockout } from "@/components/board/multi-tab-lockout";
 import { Loader2 } from "lucide-react";
 import { track } from "@/lib/track";
 
@@ -38,5 +39,10 @@ export default function GeneratePage() {
     );
   }
 
-  return <Canvas />;
+  return (
+    <>
+      <Canvas />
+      <MultiTabLockout />
+    </>
+  );
 }
