@@ -1685,6 +1685,7 @@ export function PromptBar() {
               placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "No prompt required"}
               disabled={!selectedModel}
               value={prompt}
+              maxLength={selectedModel?.maxPromptChars}
               onChange={(e) => { setPrompt(e.target.value); autoResize(); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleGenerate(); }
@@ -1693,10 +1694,26 @@ export function PromptBar() {
               style={{ minHeight: boxMinH, maxHeight: 500 }}
             />
 
-            {/* Bottom bar — cost + generate */}
+            {/* Bottom bar — cost + char counter + generate */}
             <div className="flex items-center justify-between px-2.5 pb-2 pt-1 shrink-0">
-              {selectedModel && <span className="text-[9px] text-gray-400">{getEstimatedCost(selectedModel, generationOptions)}</span>}
-              {!selectedModel && <span />}
+              <div className="flex items-center gap-2 min-w-0">
+                {selectedModel && <span className="text-[9px] text-gray-400">{getEstimatedCost(selectedModel, generationOptions)}</span>}
+                {selectedModel?.maxPromptChars != null && (() => {
+                  const cap = selectedModel.maxPromptChars!;
+                  const used = prompt.length;
+                  const ratio = used / cap;
+                  const color = ratio >= 1
+                    ? "text-red-500"
+                    : ratio >= 0.8
+                    ? "text-amber-500"
+                    : "text-gray-400";
+                  return (
+                    <span className={`text-[9px] tabular-nums ${color}`} title="Most upstream wrappers truncate at this length.">
+                      {used} / {cap}
+                    </span>
+                  );
+                })()}
+              </div>
               <button
                 type="button"
                 disabled={!selectedModel}
