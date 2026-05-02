@@ -797,7 +797,20 @@ export async function POST(req: NextRequest) {
         const text = prompt?.trim();
         if (text) content.push({ type: "text", text });
 
-        if (modelInfo.type === "s2e") {
+        // Multi-reference (Omni) routing for Ark, mirrors the Replicate logic:
+        // when more than one ref is attached (or the model has no first-frame
+        // slot at all), send each as a role-tagged reference_image and skip
+        // the first/last-frame parts. Single-image I2V keeps its first-frame
+        // path so the output character doesn't drift.
+        const arkRefImages = (input.reference_images as string[] | undefined) || [];
+        const arkIsOmniOnly = !input.image_url && !input.first_frame_url && !input.last_frame_url;
+        const arkUseOmni = arkRefImages.length > 0 && (arkIsOmniOnly || arkRefImages.length > 1);
+
+        if (arkUseOmni) {
+          for (const url of arkRefImages) {
+            content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
+          }
+        } else if (modelInfo.type === "s2e") {
           if (input.first_frame_url) {
             content.push({ type: "image_url", image_url: { url: input.first_frame_url as string }, role: "first_frame" });
           }

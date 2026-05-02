@@ -411,19 +411,19 @@ Pass up to 9 reference images, then tag them in the prompt as \`[Image1]\`, \`[I
 - If your I2V run keeps getting flagged with E005 sensitive-content, switch to Omni`,
   },
 
-  // Seedance 2.0 Fast — hosted on ByteDance Ark, not Replicate. Visible but
-  // disabled so users can see the tier exists; re-enable when the Ark
-  // integration is back.
+  // Seedance 2.0 Fast — hosted on ByteDance Ark (Dreamina direct). Cheaper
+  // and quicker than the Replicate-hosted Seedance entries; uses @ImageN
+  // syntax (not [ImageN]) for multi-ref tagging in prompts.
   {
     id: "dreamina-seedance-2-0-fast-260128",
     name: "Seedance 2.0 Fast",
     provider: "byteplus", type: "t2v", category: "Video",
-    description: "Cheaper, quicker Seedance tier. Runs on ByteDance Ark — not wired up on this deployment.",
-    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
-    disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    description: "Seedance 2.0 Fast on Dreamina direct (ByteDance Ark). Cheaper and quicker than the Replicate tier. Optionally attach up to 9 reference images and tag them in the prompt as @Image1, @Image2...",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: true,
     maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
+      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
@@ -437,13 +437,13 @@ Pass up to 9 reference images, then tag them in the prompt as \`[Image1]\`, \`[I
     id: "dreamina-seedance-2-0-fast-260128/i2v",
     name: "Seedance 2.0 Fast I2V",
     provider: "byteplus", type: "i2v", category: "Video",
-    description: "Cheaper, quicker Seedance image-to-video. Runs on ByteDance Ark — not wired up on this deployment.",
-    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
-    disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    description: "Seedance 2.0 Fast image-to-video on Dreamina direct. Attach extra refs to switch into multi-image Omni mode and tag them as @Image1, @Image2...",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: true,
     maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
-      { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 10 },
+      { name: "image_url", type: "image", required: true, description: "Image to animate (used as the first frame when no extra refs are attached)", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -457,9 +457,8 @@ Pass up to 9 reference images, then tag them in the prompt as \`[Image1]\`, \`[I
     id: "dreamina-seedance-2-0-fast-260128/s2e",
     name: "Seedance 2.0 Fast S2E",
     provider: "byteplus", type: "s2e", category: "Video",
-    description: "Cheaper, quicker Seedance start-to-end. Runs on ByteDance Ark — not wired up on this deployment.",
-    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
-    disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    description: "Seedance 2.0 Fast start-to-end on Dreamina direct. Provide a start frame and an end frame; Ark animates the transition with native audio.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: true,
     maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
