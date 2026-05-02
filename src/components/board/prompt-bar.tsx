@@ -1685,11 +1685,11 @@ export function PromptBar() {
               placeholder={selectedModel ? `Describe what ${selectedModel.name} should create...` : "No prompt required"}
               disabled={!selectedModel}
               value={prompt}
+              maxLength={selectedModel?.maxPromptChars}
               onChange={(e) => { setPrompt(e.target.value); autoResize(); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleGenerate(); }
               }}
-              maxLength={selectedModel?.maxPromptChars}
               className={`w-full text-xs placeholder-gray-400 px-3 pt-1 pb-1 resize-none leading-5 bg-transparent focus:outline-none flex-1 ${isDark ? "text-white" : "text-[#0d1117]"}`}
               style={{ minHeight: boxMinH, maxHeight: 500 }}
             />

@@ -368,6 +368,47 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
   },
 
+  {
+    id: "bytedance/seedance-2.0/omni",
+    name: "Seedance 2.0 Omni",
+    provider: "replicate", type: "i2v", category: "Video",
+    description: "Seedance 2.0 Omni Reference. Pass up to 9 reference images at once and tag them in the prompt as [Image1], [Image2], … for character consistency, multi-subject scenes, or backplate + cast composition.",
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true,
+    maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene description with [Image1], [Image2] callouts" },
+      { name: "reference_images", type: "image", required: true, description: "Up to 9 reference images — characters, props, staging backplates", maxMB: 10 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 0, withAudio4k: 0 },
+    guide: `**Seedance 2.0 Omni Reference — multi-image character + scene control.**
+
+Pass up to 9 reference images, then tag them in the prompt as \`[Image1]\`, \`[Image2]\`, etc. (1-based). Each image gets a role: a character's face, a wardrobe outfit, a setting backplate, a logo. The model composites them into a cohesive video.
+
+**Prompt syntax:** Replicate's Seedance uses **bracket notation** \`[Image1]\` (NOT \`@Image1\` — that's the Volcengine/ByteDance-direct syntax).
+
+**Best for:**
+- Multi-character scenes where each character comes from a different photo
+- Real-photo cast + AI-generated backplate compositions
+- Wardrobe / object swaps with consistent identity across the video
+- Branded shots where logo + product + setting all come from separate refs
+
+**Limits:**
+- 2000-char prompt cap (most upstream wrappers)
+- 9 images max, 10 MB each
+- The order matters: \`[Image1]\` should be the most important reference (usually the main character / primary subject); put backplates last
+
+**Why use Omni over the basic I2V:**
+- I2V's safety filter is stricter on real-photo refs because the source image is treated as a literal first frame
+- Omni mode treats refs as role-tagged assets — that's the documented use case for character + multi-subject scenes, and the classifier path is generally more permissive
+- If your I2V run keeps getting flagged with E005 sensitive-content, switch to Omni`,
+  },
+
   // Seedance 2.0 Fast — hosted on ByteDance Ark, not Replicate. Visible but
   // disabled so users can see the tier exists; re-enable when the Ark
   // integration is back.
@@ -378,6 +419,7 @@ export const models: AIModel[] = [
     description: "Cheaper, quicker Seedance tier. Runs on ByteDance Ark — not wired up on this deployment.",
     cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
     disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
     ],
@@ -396,6 +438,7 @@ export const models: AIModel[] = [
     description: "Cheaper, quicker Seedance image-to-video. Runs on ByteDance Ark — not wired up on this deployment.",
     cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
     disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 10 },
@@ -415,6 +458,7 @@ export const models: AIModel[] = [
     description: "Cheaper, quicker Seedance start-to-end. Runs on ByteDance Ark — not wired up on this deployment.",
     cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: false,
     disabled: true, disabledReason: "Requires ByteDance Ark integration.",
+    maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
