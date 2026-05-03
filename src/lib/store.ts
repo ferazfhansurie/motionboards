@@ -484,10 +484,26 @@ export const useAppStore = create<AppState>((set) => {
   isProfileOpen: false,
   isHistoryOpen: false,
   isAIPromptOpen: false,
-  // Default to AI Agent — that's the primary product surface now. Manual is
-  // the explicit opt-out. Anyone who has previously toggled to Manual keeps
-  // their choice (localStorage value === "false"); everyone else defaults on.
-  aiAgentMode: typeof window === "undefined" || window.localStorage.getItem("motionboards_ai_agent_mode") !== "false",
+  // Default to AI Agent for genuinely new visitors — they need the
+  // onboarding flow to land. Anyone who's already completed onboarding once
+  // (mb_user_name set, regardless of which device they did it on) just gets
+  // a clean canvas; the AI Agent toggle is still one click away.
+  // Explicit toggles (motionboards_ai_agent_mode === "true"|"false") always
+  // win and are respected verbatim.
+  aiAgentMode: (() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const explicit = window.localStorage.getItem("motionboards_ai_agent_mode");
+      if (explicit === "true") return true;
+      if (explicit === "false") return false;
+      // No explicit choice yet — onboarded users default to plain canvas,
+      // first-time visitors default to the AI greeting flow.
+      const onboarded = !!window.localStorage.getItem("mb_user_name");
+      return !onboarded;
+    } catch {
+      return true;
+    }
+  })(),
   pendingChatSeed: null,
   pendingPrompt: null,
   startFrameId: null,
@@ -1555,10 +1571,24 @@ export async function takeOverTabLock(): Promise<boolean> {
         if (boardsRes.ok) {
           const data2 = await boardsRes.json();
           if (data2?.boards?.length > 0) {
-            const board = data2.boards.find((b: Board) => b.id === data2.activeBoardId) || data2.boards[0];
+            // Stay on whichever board the user is currently viewing in this
+            // tab. Without this we would jump to whatever board the OTHER
+            // tab was active on (data2.activeBoardId is the server's record
+            // of the previous owner's view), which is jarring - the user
+            // hit "Take over here" expecting to keep working where they
+            // were, not to be teleported.
+            const localActiveId = useAppStore.getState().activeBoardId;
+            const localStillExists =
+              localActiveId && data2.boards.some((b: Board) => b.id === localActiveId);
+            const targetBoardId =
+              (localStillExists ? localActiveId : null) ||
+              data2.activeBoardId ||
+              data2.boards[0].id;
+            const board =
+              data2.boards.find((b: Board) => b.id === targetBoardId) || data2.boards[0];
             useAppStore.setState({
               boards: data2.boards,
-              activeBoardId: data2.activeBoardId || data2.boards[0].id,
+              activeBoardId: targetBoardId,
               items: board.items || [],
               connections: board.connections || [],
               panX: board.panX || 0,
