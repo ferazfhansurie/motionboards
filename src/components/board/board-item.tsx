@@ -360,11 +360,28 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
 
 const IMG_RETRY_DELAYS = [2000, 4000, 8000, 16000, 30000, 60000, 60000, 60000];
 
+// 4K Nano Banana 2 outputs are 24+ MB. The canvas displays them at ~250px,
+// so shipping the full file is >100x more bytes than the screen will use.
+// For our own /api/files/* URLs we route through Next's built-in image
+// optimizer which serves a resized + WebP/AVIF variant cached at the edge.
+// External URLs (Replicate CDN, etc.) get returned as-is — they aren't
+// allowlisted in next.config so the optimizer would error on them.
+const CANVAS_DISPLAY_WIDTH = 640; // ~2x retina headroom for ~250-320 logical px tiles
+function canvasOptimizedSrc(rawUrl: string): string {
+  if (!rawUrl) return rawUrl;
+  // Only own-origin files. Both relative (/api/files/x) and absolute
+  // (https://motionboards.app/api/files/x) forms count.
+  const isOwnFile = rawUrl.startsWith("/api/files/") || /^https?:\/\/[^/]+\/api\/files\//.test(rawUrl);
+  if (!isOwnFile) return rawUrl;
+  return `/_next/image?url=${encodeURIComponent(rawUrl)}&w=${CANVAS_DISPLAY_WIDTH}&q=72`;
+}
+
 function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClick: () => void }) {
   const url = item.outputUrl || "";
-  const alreadyCached = loadedImageCache.has(url);
+  const optimizedUrl = canvasOptimizedSrc(url);
+  const alreadyCached = loadedImageCache.has(optimizedUrl);
   const [imgState, setImgState] = useState<"loading" | "loaded" | "error">(alreadyCached ? "loaded" : "loading");
-  const [retrySrc, setRetrySrc] = useState(url);
+  const [retrySrc, setRetrySrc] = useState(optimizedUrl);
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -375,10 +392,10 @@ function GeneratedImage({ item, onDoubleClick }: { item: BoardItem; onDoubleClic
       prevUrlRef.current = url;
       retryCountRef.current = 0;
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      setRetrySrc(url);
-      setImgState(loadedImageCache.has(url) ? "loaded" : "loading");
+      setRetrySrc(optimizedUrl);
+      setImgState(loadedImageCache.has(optimizedUrl) ? "loaded" : "loading");
     }
-  }, [url]);
+  }, [url, optimizedUrl]);
 
   useEffect(() => () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current); }, []);
 
