@@ -230,6 +230,11 @@ export interface BoardItem {
   requestId?: string;
   generationId?: string;
   pollProvider?: "gemini" | "openai" | "replicate" | "byteplus" | "comfy";
+  // Duration (seconds) and resolution selected at generation time, persisted
+  // so the status-route can charge the correct per-second amount even after a
+  // page refresh mid-poll (otherwise it falls back to the 5s static creditCost).
+  pollDurationSec?: number;
+  pollResolution?: string;
   createdAt: string;
   // PSD layer metadata
   psdGroupId?: string;

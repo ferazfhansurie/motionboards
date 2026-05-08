@@ -59,6 +59,8 @@ function startPolling(params: {
   generationId: string;
   pollProvider: NonNullable<BoardItem["pollProvider"]>;
   outputType?: BoardItem["outputType"];
+  durationSec?: number;
+  resolution?: string;
 }) {
   if (activePollers.has(params.itemId)) return;
   activePollers.add(params.itemId);
@@ -76,17 +78,21 @@ function startPolling(params: {
       progressText: undefined,
       requestId: undefined,
       pollProvider: undefined,
+      pollDurationSec: undefined,
+      pollResolution: undefined,
     });
     activePollers.delete(params.itemId);
   };
 
   const poll = async () => {
     try {
-      const url =
+      let url =
         `/api/generate/status?requestId=${encodeURIComponent(params.requestId)}` +
         `&modelId=${encodeURIComponent(params.modelId)}` +
         `&generationId=${encodeURIComponent(params.generationId)}` +
         flagQuery;
+      if (params.durationSec) url += `&durationSec=${params.durationSec}`;
+      if (params.resolution) url += `&resolution=${encodeURIComponent(params.resolution)}`;
       const res = await fetch(url);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
@@ -268,6 +274,8 @@ export function PromptBar() {
         generationId: it.generationId,
         pollProvider: it.pollProvider,
         outputType: it.outputType,
+        durationSec: it.pollDurationSec,
+        resolution: it.pollResolution,
       });
     }
   }, []);
@@ -1006,12 +1014,22 @@ export function PromptBar() {
         isReplicateVideo ? "replicate" :
         isByteplusVideo ? "byteplus" :
         isComfyVideo ? "comfy" : undefined;
+      // Parse duration and resolution from generationOptions so the status
+      // route can charge the exact per-second amount (not the 5s baseline).
+      const pollDurStr = (generationOptions?.duration as string | undefined) ||
+        selectedModel?.options?.duration?.default || "";
+      const pollDurationSec = pollDurStr ? (parseInt(pollDurStr) || undefined) : undefined;
+      const pollResolution = (generationOptions?.resolution as string | undefined) ||
+        selectedModel?.options?.resolution?.default || undefined;
+
       useAppStore.getState().updateItem(genItem.id, {
         progressText: ttsStep ? "Cloning voice..." : "Queued...",
         ...(pollProvider && !ttsStep ? {
           requestId: data.requestId,
           generationId: data.generationId,
           pollProvider,
+          pollDurationSec,
+          pollResolution,
         } : {}),
       });
 
@@ -1023,6 +1041,8 @@ export function PromptBar() {
           if (isReplicateVideo) url += `&replicateVideo=true`;
           if (isByteplusVideo) url += `&byteplusVideo=true`;
           if (isComfyVideo) url += `&comfyVideo=true`;
+          if (pollDurationSec) url += `&durationSec=${pollDurationSec}`;
+          if (pollResolution) url += `&resolution=${encodeURIComponent(pollResolution)}`;
           if (ttsStep && currentModelId.includes("clone-voice")) {
             url += `&ttsInput=${encodeURIComponent(JSON.stringify(ttsStep.input))}&ttsModelId=${encodeURIComponent(ttsStep.modelId)}`;
           }

@@ -70,6 +70,11 @@ export async function GET(req: NextRequest) {
     const replicateVideo = req.nextUrl.searchParams.get("replicateVideo");
     const byteplusVideo = req.nextUrl.searchParams.get("byteplusVideo");
     const comfyVideo = req.nextUrl.searchParams.get("comfyVideo");
+    // Duration and resolution passed by the client so chargeForGeneration can
+    // apply the correct per-second rate rather than the static 5s creditCost.
+    const durationSecParam = req.nextUrl.searchParams.get("durationSec");
+    const durationSec = durationSecParam ? (parseInt(durationSecParam) || undefined) : undefined;
+    const resolutionParam = req.nextUrl.searchParams.get("resolution") || undefined;
 
     if (!requestId || !modelId || !generationId) {
       return NextResponse.json({ error: "Missing params" }, { status: 400 });
@@ -146,7 +151,7 @@ export async function GET(req: NextRequest) {
               outputUrl = videoUri || "";
             }
 
-            const charge = await chargeForGeneration({ userId: user.id, generationId, modelId });
+            const charge = await chargeForGeneration({ userId: user.id, generationId, modelId, durationSec, resolution: resolutionParam });
             const costDisplay = `RM${(charge.totalCredits / 100).toFixed(2)}`;
             await finalizeGeneration(generationId, { status: "completed", outputUrl });
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
@@ -339,7 +344,7 @@ export async function GET(req: NextRequest) {
               // Fall back to the raw Replicate URL
             }
 
-            const charge = await chargeForGeneration({ userId: user.id, generationId, modelId });
+            const charge = await chargeForGeneration({ userId: user.id, generationId, modelId, durationSec, resolution: resolutionParam });
             const costDisplay = `RM${(charge.totalCredits / 100).toFixed(2)}`;
             await finalizeGeneration(generationId, { status: "completed", outputUrl });
             return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
@@ -415,7 +420,7 @@ export async function GET(req: NextRequest) {
           const { id: fileId } = await putFile(buffer, mimeType, user.id);
           const outputUrl = `${req.nextUrl.origin}/api/files/${fileId}`;
 
-          await chargeForGeneration({ userId: user.id, generationId, modelId });
+          await chargeForGeneration({ userId: user.id, generationId, modelId, durationSec, resolution: resolutionParam });
           await finalizeGeneration(generationId, { status: "completed", outputUrl });
           return NextResponse.json({ status: "completed", outputUrl });
         }
