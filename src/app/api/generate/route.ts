@@ -991,6 +991,25 @@ export async function POST(req: NextRequest) {
           if (input.first_frame_url) repInput.image = input.first_frame_url;
           if (input.last_frame_url) repInput.last_frame_image = input.last_frame_url;
 
+          // Kling 3.0 (kwaivgi/kling-v3.0) uses different field names than
+          // Seedance / Veo. Translate before send so the canvas-side code
+          // and existing per-model option declarations stay uniform:
+          //   image           → start_image
+          //   last_frame_image→ tail_image_url   (S2E variant; Kling 3.0 supports it on master tier)
+          //   generate_audio  → (not supported, drop it)
+          // If Kling renames these slots in a future tier, update here.
+          if (replicateModel.startsWith("kwaivgi/kling-")) {
+            if (repInput.image !== undefined) {
+              repInput.start_image = repInput.image;
+              delete repInput.image;
+            }
+            if (repInput.last_frame_image !== undefined) {
+              repInput.tail_image_url = repInput.last_frame_image;
+              delete repInput.last_frame_image;
+            }
+            delete repInput.generate_audio;
+          }
+
           // Seedance 2.0 multi-reference (Omni) routing.
           //
           // Replicate's Seedance API treats `reference_images` as mutually

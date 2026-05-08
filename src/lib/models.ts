@@ -433,6 +433,84 @@ export const models: AIModel[] = [
     },
   },
 
+  // ────────────────────────────────────────────────────────────────────
+  // Kling 3.0 — Kuaishou's flagship video model on Replicate. Premium tier
+  // known for strong physics, natural human motion, and tight character
+  // consistency. The Replicate endpoint takes `start_image` (NOT `image`)
+  // for I2V — handled by a Kling-specific field rename in the Replicate
+  // router (src/app/api/generate/route.ts).
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: "kwaivgi/kling-v3.0",
+    name: "Kling 3.0",
+    provider: "replicate", type: "t2v", category: "Video",
+    description: "Kuaishou Kling 3.0 — premium cinematic video. Strong on physics, natural human motion, fabric / liquid dynamics. 1080p, 5s or 10s.",
+    cost: "RM1.10/s (1080p)", creditCost: 550, speed: "~3m", stable: true, maxPromptChars: 2500,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description with camera, motion, mood" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+      resolution: { values: ["720p", "1080p"], default: "1080p", label: "Resolution" },
+    },
+    perSecond: { noAudio720p: 0.85, withAudio720p: 0.85, noAudio4k: 1.10, withAudio4k: 1.10 },
+    guide: `**Kling's strengths:**
+- Tight character motion (faces, hands, hair)
+- Physical interactions: pouring liquid, fabric movement, collisions
+- Slow cinematic camera moves
+- 10-second takes without character drift
+
+**Prompt template:**
+- Describe SUBJECT + ACTION + CAMERA + LIGHTING in that order.
+- "A woman in a red coat walks across a cobblestone street at golden hour. Slow handheld dolly-in. Shallow depth of field, warm key light from screen-right."
+
+**Common gotchas:**
+- Hard whip-pans / glitch cuts often get smoothed — Kling prefers organic motion.
+- Heavy stylization (anime, painterly) drifts more than photoreal.
+- 1080p is 1.3× the cost of 720p — iterate at 720p, lock at 1080p.
+- No native audio — pair with MMAudio for SFX or Lipsync 2 Pro for dialogue.
+
+**Pair with:**
+- Nano Banana 2 keyframe → Kling I2V (cleanest character lock workflow).
+- Lipsync 2 Pro for talking-head finishes.`,
+  },
+
+  {
+    id: "kwaivgi/kling-v3.0/i2v",
+    name: "Kling 3.0 I2V",
+    provider: "replicate", type: "i2v", category: "Video",
+    description: "Kling 3.0 image-to-video. Animate a still with cinematic-grade motion. Strong character consistency, premium identity lock.",
+    cost: "RM1.10/s (1080p)", creditCost: 550, speed: "~3m", stable: true, maxPromptChars: 2500,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How to animate the image — describe motion, camera, mood" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate (used as the start frame)", maxMB: 10 },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+      resolution: { values: ["720p", "1080p"], default: "1080p", label: "Resolution" },
+    },
+    perSecond: { noAudio720p: 0.85, withAudio720p: 0.85, noAudio4k: 1.10, withAudio4k: 1.10 },
+    guide: `**One continuous shot, max 10s.** Kling 3.0 I2V is the strongest model in the picker for tight character animation and physical realism.
+
+**Best for:**
+- Talking heads (then chain into Lipsync 2 Pro for the dialogue)
+- Subtle facial performance (eye flickers, lip parts, micro-expressions)
+- Cloth + hair physics under camera motion
+- Slow cinematic dolly / orbit moves
+
+**Prompt template:** describe MOTION, not the scene (the scene is the image).
+- Bad: "make this cinematic"
+- Good: "subject turns head slowly toward camera, soft handheld push-in, gentle wind on hair, golden-hour key light"
+
+**Common gotchas:**
+- Fast camera moves (whip-pans) often soften — Kling prefers smooth motion.
+- Wildly stylized source images drift more than photoreal.
+- 1080p ~1.3× the 720p cost — iterate at 720p, finalise at 1080p.
+- No native audio — chain into MMAudio (SFX) or Lipsync 2 Pro (dialogue).`,
+  },
+
   {
     id: "wan-video/wan-2.2-animate-replace",
     name: "Wan 2.2 Animate — Character Replacement",
