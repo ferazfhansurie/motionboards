@@ -556,6 +556,9 @@ export function BoardItemCard({
 
   const isImageType = item.type === "image" || item.type === "psd-layer";
   const isMediaType = isImageType || item.type === "video" || (item.type === "generation" && item.outputUrl);
+  const isVideoItem =
+    (item.type === "video" || (item.type === "generation" && item.outputType === "video")) &&
+    !!(item.outputUrl || item.src);
   const isResizable = item.type === "image" || item.type === "video" || item.type === "generation" || item.type === "psd-layer" || item.type === "text" || item.type === "drawing";
 
   // Right-click / long-press context menu
@@ -1244,6 +1247,112 @@ export function BoardItemCard({
               >
                 <FolderPlus className="h-3.5 w-3.5 text-gray-400" />
                 Save to Folder
+              </button>
+            )}
+
+            {/* Video → MP3 audio extraction. Shown only on video items so the
+                option doesn't clutter the menu for images / audio / text. */}
+            {isVideoItem && (
+              <button
+                type="button"
+                className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+                onClick={async () => {
+                  closeContextMenu();
+                  const videoUrl = item.outputUrl || item.src;
+                  if (!videoUrl) return;
+                  const toastId = showToast("Extracting audio…", { kind: "loading" });
+                  try {
+                    // Lazy-load ffmpeg.wasm — it's ~25 MB, only worth pulling
+                    // when the user actually needs it. Same CDN core as the
+                    // trim dialog so we share the browser cache.
+                    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+                    const { fetchFile } = await import("@ffmpeg/util");
+                    const ffmpeg = new FFmpeg();
+                    ffmpeg.on("progress", ({ progress }) => {
+                      const pct = Math.min(100, Math.max(0, Math.round(progress * 100)));
+                      updateToast(toastId, { kind: "loading", message: `Extracting audio… ${pct}%` });
+                    });
+                    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+                    await ffmpeg.load({
+                      coreURL: `${baseURL}/ffmpeg-core.js`,
+                      wasmURL: `${baseURL}/ffmpeg-core.wasm`,
+                    });
+
+                    await ffmpeg.writeFile("input.mp4", await fetchFile(videoUrl));
+                    // -vn drops the video stream. -acodec libmp3lame -b:a
+                    // 192k gives a clean 192kbps MP3 — enough for lipsync /
+                    // music workflows, small enough to host comfortably.
+                    await ffmpeg.exec([
+                      "-i", "input.mp4",
+                      "-vn",
+                      "-acodec", "libmp3lame",
+                      "-b:a", "192k",
+                      "output.mp3",
+                    ]);
+
+                    const data = await ffmpeg.readFile("output.mp3");
+                    const bytes = (data as Uint8Array).buffer.slice(0) as ArrayBuffer;
+                    const blob = new Blob([bytes], { type: "audio/mpeg" });
+                    const baseName = (item.fileName || `audio_${item.id}`).replace(/\.(mp4|mov|webm|m4v)$/i, "");
+                    const filename = `${baseName}.mp3`;
+
+                    updateToast(toastId, { kind: "loading", message: "Uploading…" });
+
+                    // Try R2 presign first, fall back to /api/upload — same
+                    // pattern as the trim dialog so the file lands in the
+                    // same hosting tier.
+                    let hostedUrl: string | null = null;
+                    try {
+                      const presign = await fetch("/api/upload-presign", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ filename, contentType: "audio/mpeg" }),
+                      });
+                      if (presign.ok) {
+                        const { uploadUrl, publicUrl } = await presign.json();
+                        const putRes = await fetch(uploadUrl, {
+                          method: "PUT",
+                          headers: { "content-type": "audio/mpeg" },
+                          body: blob,
+                        });
+                        if (putRes.ok) hostedUrl = publicUrl;
+                      }
+                    } catch {}
+                    if (!hostedUrl) {
+                      const form = new FormData();
+                      form.append("file", new File([blob], filename, { type: "audio/mpeg" }));
+                      const res = await fetch("/api/upload", { method: "POST", body: form });
+                      const d = await res.json().catch(() => ({}));
+                      if (res.ok && d.url) hostedUrl = d.url;
+                      else throw new Error(d.error || "Upload failed");
+                    }
+
+                    // Drop the new audio item just to the right of the source
+                    // video so the user can immediately tag it into Lipsync /
+                    // Demucs / etc. without hunting for it on a big canvas.
+                    const newId = `audio_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                    useAppStore.getState().addItem({
+                      id: newId,
+                      type: "audio",
+                      x: item.x + item.width + 24,
+                      y: item.y,
+                      width: 280,
+                      height: 80,
+                      src: hostedUrl as string,
+                      outputUrl: hostedUrl as string,
+                      fileName: filename,
+                      createdAt: new Date().toISOString(),
+                    });
+
+                    updateToast(toastId, { kind: "success", message: "Audio extracted." });
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : "Audio extraction failed.";
+                    updateToast(toastId, { kind: "error", message: msg });
+                  }
+                }}
+              >
+                <Music className="h-3.5 w-3.5 text-gray-400" />
+                Convert to MP3
               </button>
             )}
 
