@@ -325,23 +325,44 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "No speech detected. Make sure the audio contains spoken voice and isn't pure music or silence." }, { status: 400 });
         }
 
-        // Step 2 — GPT-4o-mini translate. Cheap, fast, accurate on the
-        // language pairs we care about (en/ms/zh). Temperature low so the
-        // translation stays faithful instead of paraphrasing.
+        // Step 2 — GPT-4o-mini translate. One call, two outputs: the target
+        // language for TTS synthesis AND an English version for the
+        // transcription text item that gets dropped beneath the audio. Single
+        // round trip = lower latency + simpler accounting than two calls.
+        // When the target is already English, both fields end up identical.
         const targetLanguage =
           modelId === "translate-audio-english" ? "English"
           : modelId === "translate-audio-mandarin" ? "Mandarin Chinese (Simplified)"
           : "Malay (Bahasa Malaysia)";
         const translation = await openai.chat.completions.create({
           model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
           messages: [
-            { role: "system", content: `You are a professional translator. Translate the user's transcribed audio text to ${targetLanguage}. Output ONLY the translation — no commentary, no quotes, no labels, no "Translation:" prefix. Preserve tone and natural speech patterns of the target language.` },
+            {
+              role: "system",
+              content: `You are a professional translator. Translate the user's transcribed audio text to BOTH (a) ${targetLanguage} and (b) English. Preserve tone and natural speech patterns. Output ONLY a JSON object with exactly two keys: "target" (the ${targetLanguage} translation) and "english" (the English translation). No commentary, no extra keys.`,
+            },
             { role: "user", content: sourceText },
           ],
           temperature: 0.2,
         });
-        const translatedText = (translation.choices?.[0]?.message?.content || "").trim();
+        const raw = translation.choices?.[0]?.message?.content || "{}";
+        let translatedText = "";
+        let englishText = "";
+        try {
+          const parsed = JSON.parse(raw) as { target?: string; english?: string };
+          translatedText = (parsed.target || "").trim();
+          englishText = (parsed.english || "").trim();
+        } catch {
+          // Defensive fallback if the JSON mode somehow misbehaves: treat
+          // the raw text as the target translation, use Whisper's source
+          // text as the English fallback (still meaningful if the source
+          // language is already English).
+          translatedText = raw.trim();
+          englishText = sourceText;
+        }
         if (!translatedText) throw new Error("Translation step returned empty output");
+        if (!englishText) englishText = translatedText; // last-resort fallback
 
         // Step 3 — OpenAI TTS. "alloy" is the most multilingual default
         // voice in the tts-1 lineup; it handles English / Mandarin / Malay
@@ -356,7 +377,12 @@ export async function POST(req: NextRequest) {
 
         await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
         await finalizeGeneration(generation.id, { status: "completed", outputUrl });
-        return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
+        return NextResponse.json({
+          generationId: generation.id,
+          status: "completed",
+          outputUrl,
+          transcription: englishText,
+        });
       } catch (err) {
         const raw = err instanceof Error ? err.message : "Translation failed";
         // Friendly translations for the most common failure modes.

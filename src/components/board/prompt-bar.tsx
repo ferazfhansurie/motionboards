@@ -991,6 +991,29 @@ export function PromptBar() {
           };
           img.src = data.outputUrl;
         }
+        // Translate-audio models also return the full English transcription
+        // alongside the audio. Drop it as a text item directly beneath the
+        // audio so the user can read what the translation says without
+        // playing the clip.
+        if (data.transcription && typeof data.transcription === "string" && selectedModel.id.startsWith("translate-audio-")) {
+          const audioItem = useAppStore.getState().items.find((i) => i.id === genItem.id);
+          if (audioItem) {
+            const textId = `text_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            useAppStore.getState().addItem({
+              id: textId,
+              type: "text",
+              x: audioItem.x,
+              y: audioItem.y + audioItem.height + 12,
+              width: audioItem.width,
+              height: 80,
+              src: "",
+              text: data.transcription as string,
+              fontSize: 13,
+              fontFamily: "Inter, sans-serif",
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
         return;
       }
 
