@@ -740,6 +740,75 @@ export const models: AIModel[] = [
 
 **File limit:** 100 MB. A 7-minute uncompressed WAV is roughly 70 MB — well within range.`,
   },
+
+  // Audio-translation workflow models. No prompt needed — drop an audio clip,
+  // hit generate. Server chains OpenAI Whisper (auto-language transcription)
+  // → GPT-4o-mini (translation) → OpenAI TTS (synthesis) in one call. Handled
+  // as a special-cased model id in src/app/api/generate/route.ts, not by a
+  // generic OpenAI dispatch.
+  {
+    id: "translate-audio-english",
+    name: "Translate Audio → English",
+    provider: "openai", type: "a2a", category: "Voice",
+    description: "One-click audio translation to English. Drop any audio clip (Mandarin, Malay, Tamil, Bahasa, etc.) — no prompt needed. Auto-detects source language, transcribes, translates, and synthesizes a natural English voice.",
+    cost: "~RM0.30", creditCost: 30, speed: "~30s", stable: true,
+    inputs: [
+      { name: "audio", type: "audio", required: true, description: "Audio file to translate (any source language)", maxMB: 25 },
+    ],
+    guide: `**One-click audio translation.** Drop any audio file, hit generate. No prompt needed.
+
+**Workflow under the hood:**
+1. **Whisper** transcribes the source audio and auto-detects the language.
+2. **GPT-4o-mini** translates the transcript to English.
+3. **OpenAI TTS** synthesizes the translated text in a natural English voice (alloy).
+
+**Best for:** translating Malay / Mandarin / Tamil customer testimonials, voice notes, interview clips to English for international audiences or subtitling prep.
+
+**Limits:**
+- Max input: 25 MB audio (~25 min at standard MP3 bitrate — Whisper API hard cap).
+- Voice is a generic AI voice. The original speaker's voice is **not** preserved. For voice-preserved translation, route the translated MP3 through Fish Voice Clone manually with the original audio as the voice ref.
+- Output is a clean MP3.`,
+  },
+
+  {
+    id: "translate-audio-mandarin",
+    name: "Translate Audio → Mandarin",
+    provider: "openai", type: "a2a", category: "Voice",
+    description: "One-click audio translation to Mandarin Chinese (Simplified). Drop any audio clip — no prompt needed. Auto-detects source, transcribes, translates, and synthesizes a natural Mandarin voice.",
+    cost: "~RM0.30", creditCost: 30, speed: "~30s", stable: true,
+    inputs: [
+      { name: "audio", type: "audio", required: true, description: "Audio file to translate (any source language)", maxMB: 25 },
+    ],
+    guide: `**One-click audio translation to Mandarin.** Drop any audio file, hit generate. No prompt needed.
+
+**Workflow:** Whisper transcription → GPT-4o-mini translation → OpenAI TTS (Mandarin-capable voice).
+
+**Best for:** localising English / Malay ad VOs for Chinese-speaking Malaysian or regional audiences. Customer testimonials translated for cross-border campaigns.
+
+**Limits:**
+- Max input: 25 MB audio (Whisper cap).
+- Generic AI voice — for voice-preserved translation, chain through Fish Voice Clone after with the original as the voice ref.`,
+  },
+
+  {
+    id: "translate-audio-malay",
+    name: "Translate Audio → Malay",
+    provider: "openai", type: "a2a", category: "Voice",
+    description: "One-click audio translation to Bahasa Malaysia. Drop any audio clip — no prompt needed. Auto-detects source, transcribes, translates, and synthesizes a natural Malay voice.",
+    cost: "~RM0.30", creditCost: 30, speed: "~30s", stable: true,
+    inputs: [
+      { name: "audio", type: "audio", required: true, description: "Audio file to translate (any source language)", maxMB: 25 },
+    ],
+    guide: `**One-click audio translation to Bahasa Malaysia.** Drop any audio file, hit generate. No prompt needed.
+
+**Workflow:** Whisper transcription → GPT-4o-mini translation → OpenAI TTS (multilingual voice).
+
+**Best for:** localising English / Mandarin ad copy or testimonials into BM for local Malaysian audiences. Translating overseas client VOs into the local market language.
+
+**Limits:**
+- Max input: 25 MB audio (Whisper cap).
+- Generic AI voice. TTS quality on Malay is decent but not Malaysian-accent specific — for native-accent output, chain through Fish Voice Clone with a Malaysian voice reference.`,
+  },
 ];
 
 export const modelCategories: ModelCategory[] = [

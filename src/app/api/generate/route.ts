@@ -257,6 +257,122 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: typeErr }, { status: 400 });
     }
 
+    // Audio-translation workflow models. Three model ids, one shared
+    // pipeline: Whisper transcribes (auto-detects source language), GPT-4o-mini
+    // translates the transcript to the target, OpenAI TTS synthesizes the
+    // result as an MP3. No prompt input — the model id alone decides the
+    // target language. Special-cased before the generic OpenAI dispatch.
+    if (
+      modelId === "translate-audio-english" ||
+      modelId === "translate-audio-mandarin" ||
+      modelId === "translate-audio-malay"
+    ) {
+      if (!settings.openaiApiKey) {
+        await finalizeGeneration(generation.id, { status: "failed", error: "OpenAI API key not configured" });
+        return NextResponse.json({ error: "OpenAI API key not configured." }, { status: 500 });
+      }
+      try {
+        const audioUrl = input.audio as string | undefined;
+        if (!audioUrl) {
+          await finalizeGeneration(generation.id, { status: "failed", error: "Missing audio input" });
+          return NextResponse.json({ error: "Audio file is required." }, { status: 400 });
+        }
+
+        // Pull the audio bytes — same-origin /api/files/* skips the public
+        // round-trip via direct Neon read; external URLs fetch normally.
+        let audioBytes: Buffer;
+        let audioMime = "audio/mpeg";
+        const ownAudioId = extractOwnFileId(audioUrl, req.nextUrl.origin);
+        if (ownAudioId) {
+          const file = await getFile(ownAudioId);
+          if (!file) {
+            await finalizeGeneration(generation.id, { status: "failed", error: "Audio not found" });
+            return NextResponse.json({ error: "Audio file not found. Re-upload it." }, { status: 400 });
+          }
+          audioBytes = Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength);
+          audioMime = file.mimeType || "audio/mpeg";
+        } else {
+          const audioRes = await fetch(audioUrl);
+          if (!audioRes.ok) throw new Error(`Couldn't fetch audio (${audioRes.status})`);
+          audioBytes = Buffer.from(await audioRes.arrayBuffer());
+          audioMime = audioRes.headers.get("content-type") || "audio/mpeg";
+        }
+
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({ apiKey: settings.openaiApiKey });
+
+        // Whisper file uploads need a recognisable filename extension —
+        // OpenAI's SDK sniffs the extension to pick the decoder. Map mime →
+        // ext defensively; anything we don't recognise falls back to mp3.
+        const ext = /mp3|mpeg/i.test(audioMime) ? "mp3"
+          : /wav|wave/i.test(audioMime) ? "wav"
+          : /m4a|aac/i.test(audioMime) ? "m4a"
+          : /ogg|opus/i.test(audioMime) ? "ogg"
+          : /webm/i.test(audioMime) ? "webm"
+          : /flac/i.test(audioMime) ? "flac"
+          : "mp3";
+        const audioFile = new File([new Uint8Array(audioBytes)], `audio.${ext}`, { type: audioMime });
+
+        // Step 1 — Whisper transcribe. Auto-detects the source language so
+        // we don't have to ask the user.
+        const transcription = await openai.audio.transcriptions.create({
+          file: audioFile,
+          model: "whisper-1",
+        });
+        const sourceText = (transcription.text || "").trim();
+        if (!sourceText) {
+          await finalizeGeneration(generation.id, { status: "failed", error: "No speech detected in audio" });
+          return NextResponse.json({ error: "No speech detected. Make sure the audio contains spoken voice and isn't pure music or silence." }, { status: 400 });
+        }
+
+        // Step 2 — GPT-4o-mini translate. Cheap, fast, accurate on the
+        // language pairs we care about (en/ms/zh). Temperature low so the
+        // translation stays faithful instead of paraphrasing.
+        const targetLanguage =
+          modelId === "translate-audio-english" ? "English"
+          : modelId === "translate-audio-mandarin" ? "Mandarin Chinese (Simplified)"
+          : "Malay (Bahasa Malaysia)";
+        const translation = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: `You are a professional translator. Translate the user's transcribed audio text to ${targetLanguage}. Output ONLY the translation — no commentary, no quotes, no labels, no "Translation:" prefix. Preserve tone and natural speech patterns of the target language.` },
+            { role: "user", content: sourceText },
+          ],
+          temperature: 0.2,
+        });
+        const translatedText = (translation.choices?.[0]?.message?.content || "").trim();
+        if (!translatedText) throw new Error("Translation step returned empty output");
+
+        // Step 3 — OpenAI TTS. "alloy" is the most multilingual default
+        // voice in the tts-1 lineup; it handles English / Mandarin / Malay
+        // acceptably without needing per-language voice routing.
+        const speech = await openai.audio.speech.create({
+          model: "tts-1",
+          voice: "alloy",
+          input: translatedText,
+        });
+        const ttsBuffer = Buffer.from(await speech.arrayBuffer());
+        const outputUrl = await storeOutput(req.nextUrl.origin, ttsBuffer, "audio/mpeg", user.id);
+
+        await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
+        await finalizeGeneration(generation.id, { status: "completed", outputUrl });
+        return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : "Translation failed";
+        // Friendly translations for the most common failure modes.
+        let msg = raw;
+        if (/file.*too large|413|payload/i.test(raw)) {
+          msg = "Audio file is too large. Whisper caps inputs at 25 MB — try trimming the clip first.";
+        } else if (/invalid_request|format|unsupported/i.test(raw)) {
+          msg = "Audio format not supported. Convert to MP3, WAV, or M4A and try again.";
+        } else if (/quota|rate ?limit|429/i.test(raw)) {
+          msg = "OpenAI is rate-limited right now. Wait a minute and try again.";
+        }
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
     // OpenAI Sora: async video generation via openai.videos.create
     if (modelInfo.provider === "openai" && ["t2v", "i2v", "s2e"].includes(modelInfo.type)) {
       if (!settings.openaiApiKey) {
