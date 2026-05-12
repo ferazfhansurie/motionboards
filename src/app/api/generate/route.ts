@@ -919,21 +919,24 @@ export async function POST(req: NextRequest) {
     }
 
     // ByteDance ModelArk (Seedance 2.0). Async task — POST to create, poll in
-    // the status route. The model id already contains any /i2v or /s2e suffix
-    // we added for UI routing, so strip it before sending to Ark.
+    // the status route. The model id already contains any /i2v, /s2e, or /omni
+    // suffix we added for UI routing, so strip it before sending to Ark.
     if (modelInfo.provider === "byteplus") {
       if (!settings.arkApiKey) {
         return NextResponse.json({ error: "ByteDance Ark API key not configured." }, { status: 500 });
       }
       try {
-        const arkModel = modelId.replace(/\/(i2v|s2e)$/, "");
+        const arkModel = modelId.replace(/\/(i2v|s2e|omni)$/, "");
 
         // ModelArk's /contents/generations/tasks takes a `content` array of
-        // role-tagged parts: a text prompt, plus image_url entries where the
-        // role decides whether it's a first frame, last frame, or reference.
+        // role-tagged parts: a text prompt, plus image_url / video_url /
+        // audio_url entries where the role decides whether it's a first
+        // frame, last frame, or reference.
         type ContentPart =
           | { type: "text"; text: string }
-          | { type: "image_url"; image_url: { url: string }; role?: string };
+          | { type: "image_url"; image_url: { url: string }; role?: string }
+          | { type: "video_url"; video_url: { url: string }; role?: string }
+          | { type: "audio_url"; audio_url: { url: string }; role?: string };
         const content: ContentPart[] = [];
 
         const text = prompt?.trim();
@@ -945,12 +948,22 @@ export async function POST(req: NextRequest) {
         // the first/last-frame parts. Single-image I2V keeps its first-frame
         // path so the output character doesn't drift.
         const arkRefImages = (input.reference_images as string[] | undefined) || [];
+        const arkRefVideos = (input.reference_videos as string[] | undefined) || [];
+        const arkRefAudios = (input.reference_audios as string[] | undefined) || [];
         const arkIsOmniOnly = !input.image_url && !input.first_frame_url && !input.last_frame_url;
-        const arkUseOmni = arkRefImages.length > 0 && (arkIsOmniOnly || arkRefImages.length > 1);
+        const arkHasMultimodal = arkRefImages.length > 0 || arkRefVideos.length > 0 || arkRefAudios.length > 0;
+        const arkUseOmni = arkHasMultimodal && (arkIsOmniOnly || arkRefImages.length > 1 || arkRefVideos.length > 0 || arkRefAudios.length > 0);
 
         if (arkUseOmni) {
           for (const url of arkRefImages) {
             content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
+          }
+          // Ark caps Omni at 9 images / 3 videos / 3 audios per task.
+          for (const url of arkRefVideos.slice(0, 3)) {
+            content.push({ type: "video_url", video_url: { url }, role: "reference_video" });
+          }
+          for (const url of arkRefAudios.slice(0, 3)) {
+            content.push({ type: "audio_url", audio_url: { url }, role: "reference_audio" });
           }
         } else if (modelInfo.type === "s2e") {
           if (input.first_frame_url) {

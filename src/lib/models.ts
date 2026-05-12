@@ -371,6 +371,32 @@ export const models: AIModel[] = [
     perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 1.5, withAudio4k: 1.5 },
   },
 
+  // Seedance 2.0 Pro Omni — multi-reference mode of Pro I2V, surfaced as its
+  // own model entry so the "use faces / multiple character refs" flow is
+  // discoverable. Backend strips /omni and routes to the same Ark endpoint;
+  // arkIsOmniOnly kicks in automatically when reference_images are present
+  // and no image_url/first_frame_url/last_frame_url is set.
+  {
+    id: "dreamina-seedance-2-0-260128/omni",
+    name: "Seedance 2.0 Pro Omni",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Seedance 2.0 Pro multi-reference mode. Lock up to 9 images (faces, wardrobe, props, backplate), 3 video clips, and 3 audio tracks (mp3/wav, 15s max) and direct the arc in a single prompt. Tag each ref as @Image1, @Video1, @Audio1... Best for character-consistent ads where the same person and BGM/voice need to land together.",
+    cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs as @Image1, @Video1, @Audio1... e.g. 'Use @Image1 as her face, @Audio1 as the background music — match the cuts to its beats.'" },
+      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p", "1080p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.67, withAudio720p: 0.67, noAudio4k: 1.5, withAudio4k: 1.5 },
+  },
+
   // Seedance 2.0 Fast — hosted on ByteDance Ark (Dreamina direct). Cheaper
   // and quicker than the Replicate-hosted Seedance entries; uses @ImageN
   // syntax (not [ImageN]) for multi-ref tagging in prompts.
@@ -427,6 +453,29 @@ export const models: AIModel[] = [
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+  },
+
+  // Seedance 2.0 Fast Omni — multi-reference variant of Fast, same routing
+  // trick as Pro Omni above.
+  {
+    id: "dreamina-seedance-2-0-fast-260128/omni",
+    name: "Seedance 2.0 Fast Omni",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Seedance 2.0 Fast multi-reference mode. Lock up to 9 images, 3 video clips, and 3 audio tracks (mp3/wav, 15s max) in a single prompt. Tag each ref as @Image1, @Video1, @Audio1... Cheaper than Pro Omni, no 1080p.",
+    cost: "~RM0.46/s (720p)", creditCost: 230, speed: "~2m", stable: true,
+    maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs as @Image1, @Video1, @Audio1... e.g. 'Use @Image1 as her face, @Audio1 as the background music.'" },
+      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
       resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
       duration: { values: ["4s", "5s", "6s", "7s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
       generate_audio: { default: true, label: "Native audio" },
