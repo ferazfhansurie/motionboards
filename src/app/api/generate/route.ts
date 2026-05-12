@@ -979,15 +979,31 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Singular audio reference for non-Omni Seedance variants. Omni's
+        // multi-audio path (above) already handles reference_audios; this
+        // covers Pro / Fast / I2V / S2E entries where the user attached a
+        // single MP3 via the audio_url slot.
+        const audioUrl = input.audio_url as string | undefined;
+        if (audioUrl) {
+          content.push({ type: "audio_url", audio_url: { url: audioUrl }, role: "reference_audio" });
+        }
+
         // Map option fields to the names Ark expects — they use `ratio` not
         // aspect_ratio, and accept duration as an integer (seconds).
         const durStr = (input.duration as string) || modelInfo.options?.duration?.default || "5s";
         const durSeconds = Math.max(4, Math.min(15, parseInt(durStr.replace("s", "")) || 5));
         const resolution = (input.resolution as string) || modelInfo.options?.resolution?.default || "720p";
         const ratio = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default || "16:9";
-        const genAudio = input.generate_audio !== undefined
+        // When ANY audio reference is supplied (singular audio_url or Omni
+        // reference_audios) we want Seedance to use that as the soundtrack
+        // and drive lip-sync to it — generating a second audio track on top
+        // would fight the reference. Force generate_audio off, regardless
+        // of the UI toggle.
+        const userGenAudio = input.generate_audio !== undefined
           ? !!input.generate_audio
           : (modelInfo.options?.generate_audio?.default ?? true);
+        const hasAudioRef = !!audioUrl || arkRefAudios.length > 0;
+        const genAudio = hasAudioRef ? false : userGenAudio;
 
         const arkBody: Record<string, unknown> = {
           model: arkModel,
@@ -997,8 +1013,6 @@ export async function POST(req: NextRequest) {
           duration: durSeconds,
           watermark: false,
         };
-        // Audio gen is only valid on i2v / s2e / t2v for Seedance 2 — we pass
-        // the boolean through always since the model accepts it everywhere.
         arkBody.generate_audio = genAudio;
 
         console.log("[ByteplusArk] Submitting", arkModel, JSON.stringify(arkBody).slice(0, 500));

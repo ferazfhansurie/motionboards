@@ -321,6 +321,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
       { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "audio_url", type: "audio", required: false, description: "Optional: drive the scene with a reference audio (voice / dialogue). Seedance will sync motion + lighting to it.", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
@@ -341,6 +342,7 @@ export const models: AIModel[] = [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate (used as the first frame when no extra refs are attached)", maxMB: 10 },
       { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "audio_url", type: "audio", required: false, description: "Optional: drive lip-sync / scene timing from a reference audio.", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -361,6 +363,7 @@ export const models: AIModel[] = [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
       { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 10 },
+      { name: "audio_url", type: "audio", required: false, description: "Optional: drive the transition timing from a reference audio.", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -410,6 +413,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
       { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "audio_url", type: "audio", required: false, description: "Optional: drive the scene with a reference audio (voice / dialogue).", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
@@ -430,6 +434,7 @@ export const models: AIModel[] = [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate (used as the first frame when no extra refs are attached)", maxMB: 10 },
       { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "audio_url", type: "audio", required: false, description: "Optional: drive lip-sync / scene timing from a reference audio.", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
@@ -450,6 +455,7 @@ export const models: AIModel[] = [
       { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
       { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
       { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 10 },
+      { name: "audio_url", type: "audio", required: false, description: "Optional: drive the transition timing from a reference audio.", maxMB: 20 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
