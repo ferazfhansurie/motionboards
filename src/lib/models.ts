@@ -682,15 +682,29 @@ export const models: AIModel[] = [
     id: "zsxkib/mmaudio",
     name: "MMAudio V2",
     provider: "replicate", type: "sfx", category: "Sound Effects",
-    description: "Text-to-audio or video-to-audio sound effects. Ultra cheap (~$0.006/run on Replicate).",
+    description: "Video-to-audio sound effects (also accepts text-only, but weaker without a video). Best when you have a clip and need synced ambience or impact sounds.",
     cost: "~RM0.03", creditCost: 3, speed: "~10s", stable: true,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Sound description (e.g. 'dog barking in a park')" },
-      { name: "video_url", type: "video", required: false, description: "Optional video to synchronize audio with", maxMB: 20 },
+      { name: "video_url", type: "video", required: false, description: "Optional video to synchronize audio with — strongly recommended; text-only output is weak", maxMB: 20 },
     ],
     options: {
       duration: { values: ["2s", "4s", "6s", "8s", "10s"], default: "8s", label: "Duration" },
     },
+  },
+
+  // Tango 2 — DPO-tuned text-to-audio for short prompted SFX. Stronger
+  // prompt adherence than MMAudio on text-only "drum noise" style asks.
+  // ~$0.054/run on Replicate L40S, ~56s typical inference.
+  {
+    id: "declare-lab/tango",
+    name: "Tango 2",
+    provider: "replicate", type: "sfx", category: "Sound Effects",
+    description: "Text-to-audio specialist tuned for short SFX. Reliable on literal prompts like 'kick drum hit', 'glass shattering', 'door slam'. Good fallback when MMAudio's text-only output sounds muddy.",
+    cost: "~RM0.27", creditCost: 27, speed: "~1m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Sound description. Be literal and specific — 'tight kick drum, dry studio recording' beats 'cool drum vibes'." },
+    ],
   },
 
   {
