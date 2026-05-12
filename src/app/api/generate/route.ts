@@ -228,7 +228,17 @@ export async function POST(req: NextRequest) {
       if (inputVideo) input[inp.name] = inputVideo;
       else if (inputImage && modelInfo.type === "sfx") input[inp.name] = inputImage;
     }
-    for (const inp of audioInputs) { if (inputAudio) input[inp.name] = inputAudio; }
+    for (const inp of audioInputs) {
+      if (!inputAudio) continue;
+      // Plural slots (e.g. Seedance Omni's `reference_audios`) expect an
+      // array of URLs — wrap the single inputAudio so downstream Ark
+      // routing doesn't iterate the URL string character-by-character.
+      if (inp.name.endsWith("_audios") || inp.name.endsWith("_urls")) {
+        input[inp.name] = [inputAudio];
+      } else {
+        input[inp.name] = inputAudio;
+      }
+    }
 
     // Create generation record
     const generation = await createGeneration({
