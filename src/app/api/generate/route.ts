@@ -1191,15 +1191,51 @@ export async function POST(req: NextRequest) {
         // Log the exact payload so we can diagnose content-filter rejections
         console.log("[Replicate] Submitting", replicateModel, JSON.stringify(repInput).slice(0, 500));
 
-        const predRes = await fetch(`https://api.replicate.com/v1/models/${replicateModel}/predictions`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${settings.replicateApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ input: repInput }),
-        });
-        const predData = await predRes.json() as Record<string, unknown>;
+        // Submit. The by-model endpoint auto-resolves the latest version,
+        // but only for models that have a "default version" pinned on
+        // Replicate. Older / community-maintained models (e.g. declare-lab/
+        // tango) sometimes don't, returning 404 "resource not found". When
+        // that happens, look up the latest_version ourselves and retry on
+        // the version-explicit /v1/predictions endpoint.
+        async function submitReplicate(): Promise<{ res: Response; data: Record<string, unknown> }> {
+          const byModelRes = await fetch(`https://api.replicate.com/v1/models/${replicateModel}/predictions`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${settings.replicateApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ input: repInput }),
+          });
+          const byModelData = await byModelRes.json() as Record<string, unknown>;
+          if (byModelRes.ok) return { res: byModelRes, data: byModelData };
+          // Only fall back on 404 / "resource not found"; pass other errors through.
+          const detail = typeof byModelData.detail === "string" ? byModelData.detail : "";
+          const looksLikeMissingVersion = byModelRes.status === 404
+            || /resource.*not found|model.*does not exist/i.test(detail);
+          if (!looksLikeMissingVersion) return { res: byModelRes, data: byModelData };
+
+          console.log("[Replicate] By-model 404, resolving latest_version for", replicateModel);
+          const modelRes = await fetch(`https://api.replicate.com/v1/models/${replicateModel}`, {
+            headers: { "Authorization": `Bearer ${settings.replicateApiKey}` },
+          });
+          if (!modelRes.ok) return { res: byModelRes, data: byModelData };
+          const modelMeta = await modelRes.json() as { latest_version?: { id?: string } };
+          const versionId = modelMeta.latest_version?.id;
+          if (!versionId) return { res: byModelRes, data: byModelData };
+
+          const versionRes = await fetch(`https://api.replicate.com/v1/predictions`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${settings.replicateApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ version: versionId, input: repInput }),
+          });
+          const versionData = await versionRes.json() as Record<string, unknown>;
+          return { res: versionRes, data: versionData };
+        }
+
+        const { res: predRes, data: predData } = await submitReplicate();
         if (!predRes.ok) {
           // Replicate returns either a string "detail" or a structured error
           // object. Pull the most specific message available, then translate
