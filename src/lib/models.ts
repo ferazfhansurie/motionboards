@@ -79,10 +79,14 @@ export interface AIModel {
   //     "Prompt length N exceeds 2000 characters, truncating to 2000".
   //   - GPT Image 2 (OpenAI): 32000 chars, per OpenAI API reference
   //     (developers.openai.com/api/reference/resources/images).
-  //   - Nano Banana 2 / Gemini 3.1 Flash Image (Google): 131072 INPUT
-  //     TOKENS (~524k chars) per OpenRouter / Firebase docs. We cap UI
-  //     counter at 8000 because past that quality plateaus and the user
-  //     should be in a different tool (we count chars, not tokens).
+  //   - Nano Banana 2 / Gemini 3.1 Flash Image (Google): 2000 chars,
+  //     user-hit practical cap. Google's docs claim 131k input tokens
+  //     (~524k chars), but in production prompts past 2000 chars get
+  //     silently truncated or quality-degraded — same ceiling as Seedance.
+  //     Caught by repeated drift on long NB2 briefs (instructions in the
+  //     do-not block being ignored, text-rendering quality collapsing,
+  //     trailing layout rules dropped). Cap matches Seedance's 2000 so
+  //     the workflow stays consistent across image + video models.
   //   - FLUX Schnell (Black Forest Labs): T5 encoder hard cap at 256
   //     tokens (vs FLUX-dev's 512). ~4 chars/token = ~1024 chars.
   //
@@ -138,7 +142,7 @@ export const models: AIModel[] = [
 **Use it as the start of a chain:** generate keyframes here → tag into Veo I2V or Seedance I2V to animate.`,
     provider: "gemini", type: "t2i", category: "Image",
     description: "Google's Gemini 3.1 Flash Image. Fast, photoreal, and the current price/quality leader.",
-    cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true, maxPromptChars: 8000,
+    cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
       { name: "image_urls", type: "image", required: false, description: "Reference images (optional)", maxMB: 7 },
