@@ -1153,6 +1153,15 @@ export async function POST(req: NextRequest) {
           if (modelInfo.options?.resolution) {
             repInput.resolution = (input.resolution as string) || modelInfo.options.resolution.default || "480";
           }
+          // Kling family on the V2V path (Motion Control, Lip Sync) uses
+          // `mode: standard|pro` instead of `resolution: 720p|1080p`.
+          // Translate before forwarding so the canvas-side option pill
+          // stays uniform across providers.
+          if (replicateModel.startsWith("kwaivgi/kling-") && typeof repInput.resolution === "string") {
+            const res = repInput.resolution;
+            repInput.mode = res === "1080p" ? "pro" : "standard";
+            delete repInput.resolution;
+          }
           for (const inp of modelInfo.inputs) {
             if (
               (inp.type === "image" || inp.type === "video" || inp.type === "audio") &&
