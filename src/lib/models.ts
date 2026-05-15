@@ -12,9 +12,24 @@ export interface ModelInput {
   // Maximum file size (MB) the upstream provider accepts for THIS specific
   // slot. Empty = no known limit (the generic platform-wide ceiling still
   // applies). Enforced client-side before a generate call so the user sees
-  // a clear "Lipsync 2 Pro caps videos at 20 MB — yours is 47 MB" toast
+  // a clear "Lipsync 2 Pro caps videos at 20 MB - yours is 47 MB" toast
   // instead of an opaque 413 from the model.
   maxMB?: number;
+  // Maximum number of files the upstream model accepts for THIS slot when
+  // it's a multi-ref input (reference_images, image_urls, reference_videos,
+  // reference_audios). Empty = single-file slot, or no known cap. Enforced
+  // both in the canvas attach UI (block past the limit) and in /api/generate
+  // before the upstream call - prevents the silent truncation / 422 errors
+  // some providers throw when you over-pack a reference array.
+  //
+  // Verified caps (with source):
+  //   - Seedance 2.0 Omni (Replicate, multi-ref): 9 images, 3 videos, 3
+  //     audios, per the Replicate model schema.
+  //   - Kling 3.0 Omni (Replicate): 7 reference images, per the Replicate
+  //     model schema.
+  //   - Nano Banana 2 (Gemini, image_urls): 6 source images, per the
+  //     Gemini imagen-3 / nano-banana-2 docs.
+  maxCount?: number;
 }
 
 export interface ModelOption {
@@ -112,6 +127,28 @@ export interface AIModel {
   guide?: string;
 }
 
+// Helpers
+// -------
+
+// Find the multi-ref slot on `model` that accepts the given file kind, if
+// any. A multi-ref slot is one whose input name ends with _urls, _images,
+// _videos, or _audios AND declares a maxCount. Used by the canvas-side
+// attach UI to block the user from over-packing a slot (and by the API
+// route to reject the same condition defensively).
+export function findMultiRefSlot(
+  model: AIModel,
+  kind: "image" | "video" | "audio"
+): ModelInput | null {
+  return (
+    model.inputs.find(
+      (inp) =>
+        inp.type === kind &&
+        !!inp.maxCount &&
+        /_(urls|images|videos|audios)$/.test(inp.name)
+    ) ?? null
+  );
+}
+
 // Rate: 1 USD = 3.7 RM. Margin: +RM0.03 photo/audio, +RM0.05 video
 // Curated catalog: the 2 cheapest models per category.
 
@@ -145,7 +182,7 @@ export const models: AIModel[] = [
     cost: "~RM0.10", creditCost: 10, speed: "~15s", stable: true, maxPromptChars: 13000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_urls", type: "image", required: false, description: "Reference images (optional)", maxMB: 7 },
+      { name: "image_urls", type: "image", required: false, description: "Reference images (optional, up to 6)", maxMB: 7, maxCount: 6 },
     ],
     options: {
       aspect_ratio: { values: ["auto", "21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "4:1", "1:4", "8:1", "1:8"], default: "auto", label: "Aspect Ratio" },
@@ -324,7 +361,7 @@ export const models: AIModel[] = [
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
-      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
       { name: "audio_url", type: "audio", required: false, description: "Optional: drive the scene with a reference audio (voice / dialogue). Seedance will sync motion + lighting to it.", maxMB: 20 },
     ],
     options: {
@@ -345,7 +382,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate (used as the first frame when no extra refs are attached)", maxMB: 10 },
-      { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2... (max 9)", maxMB: 10, maxCount: 9 },
       { name: "audio_url", type: "audio", required: false, description: "Optional: drive lip-sync / scene timing from a reference audio.", maxMB: 20 },
     ],
     options: {
@@ -391,9 +428,9 @@ export const models: AIModel[] = [
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs as @Image1, @Video1, @Audio1... e.g. 'Use @Image1 as her face, @Audio1 as the background music — match the cuts to its beats.'" },
-      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
-      { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50 },
-      { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15 },
+      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
+      { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50, maxCount: 3 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15, maxCount: 3 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
@@ -416,7 +453,7 @@ export const models: AIModel[] = [
     maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
-      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
       { name: "audio_url", type: "audio", required: false, description: "Optional: drive the scene with a reference audio (voice / dialogue).", maxMB: 20 },
     ],
     options: {
@@ -437,7 +474,7 @@ export const models: AIModel[] = [
     inputs: [
       { name: "prompt", type: "text", required: true, description: "How the image should animate" },
       { name: "image_url", type: "image", required: true, description: "Image to animate (used as the first frame when no extra refs are attached)", maxMB: 10 },
-      { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: attach extra refs to switch into multi-image Omni mode. Tag them in the prompt as @Image1, @Image2... (max 9)", maxMB: 10, maxCount: 9 },
       { name: "audio_url", type: "audio", required: false, description: "Optional: drive lip-sync / scene timing from a reference audio.", maxMB: 20 },
     ],
     options: {
@@ -480,9 +517,9 @@ export const models: AIModel[] = [
     maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs as @Image1, @Video1, @Audio1... e.g. 'Use @Image1 as her face, @Audio1 as the background music.'" },
-      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10 },
-      { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50 },
-      { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15 },
+      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
+      { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50, maxCount: 3 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15, maxCount: 3 },
     ],
     options: {
       aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
@@ -493,65 +530,76 @@ export const models: AIModel[] = [
   },
 
   // ────────────────────────────────────────────────────────────────────
-  // Kling 3.0 — Kuaishou's flagship video model on Replicate. Premium tier
-  // known for strong physics, natural human motion, and tight character
-  // consistency. The Replicate endpoint takes `start_image` (NOT `image`)
-  // for I2V — handled by a Kling-specific field rename in the Replicate
-  // router (src/app/api/generate/route.ts).
+  // Kling 3.0 family - Kuaishou's flagship video model on Replicate.
+  // Premium tier known for strong physics, natural human motion, and tight
+  // character consistency.
+  //
+  // Replicate split the v3.0 line into four sibling endpoints (May 2026):
+  //   - kling-v3-video         T2V / I2V / S2E (single start_image, optional end_image)
+  //   - kling-v3-omni-video    multi-ref Omni (up to 7 reference images + 1 reference_video)
+  //   - kling-v3-motion-control character + motion-source video (pose / camera transfer)
+  //   - kling-lip-sync         video + audio (or text+voice) lip-sync
+  //
+  // The Replicate router strips the trailing /i2v, /s2e, /omni suffix from
+  // the model id before calling Replicate, and rewrites canvas-side field
+  // names (image -> start_image, last_frame_image -> end_image, ...) inside
+  // a `if (replicateModel.startsWith("kwaivgi/kling-"))` block in
+  // src/app/api/generate/route.ts.
   // ────────────────────────────────────────────────────────────────────
   {
-    id: "kwaivgi/kling-v3.0",
+    id: "kwaivgi/kling-v3-video",
     name: "Kling 3.0",
     provider: "replicate", type: "t2v", category: "Video",
-    description: "Kuaishou Kling 3.0 — premium cinematic video. Strong on physics, natural human motion, fabric / liquid dynamics. 1080p, 5s or 10s.",
+    description: "Kuaishou Kling 3.0 - premium cinematic video with multi-shot control, native audio, and improved consistency. 3-15s, 720p (standard) or 1080p (pro).",
     cost: "RM1.10/s (1080p)", creditCost: 550, speed: "~3m", stable: true, maxPromptChars: 2500,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Video description with camera, motion, mood" },
     ],
     options: {
       aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
-      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+      duration: { values: ["3s", "5s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
       resolution: { values: ["720p", "1080p"], default: "1080p", label: "Resolution" },
+      generate_audio: { default: true, label: "Native audio" },
     },
     perSecond: { noAudio720p: 0.85, withAudio720p: 0.85, noAudio4k: 1.10, withAudio4k: 1.10 },
     guide: `**Kling's strengths:**
 - Tight character motion (faces, hands, hair)
 - Physical interactions: pouring liquid, fabric movement, collisions
-- Slow cinematic camera moves
-- 10-second takes without character drift
+- Multi-shot control with native audio
+- 15-second takes without character drift
 
 **Prompt template:**
 - Describe SUBJECT + ACTION + CAMERA + LIGHTING in that order.
 - "A woman in a red coat walks across a cobblestone street at golden hour. Slow handheld dolly-in. Shallow depth of field, warm key light from screen-right."
 
 **Common gotchas:**
-- Hard whip-pans / glitch cuts often get smoothed — Kling prefers organic motion.
+- Hard whip-pans / glitch cuts often get smoothed - Kling prefers organic motion.
 - Heavy stylization (anime, painterly) drifts more than photoreal.
-- 1080p is 1.3× the cost of 720p — iterate at 720p, lock at 1080p.
-- No native audio — pair with MMAudio for SFX or Lipsync 2 Pro for dialogue.
+- pro (1080p) is ~1.3x the cost of standard (720p) - iterate at 720p, lock at 1080p.
 
 **Pair with:**
-- Nano Banana 2 keyframe → Kling I2V (cleanest character lock workflow).
+- Nano Banana 2 keyframe -> Kling I2V (cleanest character lock workflow).
 - Lipsync 2 Pro for talking-head finishes.`,
   },
 
   {
-    id: "kwaivgi/kling-v3.0/i2v",
+    id: "kwaivgi/kling-v3-video/i2v",
     name: "Kling 3.0 I2V",
     provider: "replicate", type: "i2v", category: "Video",
-    description: "Kling 3.0 image-to-video. Animate a still with cinematic-grade motion. Strong character consistency, premium identity lock.",
+    description: "Kling 3.0 image-to-video. Animate a still with cinematic-grade motion. Strong character consistency, premium identity lock. 3-15s.",
     cost: "RM1.10/s (1080p)", creditCost: 550, speed: "~3m", stable: true, maxPromptChars: 2500,
     inputs: [
-      { name: "prompt", type: "text", required: true, description: "How to animate the image — describe motion, camera, mood" },
+      { name: "prompt", type: "text", required: true, description: "How to animate the image - describe motion, camera, mood" },
       { name: "image_url", type: "image", required: true, description: "Image to animate (used as the start frame)", maxMB: 10 },
     ],
     options: {
       aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
-      duration: { values: ["5s", "10s"], default: "5s", label: "Duration" },
+      duration: { values: ["3s", "5s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
       resolution: { values: ["720p", "1080p"], default: "1080p", label: "Resolution" },
+      generate_audio: { default: true, label: "Native audio" },
     },
     perSecond: { noAudio720p: 0.85, withAudio720p: 0.85, noAudio4k: 1.10, withAudio4k: 1.10 },
-    guide: `**One continuous shot, max 10s.** Kling 3.0 I2V is the strongest model in the picker for tight character animation and physical realism.
+    guide: `**One continuous shot, max 15s.** Kling 3.0 I2V is the strongest model in the picker for tight character animation and physical realism.
 
 **Best for:**
 - Talking heads (then chain into Lipsync 2 Pro for the dialogue)
@@ -564,10 +612,128 @@ export const models: AIModel[] = [
 - Good: "subject turns head slowly toward camera, soft handheld push-in, gentle wind on hair, golden-hour key light"
 
 **Common gotchas:**
-- Fast camera moves (whip-pans) often soften — Kling prefers smooth motion.
+- Fast camera moves (whip-pans) often soften - Kling prefers smooth motion.
 - Wildly stylized source images drift more than photoreal.
-- 1080p ~1.3× the 720p cost — iterate at 720p, finalise at 1080p.
-- No native audio — chain into MMAudio (SFX) or Lipsync 2 Pro (dialogue).`,
+- 1080p ~1.3x the 720p cost - iterate at 720p, finalise at 1080p.`,
+  },
+
+  {
+    id: "kwaivgi/kling-v3-video/s2e",
+    name: "Kling 3.0 S2E",
+    provider: "replicate", type: "s2e", category: "Video",
+    description: "Kling 3.0 start-to-end. Provide a start frame and an end frame; Kling animates the transition with cinematic motion and native audio. 3-15s.",
+    cost: "RM1.10/s (1080p)", creditCost: 550, speed: "~3m", stable: true, maxPromptChars: 2500,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 10 },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["3s", "5s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      resolution: { values: ["720p", "1080p"], default: "1080p", label: "Resolution" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.85, withAudio720p: 0.85, noAudio4k: 1.10, withAudio4k: 1.10 },
+    guide: `**Kling 3.0 S2E** interpolates a smooth motion path between two keyframes. The strongest "transition" model in the picker for character continuity.
+
+**Frame rules:**
+- Same character / scene continuity between start and end. Wildly different framings = the model invents a chaotic transition.
+- Match aspect ratio across both keyframes.
+- For "camera-only" cuts: use the same subject in both frames at different angles. For "subject-action" cuts: same camera, subject in different positions.
+
+**Prompt template:** describe the TRANSITION, not just the end state.
+- "the woman turns her head from looking left to looking right, soft natural motion"
+- "the camera pulls back slowly while the subject stays centered"
+
+**Chain S2E** for multi-shot sequences: A->B, B->C, C->D, each clip cuts naturally to the next.`,
+  },
+
+  {
+    id: "kwaivgi/kling-v3-omni-video",
+    name: "Kling 3.0 Omni",
+    provider: "replicate", type: "i2v", category: "Video",
+    description: "Kling 3.0 Omni - multi-reference cinematic video. Lock up to 7 reference images (faces, wardrobe, props, locations) and an optional reference video. Tag refs in the prompt as [Image1], [Image2]...",
+    cost: "RM1.10/s (1080p)", creditCost: 550, speed: "~3m", stable: true, maxPromptChars: 2500,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs as [Image1], [Image2]... e.g. 'Use [Image1] as her face, [Image2] as the wardrobe, [Image3] as the backplate.'" },
+      { name: "reference_images", type: "image", required: true, description: "1-7 reference images. With a reference video the cap drops to 4. Tag in prompt as [Image1], [Image2]...", maxMB: 10, maxCount: 7 },
+      { name: "reference_video", type: "video", required: false, description: "Optional: 1 reference video (3-10s, mp4/mov, max 200 MB) to transfer motion and camera into the scene.", maxMB: 200 },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16", "1:1"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["3s", "5s", "8s", "10s", "12s", "15s"], default: "5s", label: "Duration" },
+      resolution: { values: ["720p", "1080p"], default: "1080p", label: "Resolution" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.85, withAudio720p: 0.85, noAudio4k: 1.10, withAudio4k: 1.10 },
+    guide: `**Kling 3.0 Omni** is the multi-reference variant. Lock multiple identities in a single prompt - the same character across wardrobe / location refs, or several distinct characters interacting.
+
+**Reference manifest pattern** (start the prompt with this):
+- Use [Image1] as the lead's face and hair, preserve them exactly.
+- Use [Image2] as her co-star's face and wardrobe.
+- Use [Image3] as the staging backplate. Preserve composition and colors.
+
+**Caps:**
+- Up to 7 reference images normally.
+- Up to 4 reference images when also using a reference video.
+- Reference video must be 3-10s, mp4 or mov, under 200 MB.
+
+**Use the bracket syntax [Image1]**, not @Image1 - the Replicate Omni schema parses brackets.`,
+  },
+
+  {
+    id: "kwaivgi/kling-v3-motion-control",
+    name: "Kling 3.0 Motion Control",
+    provider: "replicate", type: "v2v", category: "Video",
+    description: "Kling 3.0 Motion Control - transfer character motion from a reference video onto any character image. Improved consistency over Wan Animate, premium identity lock.",
+    cost: "RM1.10/s (1080p)", creditCost: 550, speed: "~4m", stable: true, maxPromptChars: 2500,
+    inputs: [
+      { name: "prompt", type: "text", required: false, description: "Optional caption for additional guidance" },
+      { name: "character_image", type: "image", required: true, description: "Character image (the person to animate)", maxMB: 10 },
+      { name: "video", type: "video", required: true, description: "Motion source video. Duration cap depends on orientation: image=10s, video=30s.", maxMB: 200 },
+    ],
+    options: {
+      resolution: { values: ["720p", "1080p"], default: "720p", label: "Resolution" },
+    },
+    perSecond: { noAudio720p: 0.85, withAudio720p: 0.85, noAudio4k: 1.10, withAudio4k: 1.10 },
+    guide: `**Kling 3.0 Motion Control** copies the motion of a source video onto your character image. Different from Wan Animate - tighter face/identity lock, less drift, supports up to 30s when in "video" orientation mode.
+
+**Character image rules:**
+- Full body if the source video is full-body. Half-body image + full-body source = legs invented and usually wrong.
+- Clean background. Plain studio lighting beats a busy scene.
+- Same orientation as the source subject (front-on character image for a front-on source video).
+
+**Source video rules:**
+- ONE person in frame. Multiple people = the model picks one and the others ghost.
+- Subject mostly facing the camera works best. Profile / back-of-head shots are weaker.
+- Stable framing - handheld is fine, but no rapid camera shake or aggressive zoom.
+
+**Resolution:** start at 720p for iteration. Premium charges 1.3x for 1080p.`,
+  },
+
+  {
+    id: "kwaivgi/kling-lip-sync",
+    name: "Kling Lip Sync",
+    provider: "replicate", type: "v2v", category: "Video",
+    description: "Kling Lip Sync - drive the lips of any video to match an audio file. Cinematic-grade mouth tracking for dubbing and dialogue replacement.",
+    cost: "RM0.50/s", creditCost: 250, speed: "~3m", stable: true, maxPromptChars: 2500,
+    inputs: [
+      { name: "video", type: "video", required: true, description: "Source video whose lips should match the audio.", maxMB: 50 },
+      { name: "audio", type: "audio", required: true, description: "Audio the lips should sync to.", maxMB: 50 },
+    ],
+    perSecond: { noAudio720p: 0.50, withAudio720p: 0.50, noAudio4k: 0.50, withAudio4k: 0.50 },
+    guide: `**Kling Lip Sync** is premium mouth tracking. Use after a video is shot or generated, when you need clean dialogue replacement.
+
+**Best for:**
+- Dubbing a clip into a different language.
+- Replacing a generated talking-head's mouth with cleaner audio.
+- Tightening a Wan Animate or Veo character's lip-sync to match a recorded VO.
+
+**Tips:**
+- Keep the source video under 60s for fastest turnaround.
+- Avoid hard cuts within the clip - one continuous shot per run.
+- Audio under 30s = best identity preservation.`,
   },
 
   {

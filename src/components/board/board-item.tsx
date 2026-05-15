@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { CropOverlay } from "./crop-overlay";
 import { askShareToCommunity, pickFolder, showToast, updateToast } from "@/lib/ui-store";
 import { useInViewport } from "@/lib/use-in-viewport";
+import { findMultiRefSlot, getModelById } from "@/lib/models";
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
@@ -1387,7 +1388,37 @@ export function BoardItemCard({
                 <button
                   type="button"
                   className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
-                  onClick={() => { closeContextMenu(); useAppStore.getState().toggleInputRef(item.id); }}
+                  onClick={() => {
+                    closeContextMenu();
+                    const store = useAppStore.getState();
+                    // Removing is always allowed; only adds hit the cap.
+                    if (isInputRef) { store.toggleInputRef(item.id); return; }
+                    const model = store.selectedModelId ? getModelById(store.selectedModelId) : null;
+                    if (!model) { store.toggleInputRef(item.id); return; }
+                    const itemKind: "image" | "video" | "audio" =
+                      (item.type === "image" || item.type === "psd-layer" || (item.type === "generation" && item.outputType === "image")) ? "image"
+                      : (item.type === "video" || (item.type === "generation" && item.outputType === "video")) ? "video"
+                      : "audio";
+                    const slot = findMultiRefSlot(model, itemKind);
+                    if (slot && slot.maxCount) {
+                      const sameKind = store.inputRefs
+                        .map((rid) => store.items.find((x) => x.id === rid))
+                        .filter((it): it is BoardItem => !!it)
+                        .filter((it) => {
+                          if (itemKind === "image") return it.type === "image" || it.type === "psd-layer" || (it.type === "generation" && it.outputType === "image");
+                          if (itemKind === "video") return it.type === "video" || (it.type === "generation" && it.outputType === "video");
+                          return it.type === "audio" || (it.type === "generation" && it.outputType === "audio");
+                        });
+                      if (sameKind.length >= slot.maxCount) {
+                        showToast(
+                          `${model.name} accepts at most ${slot.maxCount} ${itemKind} references. Unset one before adding another.`,
+                          { kind: "error", durationMs: 6000 }
+                        );
+                        return;
+                      }
+                    }
+                    store.toggleInputRef(item.id);
+                  }}
                 >
                   <Target className={`h-3.5 w-3.5 ${isInputRef ? "text-[#f26522]" : "text-gray-400"}`} />
                   {isInputRef ? "Remove as Input" : "Set as Input"}

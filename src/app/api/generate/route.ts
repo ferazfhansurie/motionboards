@@ -259,6 +259,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Enforce per-slot maxCount caps on multi-ref inputs. Each upstream
+    // model has its own ceiling on how many files a multi-ref slot accepts
+    // (e.g. Seedance Omni: 9 images, 3 videos, 3 audios; Kling Omni: 7
+    // images; Nano Banana 2: 6 images). When the user attaches more than
+    // the cap, some providers silently truncate, others 422. Reject hard
+    // here so the user gets a clear message instead of a confusing silent
+    // drop. The canvas-side UI already blocks attaching past the cap; this
+    // is defensive against direct API calls and stale clients.
+    for (const inp of modelInfo.inputs) {
+      if (!inp.maxCount) continue;
+      const v = input[inp.name];
+      if (Array.isArray(v) && v.length > inp.maxCount) {
+        return NextResponse.json({
+          error: `Too many ${inp.name} attached: ${v.length} provided, but ${modelInfo.name} accepts at most ${inp.maxCount}. Remove ${v.length - inp.maxCount} reference${v.length - inp.maxCount === 1 ? "" : "s"} and try again.`,
+        }, { status: 400 });
+      }
+    }
+
     // Type-check every file input — catches the misclick where a video is
     // tagged into an image slot (or vice versa) before it reaches the provider.
     const typeErr = await validateInputTypes(input, modelInfo.inputs, req.nextUrl.origin);
@@ -1170,23 +1188,41 @@ export async function POST(req: NextRequest) {
           if (input.first_frame_url) repInput.image = input.first_frame_url;
           if (input.last_frame_url) repInput.last_frame_image = input.last_frame_url;
 
-          // Kling 3.0 (kwaivgi/kling-v3.0) uses different field names than
-          // Seedance / Veo. Translate before send so the canvas-side code
-          // and existing per-model option declarations stay uniform:
-          //   image           → start_image
-          //   last_frame_image→ tail_image_url   (S2E variant; Kling 3.0 supports it on master tier)
-          //   generate_audio  → (not supported, drop it)
-          // If Kling renames these slots in a future tier, update here.
+          // Kling 3.0 family (kwaivgi/kling-v3-video, kwaivgi/kling-v3-omni-video)
+          // uses different field names than Seedance / Veo. Translate before send
+          // so the canvas-side code and existing per-model option declarations
+          // stay uniform:
+          //   image           -> start_image
+          //   last_frame_image-> end_image       (S2E variant on kling-v3-video)
+          //   reference_video -> forward as-is   (Omni 1-clip motion source, NOT
+          //                                       the plural reference_videos array
+          //                                       Seedance uses)
+          //   resolution       -> mode (standard/pro)  Kling 3.0 schema uses `mode`
+          //                                       for quality tier, not `resolution`
+          // The new Kling family does support native audio toggle, so we keep
+          // generate_audio when the model declares the option.
           if (replicateModel.startsWith("kwaivgi/kling-")) {
             if (repInput.image !== undefined) {
               repInput.start_image = repInput.image;
               delete repInput.image;
             }
             if (repInput.last_frame_image !== undefined) {
-              repInput.tail_image_url = repInput.last_frame_image;
+              repInput.end_image = repInput.last_frame_image;
               delete repInput.last_frame_image;
             }
-            delete repInput.generate_audio;
+            // Kling Omni multi-ref accepts a single reference_video alongside
+            // the reference_images array. Forward 1:1 so the user can attach
+            // a motion-source clip to drive the camera/character motion.
+            if (input.reference_video !== undefined) {
+              repInput.reference_video = input.reference_video;
+            }
+            // Translate resolution -> mode for Kling 3.0's quality tier.
+            // 720p -> "standard", 1080p -> "pro".
+            if (typeof repInput.resolution === "string") {
+              const res = repInput.resolution;
+              repInput.mode = res === "1080p" ? "pro" : "standard";
+              delete repInput.resolution;
+            }
           }
 
           // Seedance 2.0 multi-reference (Omni) routing.

@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useAppStore, type BoardItem } from "@/lib/store";
 import { importBoardFromFile, ImportCancelled } from "@/lib/board-io";
-import { getModelById, type ModelOptions, type AIModel } from "@/lib/models";
+import { getModelById, findMultiRefSlot, type ModelOptions, type AIModel } from "@/lib/models";
 import { requireAuth } from "@/lib/auth-gate";
 import { askConfirm, askPrompt, showToast } from "@/lib/ui-store";
 import { track } from "@/lib/track";
@@ -1255,7 +1255,36 @@ export function PromptBar() {
       return;
     }
 
-    // Manual mode — register as input ref for the selected model
+    // Manual mode — register as input ref for the selected model.
+    // Enforce maxCount: if the selected model caps this kind, refuse to
+    // auto-attach beyond the cap (the file still drops on the canvas; the
+    // user just has to unset something else to wire it in).
+    const storeNow = useAppStore.getState();
+    const modelNow = storeNow.selectedModelId ? getModelById(storeNow.selectedModelId) : null;
+    if (modelNow) {
+      const kindNow: "image" | "video" | "audio" =
+        (newItem.type === "image" || newItem.type === "psd-layer" || (newItem.type === "generation" && newItem.outputType === "image")) ? "image"
+        : (newItem.type === "video" || (newItem.type === "generation" && newItem.outputType === "video")) ? "video"
+        : "audio";
+      const slotNow = findMultiRefSlot(modelNow, kindNow);
+      if (slotNow && slotNow.maxCount) {
+        const sameKindRefs = storeNow.inputRefs
+          .map((rid) => storeNow.items.find((x) => x.id === rid))
+          .filter((it): it is BoardItem => !!it)
+          .filter((it) => {
+            if (kindNow === "image") return it.type === "image" || it.type === "psd-layer" || (it.type === "generation" && it.outputType === "image");
+            if (kindNow === "video") return it.type === "video" || (it.type === "generation" && it.outputType === "video");
+            return it.type === "audio" || (it.type === "generation" && it.outputType === "audio");
+          });
+        if (sameKindRefs.length >= slotNow.maxCount) {
+          showToast(
+            `${modelNow.name} accepts at most ${slotNow.maxCount} ${kindNow} references. Added to canvas only.`,
+            { kind: "info", durationMs: 5000 }
+          );
+          return;
+        }
+      }
+    }
     useAppStore.setState((s) => ({ inputRefs: [...s.inputRefs, newItem.id] }));
   };
   const handleHeroFilePick = async (file: File) => {
@@ -1757,7 +1786,43 @@ export function PromptBar() {
               onSetStartFrame={setStartFrame}
               onSetEndFrame={setEndFrame}
               onSetAudioInput={setAudioInput}
-              onToggleInputRef={(id) => useAppStore.getState().toggleInputRef(id)}
+              onToggleInputRef={(id) => {
+                const store = useAppStore.getState();
+                const currentRefs = store.inputRefs;
+                // Removing is always allowed; only adding hits the cap check.
+                if (currentRefs.includes(id)) { store.toggleInputRef(id); return; }
+                const item = items.find((x) => x.id === id);
+                if (!item || !selectedModel) { store.toggleInputRef(id); return; }
+                // What slot would this item fill? Match by type to the first
+                // model input of the same kind, preferring multi-ref slots
+                // (reference_images / image_urls / reference_videos) when the
+                // item matches one of those.
+                const itemKind: "image" | "video" | "audio" =
+                  (item.type === "image" || item.type === "psd-layer" || (item.type === "generation" && item.outputType === "image")) ? "image"
+                  : (item.type === "video" || (item.type === "generation" && item.outputType === "video")) ? "video"
+                  : "audio";
+                // Count refs of the same kind currently attached.
+                const sameKindRefs = currentRefs
+                  .map((rid) => items.find((x) => x.id === rid))
+                  .filter((it): it is BoardItem => !!it)
+                  .filter((it) => {
+                    if (itemKind === "image") return it.type === "image" || it.type === "psd-layer" || (it.type === "generation" && it.outputType === "image");
+                    if (itemKind === "video") return it.type === "video" || (it.type === "generation" && it.outputType === "video");
+                    return it.type === "audio" || (it.type === "generation" && it.outputType === "audio");
+                  });
+                // Find the model's multi-ref slot for this kind via the
+                // shared helper in models.ts (kept in one place so the same
+                // rule applies in board-item.tsx, the API route, etc.).
+                const multiRefSlot = findMultiRefSlot(selectedModel, itemKind);
+                if (multiRefSlot && multiRefSlot.maxCount && sameKindRefs.length >= multiRefSlot.maxCount) {
+                  showToast(
+                    `${selectedModel.name} accepts at most ${multiRefSlot.maxCount} ${itemKind} references. Unset one before adding another.`,
+                    { kind: "error", durationMs: 6000 }
+                  );
+                  return;
+                }
+                store.toggleInputRef(id);
+              }}
               onClearInputRefsOfKind={(kind) => {
                 useAppStore.setState({
                   inputRefs: inputRefs.filter((id) => {
