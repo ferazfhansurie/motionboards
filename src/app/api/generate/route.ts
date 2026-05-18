@@ -225,8 +225,13 @@ export async function POST(req: NextRequest) {
     // inputImage only for legacy SFX/mmaudio flows that sometimes pass the
     // same item through both channels.
     for (const inp of videoInputs) {
-      if (inputVideo) input[inp.name] = inputVideo;
-      else if (inputImage && modelInfo.type === "sfx") input[inp.name] = inputImage;
+      // Plural slots (e.g. Seedance Omni's `reference_videos`) expect an
+      // array of URLs — wrap the single inputVideo so downstream Ark
+      // routing doesn't iterate the URL string character-by-character
+      // (same bug class as the reference_audios plural-wrap fix).
+      const isPlural = inp.name.endsWith("_videos") || inp.name.endsWith("_urls");
+      if (inputVideo) input[inp.name] = isPlural ? [inputVideo] : inputVideo;
+      else if (inputImage && modelInfo.type === "sfx") input[inp.name] = isPlural ? [inputImage] : inputImage;
     }
     for (const inp of audioInputs) {
       if (!inputAudio) continue;
@@ -975,9 +980,17 @@ export async function POST(req: NextRequest) {
         // slot at all), send each as a role-tagged reference_image and skip
         // the first/last-frame parts. Single-image I2V keeps its first-frame
         // path so the output character doesn't drift.
-        const arkRefImages = (input.reference_images as string[] | undefined) || [];
-        const arkRefVideos = (input.reference_videos as string[] | undefined) || [];
-        const arkRefAudios = (input.reference_audios as string[] | undefined) || [];
+        //
+        // Defensive: coerce a single-URL string into a one-element array. The
+        // setup code now wraps singletons for `_videos` / `_audios` / `_urls`
+        // slots, but stale clients or direct API callers could still send a
+        // raw string. Without this, `for (const url of "https://...")` would
+        // iterate the URL one character at a time and Ark would reject the
+        // first content part with `invalid url`.
+        const arrayify = (v: unknown): string[] => Array.isArray(v) ? v as string[] : (typeof v === "string" && v ? [v] : []);
+        const arkRefImages = arrayify(input.reference_images);
+        const arkRefVideos = arrayify(input.reference_videos);
+        const arkRefAudios = arrayify(input.reference_audios);
         const arkIsOmniOnly = !input.image_url && !input.first_frame_url && !input.last_frame_url;
         const arkHasMultimodal = arkRefImages.length > 0 || arkRefVideos.length > 0 || arkRefAudios.length > 0;
         const arkUseOmni = arkHasMultimodal && (arkIsOmniOnly || arkRefImages.length > 1 || arkRefVideos.length > 0 || arkRefAudios.length > 0);
