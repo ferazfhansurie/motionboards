@@ -130,6 +130,25 @@ async function validateInputTypes(
       return `Input "${inp.description}" needs ${inp.type === "audio" ? "an audio file" : `a ${inp.type}`}, but you tagged a ${mime || actual} file. Drag a ${inp.type} onto the canvas and tag it as the ${inp.description.toLowerCase()}.`;
     }
   }
+
+  // Defensive cross-slot check for the multi-ref Omni flow: if the user
+  // tagged a video into `reference_images` (the canvas-side request
+  // builder used to forward ALL refItems into inputImages, regardless of
+  // kind), every byteplus / Replicate Omni run blew up upstream with
+  // "image format is not supported". Catch the mismatch here with a
+  // clearer message that points at the actual fix on the canvas.
+  for (const inp of modelInputs) {
+    if (inp.type !== "image") continue;
+    const v = input[inp.name];
+    const urls = Array.isArray(v) ? v as string[] : (typeof v === "string" && v ? [v] : []);
+    for (const url of urls) {
+      if (typeof url !== "string" || !url) continue;
+      const kindByExt = kindFromUrlExtension(url);
+      if (kindByExt === "video" || kindByExt === "audio") {
+        return `Input "${inp.description}" needs an image, but one of the refs you tagged is a ${kindByExt}. Untag the ${kindByExt} clip from the image-reference slot, drag it into the ${kindByExt}-reference slot instead, then try again.`;
+      }
+    }
+  }
   return null;
 }
 
@@ -140,7 +159,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Not authenticated. Please login or pass a valid Bearer API key." }, { status: 401 });
 
     const body = await req.json();
-    const { prompt, model: modelId, inputImage, inputImages, inputVideo, startFrame, endFrame, inputAudio, generationOptions } = body;
+    const { prompt, model: modelId, inputImage, inputImages, inputVideo, inputVideos, startFrame, endFrame, inputAudio, inputAudios, generationOptions } = body;
 
     const modelInfo = models.find((m) => m.id === modelId);
     if (!modelInfo) {
@@ -221,27 +240,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Video inputs — pull from the dedicated inputVideo slot; fall back to
-    // inputImage only for legacy SFX/mmaudio flows that sometimes pass the
-    // same item through both channels.
+    // Video inputs — pull from the dedicated inputVideo / inputVideos slots;
+    // fall back to inputImage only for legacy SFX/mmaudio flows that sometimes
+    // pass the same item through both channels.
+    const allVideos = Array.isArray(inputVideos) ? inputVideos as string[] : [];
     for (const inp of videoInputs) {
       // Plural slots (e.g. Seedance Omni's `reference_videos`) expect an
-      // array of URLs — wrap the single inputVideo so downstream Ark
-      // routing doesn't iterate the URL string character-by-character
-      // (same bug class as the reference_audios plural-wrap fix).
+      // array of URLs - prefer the full inputVideos list when provided so
+      // Omni can use up to 3 video refs; fall back to wrapping the single
+      // inputVideo. Without the wrap, downstream Ark routing iterates the
+      // URL string character-by-character (same bug class as the
+      // reference_audios plural-wrap fix).
       const isPlural = inp.name.endsWith("_videos") || inp.name.endsWith("_urls");
-      if (inputVideo) input[inp.name] = isPlural ? [inputVideo] : inputVideo;
-      else if (inputImage && modelInfo.type === "sfx") input[inp.name] = isPlural ? [inputImage] : inputImage;
-    }
-    for (const inp of audioInputs) {
-      if (!inputAudio) continue;
-      // Plural slots (e.g. Seedance Omni's `reference_audios`) expect an
-      // array of URLs — wrap the single inputAudio so downstream Ark
-      // routing doesn't iterate the URL string character-by-character.
-      if (inp.name.endsWith("_audios") || inp.name.endsWith("_urls")) {
-        input[inp.name] = [inputAudio];
+      if (isPlural) {
+        if (allVideos.length > 0) input[inp.name] = allVideos;
+        else if (inputVideo) input[inp.name] = [inputVideo];
+        else if (inputImage && modelInfo.type === "sfx") input[inp.name] = [inputImage];
       } else {
-        input[inp.name] = inputAudio;
+        if (inputVideo) input[inp.name] = inputVideo;
+        else if (inputImage && modelInfo.type === "sfx") input[inp.name] = inputImage;
+      }
+    }
+    const allAudios = Array.isArray(inputAudios) ? inputAudios as string[] : [];
+    for (const inp of audioInputs) {
+      const isPlural = inp.name.endsWith("_audios") || inp.name.endsWith("_urls");
+      if (isPlural) {
+        // Plural audio slots (e.g. Seedance Omni's `reference_audios`)
+        // accept up to 3 audio refs.
+        if (allAudios.length > 0) input[inp.name] = allAudios;
+        else if (inputAudio) input[inp.name] = [inputAudio];
+      } else {
+        if (inputAudio) input[inp.name] = inputAudio;
       }
     }
 

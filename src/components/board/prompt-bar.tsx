@@ -844,7 +844,34 @@ export function PromptBar() {
       const firstVideoRef = refItems.find((r) => r && (r.type === "video" || (r.type === "generation" && r.outputType === "video")));
       const inputImage = (await resolveUrl(firstImageRef)) || (await resolveUrl(startItem));
       const inputVideo = await resolveUrl(firstVideoRef);
-      const inputImagesList = (await Promise.all(refItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
+      // `inputImages` feeds the model's plural image slot (reference_images
+      // / image_urls). It MUST be filtered to image-like refs only - the
+      // previous behaviour of forwarding every refItem regardless of kind
+      // meant a video ref attached alongside images got dumped into the
+      // image array, and the upstream Omni run failed with
+      // "image format is not supported". Same filter logic as
+      // `firstImageRef` above.
+      const imageRefItems = refItems.filter((r) => r && (
+        r.type === "image" ||
+        r.type === "psd-layer" ||
+        (r.type === "generation" && r.outputType === "image")
+      ));
+      const inputImagesList = (await Promise.all(imageRefItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
+      // `inputVideos` mirrors the same pattern for the model's plural
+      // video slot (reference_videos). Send the full list of video refs
+      // so Seedance / Kling Omni can use up to 3 of them, not just the
+      // single one captured in `inputVideo` above.
+      const videoRefItems = refItems.filter((r) => r && (
+        r.type === "video" ||
+        (r.type === "generation" && r.outputType === "video")
+      ));
+      const inputVideosList = (await Promise.all(videoRefItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
+      // Same for audio refs on Omni models.
+      const audioRefItems = refItems.filter((r) => r && (
+        r.type === "audio" ||
+        (r.type === "generation" && r.outputType === "audio")
+      ));
+      const inputAudiosList = (await Promise.all(audioRefItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
       const startFrameUrl = await resolveUrl(startItem);
       const endFrameUrl = await resolveUrl(endItem);
       const inputAudioUrl = await resolveUrl(audioItem);
@@ -864,9 +891,11 @@ export function PromptBar() {
           inputImage,
           inputImages: inputImagesList,
           inputVideo,
+          inputVideos: inputVideosList,
           startFrame: startFrameUrl,
           endFrame: endFrameUrl,
           inputAudio: inputAudioUrl,
+          inputAudios: inputAudiosList,
           generationOptions: Object.keys(generationOptions).length > 0 ? generationOptions : undefined,
         }),
       });
