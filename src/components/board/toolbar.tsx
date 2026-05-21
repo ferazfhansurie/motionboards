@@ -207,6 +207,7 @@ export function Toolbar() {
           // not as a feature.
           backgroundColor: isDark ? "rgba(13,17,23,0.85)" : "rgba(255,255,255,0.85)",
           borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+          marginTop: "env(safe-area-inset-top, 0px)",
         }}
       >
         <div className="flex items-center px-0.5 md:px-1 py-0.5 rounded-lg shrink-0">

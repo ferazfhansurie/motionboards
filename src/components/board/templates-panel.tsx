@@ -87,7 +87,7 @@ export function TemplatesPanel() {
   };
 
   return (
-    <div className="absolute left-2 bottom-12 z-[45] w-[500px] pointer-events-auto">
+    <div className="absolute left-2 bottom-12 z-[45] w-[calc(100vw-1rem)] sm:w-[500px] pointer-events-auto">
       <div className={`rounded-2xl border overflow-hidden ${isDark ? "border-gray-800 bg-[#0d1117]" : "border-gray-200 bg-white"}`}
         style={{ boxShadow: isDark ? "0 25px 60px rgba(0,0,0,0.6)" : "0 25px 60px rgba(0,0,0,0.15)" }}>
         {/* Header */}

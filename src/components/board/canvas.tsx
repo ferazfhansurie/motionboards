@@ -936,8 +936,8 @@ export function Canvas() {
 
   return (
     <div
-      className={`relative h-screen overflow-hidden transition-[width] duration-200 ${isDark ? "bg-[#0d1117]" : "bg-white"}`}
-      style={{ width: isAIPromptOpen ? `calc(100vw - ${aiPanelWidth}px)` : "100vw", WebkitTouchCallout: "none" }}
+      className={`relative h-[100dvh] overflow-hidden transition-[width] duration-200 ${isDark ? "bg-[#0d1117]" : "bg-white"}`}
+      style={{ width: isAIPromptOpen ? `calc(100dvw - ${aiPanelWidth}px)` : "100dvw", WebkitTouchCallout: "none", touchAction: "none" }}
     >
       {/* Canvas area */}
       <div

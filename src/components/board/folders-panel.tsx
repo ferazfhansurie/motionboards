@@ -253,7 +253,7 @@ export function FoldersPanel() {
   const activeFolder = folders.find((f) => f.id === activeFolderId) || null;
 
   return (
-    <div className="fixed right-0 top-0 z-[48] flex h-full w-[360px] pointer-events-auto">
+    <div className="fixed right-0 top-0 z-[48] flex h-[100dvh] w-full sm:w-[360px] pointer-events-auto">
       <div
         className={`flex h-full w-full flex-col border-l ${panel}`}
         style={{ boxShadow: isDark ? "-20px 0 40px rgba(0,0,0,0.4)" : "-20px 0 40px rgba(0,0,0,0.06)" }}

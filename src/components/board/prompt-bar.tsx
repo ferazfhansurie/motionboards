@@ -1742,7 +1742,7 @@ export function PromptBar() {
   }
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 flex flex-col pointer-events-none">
+    <div className="absolute bottom-0 left-0 right-0 flex flex-col pointer-events-none" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       {/* (The old "Set as: INPUT 1" row used to live here. It's been merged
           into the always-visible RequirementsRow below the chatbox — each
           pill doubles as both status and the click-to-assign action when a

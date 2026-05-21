@@ -1311,8 +1311,8 @@ export function AIPromptPanel() {
   return (
     <div
       data-ai-panel="true"
-      className={`fixed right-0 top-0 z-[55] h-screen flex flex-col border-l shadow-2xl animate-[slideInRight_0.32s_cubic-bezier(0.22,1,0.36,1)] ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}
-      style={{ width: isMobile ? "100vw" : panelWidth }}
+      className={`fixed right-0 top-0 z-[55] h-[100dvh] flex flex-col border-l shadow-2xl animate-[slideInRight_0.32s_cubic-bezier(0.22,1,0.36,1)] ${isDark ? "bg-[#161b22] border-gray-700" : "bg-white border-gray-200"}`}
+      style={{ width: isMobile ? "100dvw" : panelWidth }}
     >
       {/* Drag-to-resize handle — desktop only, hidden on mobile */}
       {!isMobile && (
