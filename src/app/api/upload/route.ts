@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { requireUser } from "@/lib/auth";
+import { putFile } from "@/lib/db";
 
 export const maxDuration = 300;
 
-// POST /api/upload — streams the raw request body straight into Vercel Blob
-// and returns the resulting public URL.
+// POST /api/upload — stores the request body in Neon (mb_files) and returns
+// the public files-route URL.
 //
-// Why not FormData: calling req.formData() / req.blob() / req.arrayBuffer()
-// buffers the body into memory BEFORE the handler runs, and that buffered
-// read is the thing Vercel caps at ~4.5 MB. Reading req.body as a
-// ReadableStream under Fluid Compute does not trigger that cap — the bytes
-// flow straight through the function to Blob without ever being collected
-// in one place.
+// History: this previously streamed into Vercel Blob with access: "public",
+// but the underlying store was provisioned as PRIVATE which made every upload
+// fail with "Cannot use public access on a private store". Rather than
+// reconfigure the blob store, switched to the same Neon-backed `putFile`
+// pipeline that the status route uses for finished Veo / ComfyUI outputs.
+// The /api/files/:id route serves those bytes public-by-unguessable-id, which
+// is exactly what generation backends (Vertex AI, byteplus, replicate) need
+// to fetch a user-supplied reference image.
 //
 // Client contract: send the raw File/Blob as the body. Pass the filename
 // in `x-filename` and the mime type in `content-type`. No multipart,
@@ -22,29 +24,22 @@ export async function POST(req: NextRequest) {
     const user = await requireUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return NextResponse.json(
-        { error: "Blob storage not configured — BLOB_READ_WRITE_TOKEN missing on this deployment." },
-        { status: 500 }
-      );
-    }
-
-    const rawName = req.headers.get("x-filename") || "upload.bin";
     const contentType = req.headers.get("content-type") || "application/octet-stream";
-    const safeName = rawName.replace(/[^\w.\-]+/g, "_").slice(-120) || "upload.bin";
-    const pathname = `uploads/${user.id}/${Date.now()}_${safeName}`;
 
     if (!req.body) {
       return NextResponse.json({ error: "No request body" }, { status: 400 });
     }
 
-    const result = await put(pathname, req.body, {
-      access: "public",
-      contentType,
-      addRandomSuffix: true,
-    });
+    // Buffer the stream — putFile takes a Buffer. For large videos this
+    // does pull the whole body into memory; if that ever becomes a problem,
+    // bump maxDuration / switch back to a streaming store. For reference
+    // images (typically <10MB) this is fine.
+    const buffer = Buffer.from(await req.arrayBuffer());
 
-    return NextResponse.json({ url: result.url });
+    const { id } = await putFile(buffer, contentType, user.id);
+    const url = `${req.nextUrl.origin}/api/files/${id}`;
+
+    return NextResponse.json({ url });
   } catch (error) {
     console.error("Upload error:", error);
     const msg = error instanceof Error ? error.message : "Upload failed";
