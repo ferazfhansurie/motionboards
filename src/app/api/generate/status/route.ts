@@ -65,11 +65,24 @@ export async function GET(req: NextRequest) {
     const requestId = req.nextUrl.searchParams.get("requestId");
     const modelId = req.nextUrl.searchParams.get("modelId");
     const generationId = req.nextUrl.searchParams.get("generationId");
-    const geminiVideo = req.nextUrl.searchParams.get("geminiVideo");
-    const openaiVideo = req.nextUrl.searchParams.get("openaiVideo");
-    const replicateVideo = req.nextUrl.searchParams.get("replicateVideo");
-    const byteplusVideo = req.nextUrl.searchParams.get("byteplusVideo");
-    const comfyVideo = req.nextUrl.searchParams.get("comfyVideo");
+    let geminiVideo = req.nextUrl.searchParams.get("geminiVideo");
+    let openaiVideo = req.nextUrl.searchParams.get("openaiVideo");
+    let replicateVideo = req.nextUrl.searchParams.get("replicateVideo");
+    let byteplusVideo = req.nextUrl.searchParams.get("byteplusVideo");
+    let comfyVideo = req.nextUrl.searchParams.get("comfyVideo");
+
+    // Auto-detect provider from modelId when the client didn't pass an explicit
+    // flag. This lets non-browser clients (claude-motion MCP, AIOS bridge poller)
+    // poll without knowing the internal provider taxonomy. Browser clients that
+    // already set the flag keep working unchanged.
+    if (!geminiVideo && !openaiVideo && !replicateVideo && !byteplusVideo && !comfyVideo && modelId) {
+      const m = modelId.toLowerCase();
+      if (/^veo-/.test(m)) geminiVideo = "true";
+      else if (/^dreamina-seedance/.test(m)) byteplusVideo = "true";
+      else if (/^sora/.test(m) || /^gpt-video/.test(m)) openaiVideo = "true";
+      else if (/^comfy/.test(m)) comfyVideo = "true";
+      else if (m.includes("/")) replicateVideo = "true"; // kling, wan, sync, etc. — replicate uses owner/name shape
+    }
     // Duration and resolution passed by the client so chargeForGeneration can
     // apply the correct per-second rate rather than the static 5s creditCost.
     const durationSecParam = req.nextUrl.searchParams.get("durationSec");
