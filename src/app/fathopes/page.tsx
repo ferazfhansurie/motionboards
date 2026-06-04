@@ -24,16 +24,15 @@ export default function FathopesMediaPage() {
   const { theme } = useAppStore();
   const isDark = theme === "dark";
 
-  // Apple-Photos-style neutral palette (not the app's newspaper theme).
+  // ADletic / MotionBoards palette (paper + ink + orange).
   const c = isDark
-    ? { bg: "#1c1c1e", side: "#161618", line: "#2c2c2e", text: "#f5f5f7", dim: "#8e8e93", tile: "#0e0e10", hover: "#2c2c2e" }
-    : { bg: "#ffffff", side: "#f5f5f7", line: "#e3e3e6", text: "#1d1d1f", dim: "#86868b", tile: "#ededf0", hover: "#e8e8ec" };
-  const accent = "#0a84ff";
+    ? { bg: "#14100c", side: "#1c1712", line: "#2a231a", text: "#f4ece0", dim: "#9a8f7d", tile: "#221c14", hover: "#2a231a" }
+    : { bg: "#fdf6ec", side: "#fff8ec", line: "#e7ddc9", text: "#0d1117", dim: "#8a7d68", tile: "#f0e6d4", hover: "#f3ebdb" };
+  const accent = "#f26522";
 
   const [activeCat, setActiveCat] = useState<string>("all"); // "all" or a category slug
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [rowHeight, setRowHeight] = useState(200);
-  const [ratios, setRatios] = useState<Record<string, number>>({});
   const [lightbox, setLightbox] = useState<number | null>(null);
 
   const items = useMemo(
@@ -158,7 +157,7 @@ export default function FathopesMediaPage() {
         <main className="flex-1 overflow-y-auto p-[3px]">
           <div className="flex flex-wrap" style={{ gap: 3 }}>
             {items.map((m, i) => {
-              const ratio = ratios[m.src] ?? (m.type === "video" ? 16 / 9 : 1);
+              const ratio = m.ratio || (m.type === "video" ? 16 / 9 : 1);
               return (
                 <button
                   key={m.src}
@@ -168,35 +167,18 @@ export default function FathopesMediaPage() {
                 >
                   {m.type === "video" ? (
                     <>
-                      <video
-                        src={mediaUrl(m.src)}
-                        muted
-                        playsInline
-                        preload="metadata"
-                        className="h-full w-full object-cover"
-                        onLoadedMetadata={(e) => {
-                          const v = e.currentTarget;
-                          if (v.videoWidth && v.videoHeight) {
-                            setRatios((p) => (p[m.src] ? p : { ...p, [m.src]: v.videoWidth / v.videoHeight }));
-                          }
-                        }}
-                      />
+                      <video src={mediaUrl(m.src)} muted playsInline preload="metadata" className="h-full w-full object-cover" />
                       <span className="pointer-events-none absolute bottom-1.5 left-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/55">
                         <Play className="h-3 w-3 fill-white text-white" />
                       </span>
                     </>
                   ) : (
                     <img
-                      src={mediaUrl(m.src)}
+                      src={mediaUrl(m.thumb)}
                       alt={m.name}
                       loading="lazy"
-                      className="h-full w-full object-cover transition-opacity"
-                      onLoad={(e) => {
-                        const img = e.currentTarget;
-                        if (img.naturalWidth && img.naturalHeight) {
-                          setRatios((p) => (p[m.src] ? p : { ...p, [m.src]: img.naturalWidth / img.naturalHeight }));
-                        }
-                      }}
+                      decoding="async"
+                      className="h-full w-full object-cover"
                     />
                   )}
                   <span className="pointer-events-none absolute inset-0 transition-colors group-hover:bg-black/10" />

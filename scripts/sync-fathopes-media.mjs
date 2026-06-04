@@ -10,6 +10,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "fathopes-footages", "FatHopes Energy Brand");
@@ -98,8 +99,35 @@ async function main() {
     await fs.mkdir(destDir, { recursive: true });
     await fs.copyFile(full, path.join(destDir, outName));
 
+    // Generate a small, correctly-oriented thumbnail for the grid so the
+    // browser never downloads multi-MB originals just to show a tile. The
+    // baked-in ratio lets the justified layout render with zero reflow.
+    let thumb = `/fathopes/${catSlug}/${outName}`;
+    let ratio = 16 / 9;
+    if (isImage) {
+      try {
+        const thumbDir = path.join(PUBLIC_DEST, "_thumbs", catSlug);
+        await fs.mkdir(thumbDir, { recursive: true });
+        const thumbName = `${base}.webp`;
+        const out = await sharp(full)
+          .rotate() // honour EXIF orientation (fixes the sideways phone shots)
+          .resize({ height: 500, withoutEnlargement: true })
+          .webp({ quality: 72 })
+          .toBuffer({ resolveWithObject: true });
+        await fs.writeFile(path.join(thumbDir, thumbName), out.data);
+        thumb = `/fathopes/_thumbs/${catSlug}/${thumbName}`;
+        ratio = out.info.width / out.info.height;
+      } catch (e) {
+        console.warn(`  thumb failed for ${rel.join("/")}: ${e.message}`);
+        thumb = `/fathopes/${catSlug}/${outName}`;
+        ratio = 1;
+      }
+    }
+
     items.push({
       src: `/fathopes/${catSlug}/${outName}`,
+      thumb,
+      ratio: Math.round(ratio * 1000) / 1000,
       category,
       catSlug,
       type: isVideo ? "video" : "image",
@@ -131,6 +159,8 @@ async function main() {
 
 export interface FathopesMediaItem {
   src: string;
+  thumb: string;
+  ratio: number;
   category: string;
   catSlug: string;
   type: "image" | "video";

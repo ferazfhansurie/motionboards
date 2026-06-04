@@ -3,6 +3,8 @@
 
 export interface FathopesMediaItem {
   src: string;
+  thumb: string;
+  ratio: number;
   category: string;
   catSlug: string;
   type: "image" | "video";
@@ -119,6 +121,8 @@ export const FATHOPES_CATEGORIES: FathopesCategory[] = [
 export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   {
     "src": "/fathopes/super-hero/d-r-up-action.png",
+    "thumb": "/fathopes/_thumbs/super-hero/d-r-up-action.webp",
+    "ratio": 0.974,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -127,6 +131,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/d-r-up-back.png",
+    "thumb": "/fathopes/_thumbs/super-hero/d-r-up-back.webp",
+    "ratio": 0.46,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -135,6 +141,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/d-r-up-front.png",
+    "thumb": "/fathopes/_thumbs/super-hero/d-r-up-front.webp",
+    "ratio": 0.546,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -143,6 +151,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/d-r-up-left.png",
+    "thumb": "/fathopes/_thumbs/super-hero/d-r-up-left.webp",
+    "ratio": 0.25,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -151,6 +161,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/d-r-up-right.png",
+    "thumb": "/fathopes/_thumbs/super-hero/d-r-up-right.webp",
+    "ratio": 0.308,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -159,6 +171,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/glinciro-action.png",
+    "thumb": "/fathopes/_thumbs/super-hero/glinciro-action.webp",
+    "ratio": 0.814,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -167,6 +181,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/glinciro-2.png",
+    "thumb": "/fathopes/_thumbs/super-hero/glinciro-2.webp",
+    "ratio": 0.354,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -175,6 +191,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/glinciro-3.png",
+    "thumb": "/fathopes/_thumbs/super-hero/glinciro-3.webp",
+    "ratio": 0.276,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -183,6 +201,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/glinciro-4.png",
+    "thumb": "/fathopes/_thumbs/super-hero/glinciro-4.webp",
+    "ratio": 0.342,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -191,6 +211,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/glinciro-5.png",
+    "thumb": "/fathopes/_thumbs/super-hero/glinciro-5.webp",
+    "ratio": 0.352,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -199,6 +221,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/kit-2.png",
+    "thumb": "/fathopes/_thumbs/super-hero/kit-2.webp",
+    "ratio": 0.472,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -207,6 +231,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/kit-3.png",
+    "thumb": "/fathopes/_thumbs/super-hero/kit-3.webp",
+    "ratio": 0.378,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -215,6 +241,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/kit-4.png",
+    "thumb": "/fathopes/_thumbs/super-hero/kit-4.webp",
+    "ratio": 0.336,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -223,6 +251,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/kit-action.png",
+    "thumb": "/fathopes/_thumbs/super-hero/kit-action.webp",
+    "ratio": 0.926,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -231,6 +261,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/sparron-2.png",
+    "thumb": "/fathopes/_thumbs/super-hero/sparron-2.webp",
+    "ratio": 0.392,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -239,6 +271,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/sparron-3.png",
+    "thumb": "/fathopes/_thumbs/super-hero/sparron-3.webp",
+    "ratio": 0.304,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -247,6 +281,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/sparron-4.png",
+    "thumb": "/fathopes/_thumbs/super-hero/sparron-4.webp",
+    "ratio": 0.3,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -255,6 +291,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/sparron-5.png",
+    "thumb": "/fathopes/_thumbs/super-hero/sparron-5.webp",
+    "ratio": 0.338,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -263,6 +301,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/sparron-action.png",
+    "thumb": "/fathopes/_thumbs/super-hero/sparron-action.webp",
+    "ratio": 0.678,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -271,6 +311,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/superheroes-group-02.png",
+    "thumb": "/fathopes/_thumbs/super-hero/superheroes-group-02.webp",
+    "ratio": 0.706,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -279,6 +321,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/super-hero/superheroes-group.png",
+    "thumb": "/fathopes/_thumbs/super-hero/superheroes-group.webp",
+    "ratio": 1,
     "category": "Super Hero",
     "catSlug": "super-hero",
     "type": "image",
@@ -287,6 +331,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-4426.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-4426.webp",
+    "ratio": 0.75,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -295,6 +341,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-4447.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-4447.webp",
+    "ratio": 0.75,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -303,6 +351,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-4454.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-4454.webp",
+    "ratio": 0.75,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -311,6 +361,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-4467.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-4467.webp",
+    "ratio": 0.562,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -319,6 +371,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-4504.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-4504.webp",
+    "ratio": 0.75,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -327,6 +381,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-4866.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-4866.webp",
+    "ratio": 0.562,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -335,6 +391,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-5249.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-5249.webp",
+    "ratio": 0.75,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -343,6 +401,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-5406.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-5406.webp",
+    "ratio": 0.75,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -351,6 +411,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/img-5417.jpg",
+    "thumb": "/fathopes/_thumbs/images/img-5417.webp",
+    "ratio": 0.75,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -359,6 +421,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/images/pux08219.jpg",
+    "thumb": "/fathopes/_thumbs/images/pux08219.webp",
+    "ratio": 1.778,
     "category": "Images",
     "catSlug": "images",
     "type": "image",
@@ -367,6 +431,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3931.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3931.webp",
+    "ratio": 0.75,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -375,6 +441,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3936.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3936.webp",
+    "ratio": 0.75,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -383,6 +451,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3940.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3940.webp",
+    "ratio": 0.75,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -391,6 +461,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3941.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3941.webp",
+    "ratio": 0.75,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -399,6 +471,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3953.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3953.webp",
+    "ratio": 0.75,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -407,6 +481,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3954.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3954.webp",
+    "ratio": 1.334,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -415,6 +491,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3955.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3955.webp",
+    "ratio": 1.334,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -423,6 +501,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3956.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3956.webp",
+    "ratio": 1.334,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -431,6 +511,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/img-3957.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/img-3957.webp",
+    "ratio": 0.75,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -439,6 +521,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03638.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03638.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -447,6 +531,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03774.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03774.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -455,6 +541,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03779.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03779.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -463,6 +551,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03813.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03813.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -471,6 +561,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03822.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03822.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -479,6 +571,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03844.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03844.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -487,6 +581,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03866.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03866.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -495,6 +591,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03874.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03874.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -503,6 +601,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03900.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03900.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -511,6 +611,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03912.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03912.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -519,6 +621,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03914.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03914.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -527,6 +631,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03923.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03923.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -535,6 +641,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03950.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03950.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -543,6 +651,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03951.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03951.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -551,6 +661,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03959.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03959.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -559,6 +671,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03966.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03966.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -567,6 +681,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03967.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03967.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -575,6 +691,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03969.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03969.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -583,6 +701,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03970.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03970.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -591,6 +711,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03980.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03980.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -599,6 +721,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03987.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03987.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -607,6 +731,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03993.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03993.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -615,6 +741,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03996.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03996.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -623,6 +751,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux03998.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux03998.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -631,6 +761,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux04009.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux04009.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -639,6 +771,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux04011.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux04011.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -647,6 +781,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux04015.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux04015.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -655,6 +791,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux04021.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux04021.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -663,6 +801,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux04023.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux04023.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -671,6 +811,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux04031.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux04031.webp",
+    "ratio": 1.778,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -679,6 +821,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/strand-mall/pux04042.jpg",
+    "thumb": "/fathopes/_thumbs/strand-mall/pux04042.webp",
+    "ratio": 0.562,
     "category": "Strand Mall",
     "catSlug": "strand-mall",
     "type": "image",
@@ -687,6 +831,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux02960.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux02960.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -695,6 +841,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux02974.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux02974.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -703,6 +851,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03014.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03014.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -711,6 +861,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03015.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03015.webp",
+    "ratio": 0.562,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -719,6 +871,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03019.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03019.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -727,6 +881,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03034.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03034.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -735,6 +891,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03076.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03076.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -743,6 +901,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03087.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03087.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -751,6 +911,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03102.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03102.webp",
+    "ratio": 0.562,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -759,6 +921,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03129.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03129.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -767,6 +931,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03155.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03155.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -775,6 +941,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03167.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03167.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -783,6 +951,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03176.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03176.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -791,6 +961,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03187.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03187.webp",
+    "ratio": 0.562,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -799,6 +971,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03199.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03199.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -807,6 +981,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03204.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03204.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -815,6 +991,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03226.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03226.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -823,6 +1001,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03267.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03267.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -831,6 +1011,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03287.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03287.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -839,6 +1021,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03314.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03314.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -847,6 +1031,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03320.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03320.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -855,6 +1041,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03365.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03365.webp",
+    "ratio": 0.562,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -863,6 +1051,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03369.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03369.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -871,6 +1061,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03406.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03406.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -879,6 +1071,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03420.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03420.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -887,6 +1081,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03473.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03473.webp",
+    "ratio": 0.562,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -895,6 +1091,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03477.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03477.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -903,6 +1101,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03492.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03492.webp",
+    "ratio": 1.778,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -911,6 +1111,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/wisma-cimb-bangsar-2025/pux03497.jpg",
+    "thumb": "/fathopes/_thumbs/wisma-cimb-bangsar-2025/pux03497.webp",
+    "ratio": 0.562,
     "category": "Wisma CIMB Bangsar 2025",
     "catSlug": "wisma-cimb-bangsar-2025",
     "type": "image",
@@ -919,6 +1121,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05750.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05750.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -927,6 +1131,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05757.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05757.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -935,6 +1141,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05760.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05760.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -943,6 +1151,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05769.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05769.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -951,6 +1161,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05782.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05782.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -959,6 +1171,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05783.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05783.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -967,6 +1181,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05784.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05784.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -975,6 +1191,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05787.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05787.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -983,6 +1201,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05788.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05788.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -991,6 +1211,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05801.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05801.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -999,6 +1221,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05802.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05802.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1007,6 +1231,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05829.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05829.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1015,6 +1241,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05836.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05836.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1023,6 +1251,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05840.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05840.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1031,6 +1261,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05850.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05850.webp",
+    "ratio": 0.562,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1039,6 +1271,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05855.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05855.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1047,6 +1281,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05856.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05856.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1055,6 +1291,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05860.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05860.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1063,6 +1301,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05862.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05862.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1071,6 +1311,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05868.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05868.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1079,6 +1321,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05869.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05869.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1087,6 +1331,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05871.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05871.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1095,6 +1341,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05882.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05882.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1103,6 +1351,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05889.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05889.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1111,6 +1361,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05891.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05891.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1119,6 +1371,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05895.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05895.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1127,6 +1381,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05899.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05899.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1135,6 +1391,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05905.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05905.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1143,6 +1401,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05915.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05915.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1151,6 +1411,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05917.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05917.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1159,6 +1421,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05919.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05919.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1167,6 +1431,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05922.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05922.webp",
+    "ratio": 0.562,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1175,6 +1441,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ranger-training/pux05927.jpg",
+    "thumb": "/fathopes/_thumbs/ranger-training/pux05927.webp",
+    "ratio": 1.778,
     "category": "Ranger Training",
     "catSlug": "ranger-training",
     "type": "image",
@@ -1183,6 +1451,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03523.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03523.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1191,6 +1461,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03537.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03537.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1199,6 +1471,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03563.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03563.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1207,6 +1481,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03575.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03575.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1215,6 +1491,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03603.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03603.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1223,6 +1501,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03611.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03611.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1231,6 +1511,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03616.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03616.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1239,6 +1521,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03639.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03639.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1247,6 +1531,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03645.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03645.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1255,6 +1541,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03653.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03653.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1263,6 +1551,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03657.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03657.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1271,6 +1561,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03681.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03681.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1279,6 +1571,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03727.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03727.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1287,6 +1581,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03740.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03740.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1295,6 +1591,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03741.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03741.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1303,6 +1601,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03749.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03749.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1311,6 +1611,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03756.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03756.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1319,6 +1621,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03760.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03760.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1327,6 +1631,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03765.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03765.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1335,6 +1641,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03774.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03774.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1343,6 +1651,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03779.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03779.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1351,6 +1661,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03790.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03790.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1359,6 +1671,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03800.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03800.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1367,6 +1681,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03807.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03807.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1375,6 +1691,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03809.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03809.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1383,6 +1701,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03824.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03824.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1391,6 +1711,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03874.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03874.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1399,6 +1721,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03922.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03922.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1407,6 +1731,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03931.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03931.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1415,6 +1741,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux03998.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux03998.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1423,6 +1751,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04033.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04033.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1431,6 +1761,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04062.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04062.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1439,6 +1771,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04068.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04068.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1447,6 +1781,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04140.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04140.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1455,6 +1791,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04157.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04157.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1463,6 +1801,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04162.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04162.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1471,6 +1811,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04168.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04168.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1479,6 +1821,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04174.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04174.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1487,6 +1831,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04176.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04176.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1495,6 +1841,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04184.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04184.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1503,6 +1851,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04190.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04190.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1511,6 +1861,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04201.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04201.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1519,6 +1871,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04206.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04206.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1527,6 +1881,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04208.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04208.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1535,6 +1891,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04214.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04214.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1543,6 +1901,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04220.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04220.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1551,6 +1911,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04230.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04230.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1559,6 +1921,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04240.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04240.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1567,6 +1931,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04241.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04241.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1575,6 +1941,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04247.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04247.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1583,6 +1951,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04254.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04254.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1591,6 +1961,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04258.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04258.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1599,6 +1971,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04262.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04262.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1607,6 +1981,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04269.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04269.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1615,6 +1991,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04287.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04287.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1623,6 +2001,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04293.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04293.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1631,6 +2011,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04295.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04295.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1639,6 +2021,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04299.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04299.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1647,6 +2031,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04310.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04310.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1655,6 +2041,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04326.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04326.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1663,6 +2051,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04334.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04334.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1671,6 +2061,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04352.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04352.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1679,6 +2071,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04363.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04363.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1687,6 +2081,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04368.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04368.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1695,6 +2091,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04373.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04373.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1703,6 +2101,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04380.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04380.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1711,6 +2111,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04390.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04390.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1719,6 +2121,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04394.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04394.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1727,6 +2131,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04409.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04409.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1735,6 +2141,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04412.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04412.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1743,6 +2151,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04426.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04426.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1751,6 +2161,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04434.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04434.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1759,6 +2171,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04440.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04440.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1767,6 +2181,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04446.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04446.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1775,6 +2191,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04448.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04448.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1783,6 +2201,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04450.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04450.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1791,6 +2211,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04456.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04456.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1799,6 +2221,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04461.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04461.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1807,6 +2231,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04465.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04465.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1815,6 +2241,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04472.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04472.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1823,6 +2251,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04497.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04497.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1831,6 +2261,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04500.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04500.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1839,6 +2271,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04542.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04542.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1847,6 +2281,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04550.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04550.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1855,6 +2291,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04558.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04558.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1863,6 +2301,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04569.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04569.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1871,6 +2311,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04575.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04575.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1879,6 +2321,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04579.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04579.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1887,6 +2331,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04583.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04583.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1895,6 +2341,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04587.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04587.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1903,6 +2351,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04591.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04591.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1911,6 +2361,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04597.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04597.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1919,6 +2371,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04604.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04604.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1927,6 +2381,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04616.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04616.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1935,6 +2391,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04625.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04625.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1943,6 +2401,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04632.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04632.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1951,6 +2411,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04641.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04641.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1959,6 +2421,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04654.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04654.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1967,6 +2431,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04659.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04659.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1975,6 +2441,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04672.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04672.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1983,6 +2451,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04685.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04685.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1991,6 +2461,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04694.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04694.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -1999,6 +2471,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04698.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04698.webp",
+    "ratio": 0.562,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2007,6 +2481,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04727.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04727.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2015,6 +2491,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04754.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04754.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2023,6 +2501,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04773.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04773.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2031,6 +2511,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04779.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04779.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2039,6 +2521,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04784.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04784.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2047,6 +2531,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04790.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04790.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2055,6 +2541,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04796.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04796.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2063,6 +2551,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04800.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04800.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2071,6 +2561,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04805.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04805.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2079,6 +2571,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04813.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04813.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2087,6 +2581,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04825.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04825.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2095,6 +2591,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04829.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04829.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2103,6 +2601,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04835.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04835.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2111,6 +2611,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04840.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04840.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2119,6 +2621,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04846.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04846.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2127,6 +2631,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04850.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04850.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2135,6 +2641,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04856.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04856.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2143,6 +2651,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04862.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04862.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2151,6 +2661,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04881.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04881.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2159,6 +2671,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04884.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04884.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2167,6 +2681,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04894.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04894.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2175,6 +2691,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04902.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04902.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2183,6 +2701,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04921.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04921.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2191,6 +2711,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04927.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04927.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2199,6 +2721,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04965.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04965.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2207,6 +2731,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04972.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04972.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2215,6 +2741,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04986.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04986.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2223,6 +2751,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux04994.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux04994.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2231,6 +2761,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05047.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05047.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2239,6 +2771,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05109.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05109.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2247,6 +2781,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05141.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05141.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2255,6 +2791,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05152.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05152.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2263,6 +2801,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05169.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05169.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2271,6 +2811,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05183.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05183.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2279,6 +2821,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05200.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05200.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2287,6 +2831,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05201.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05201.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2295,6 +2841,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05212.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05212.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2303,6 +2851,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05251.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05251.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2311,6 +2861,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05266.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05266.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2319,6 +2871,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05278.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05278.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2327,6 +2881,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05304.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05304.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2335,6 +2891,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05309.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05309.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2343,6 +2901,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05349.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05349.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2351,6 +2911,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/team-building/pux05360.jpg",
+    "thumb": "/fathopes/_thumbs/team-building/pux05360.webp",
+    "ratio": 1.778,
     "category": "Team Building",
     "catSlug": "team-building",
     "type": "image",
@@ -2359,6 +2921,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/waste2energy/pux07095.jpg",
+    "thumb": "/fathopes/_thumbs/waste2energy/pux07095.webp",
+    "ratio": 1.778,
     "category": "Waste2Energy",
     "catSlug": "waste2energy",
     "type": "image",
@@ -2367,6 +2931,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/waste2energy/pux07107.jpg",
+    "thumb": "/fathopes/_thumbs/waste2energy/pux07107.webp",
+    "ratio": 0.562,
     "category": "Waste2Energy",
     "catSlug": "waste2energy",
     "type": "image",
@@ -2375,6 +2941,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/waste2energy/pux07117.jpg",
+    "thumb": "/fathopes/_thumbs/waste2energy/pux07117.webp",
+    "ratio": 1.778,
     "category": "Waste2Energy",
     "catSlug": "waste2energy",
     "type": "image",
@@ -2383,6 +2951,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/waste2energy/pux07129.jpg",
+    "thumb": "/fathopes/_thumbs/waste2energy/pux07129.webp",
+    "ratio": 0.562,
     "category": "Waste2Energy",
     "catSlug": "waste2energy",
     "type": "image",
@@ -2391,6 +2961,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/astro/pux02823.jpg",
+    "thumb": "/fathopes/_thumbs/astro/pux02823.webp",
+    "ratio": 0.562,
     "category": "Astro",
     "catSlug": "astro",
     "type": "image",
@@ -2399,6 +2971,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/astro/pux02873.jpg",
+    "thumb": "/fathopes/_thumbs/astro/pux02873.webp",
+    "ratio": 0.562,
     "category": "Astro",
     "catSlug": "astro",
     "type": "image",
@@ -2407,6 +2981,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/astro/pux02885.jpg",
+    "thumb": "/fathopes/_thumbs/astro/pux02885.webp",
+    "ratio": 0.562,
     "category": "Astro",
     "catSlug": "astro",
     "type": "image",
@@ -2415,6 +2991,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/plus-community-day/pux02274.jpg",
+    "thumb": "/fathopes/_thumbs/plus-community-day/pux02274.webp",
+    "ratio": 1.778,
     "category": "PLUS Community Day",
     "catSlug": "plus-community-day",
     "type": "image",
@@ -2423,6 +3001,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/mitsui-x-fathopes-energy/pux03432.jpg",
+    "thumb": "/fathopes/_thumbs/mitsui-x-fathopes-energy/pux03432.webp",
+    "ratio": 1.778,
     "category": "Mitsui X FatHopes Energy",
     "catSlug": "mitsui-x-fathopes-energy",
     "type": "image",
@@ -2431,6 +3011,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/klb-fuel/20260514-114622-jpg.jpeg",
+    "thumb": "/fathopes/_thumbs/klb-fuel/20260514-114622-jpg.webp",
+    "ratio": 0.75,
     "category": "KLB Fuel",
     "catSlug": "klb-fuel",
     "type": "image",
@@ -2439,6 +3021,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/my-aero-2026/my-aero-backdrop.jpg",
+    "thumb": "/fathopes/_thumbs/my-aero-2026/my-aero-backdrop.webp",
+    "ratio": 1.612,
     "category": "My Aero 2026",
     "catSlug": "my-aero-2026",
     "type": "image",
@@ -2447,6 +3031,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/turiya-earth-day-2026/26cc38f4-4534-4a41-84cf-2db4029229fe.jpg",
+    "thumb": "/fathopes/_thumbs/turiya-earth-day-2026/26cc38f4-4534-4a41-84cf-2db4029229fe.webp",
+    "ratio": 0.75,
     "category": "Turiya Earth Day 2026",
     "catSlug": "turiya-earth-day-2026",
     "type": "image",
@@ -2455,6 +3041,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/1080-x-1080.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/1080-x-1080.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2463,6 +3051,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/activate-dormant-recyclers-100.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/activate-dormant-recyclers-100.webp",
+    "ratio": 2,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2471,6 +3061,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/cash.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/cash.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2479,6 +3071,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/deals.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/deals.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2487,6 +3081,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/download.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/download.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2495,6 +3091,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/drop-off-2.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/drop-off-2.webp",
+    "ratio": 1.984,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2503,6 +3101,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/drop-off.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/drop-off.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2511,6 +3111,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/fa-60cm-round-matte-sticker.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/fa-60cm-round-matte-sticker.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2519,6 +3121,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/incentives.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/incentives.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2527,6 +3131,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/income.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/income.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2535,6 +3141,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/koppiku-app-banner.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/koppiku-app-banner.webp",
+    "ratio": 2,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2543,6 +3151,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/koppiku.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/koppiku.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2551,6 +3161,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/ranger-sign-up-100.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/ranger-sign-up-100.webp",
+    "ratio": 1.996,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2559,6 +3171,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/rewards-banner-100.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/rewards-banner-100.webp",
+    "ratio": 1.998,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2567,6 +3181,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/rewards-catalogues.jpg",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/rewards-catalogues.webp",
+    "ratio": 1.984,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2575,6 +3191,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/saf.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/saf.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2583,6 +3201,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/spot-icon-20x20.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/spot-icon-20x20.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2591,6 +3211,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/supporthotline.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/supporthotline.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2599,6 +3221,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/uco.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/uco.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2607,6 +3231,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/uniform.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/uniform.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2615,6 +3241,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-loyalty-app/vouchers.png",
+    "thumb": "/fathopes/_thumbs/fathopes-loyalty-app/vouchers.webp",
+    "ratio": 1,
     "category": "FatHopes Loyalty App",
     "catSlug": "fathopes-loyalty-app",
     "type": "image",
@@ -2623,6 +3251,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/bunting/flyer-a4-fa.png",
+    "thumb": "/fathopes/_thumbs/bunting/flyer-a4-fa.webp",
+    "ratio": 0.706,
     "category": "Bunting",
     "catSlug": "bunting",
     "type": "image",
@@ -2631,6 +3261,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/googlebackground.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/googlebackground.webp",
+    "ratio": 1.778,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2639,6 +3271,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/laptopwallpaper-01.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/laptopwallpaper-01.webp",
+    "ratio": 1.778,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2647,6 +3281,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/laptopwallpaper-02.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/laptopwallpaper-02.webp",
+    "ratio": 1.778,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2655,6 +3291,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/linkedin-profilebanner-02.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/linkedin-profilebanner-02.webp",
+    "ratio": 3.622,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2663,6 +3301,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/linkedin-profilebanner.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/linkedin-profilebanner.webp",
+    "ratio": 3.622,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2671,6 +3311,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/mobilewallpaper-01.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/mobilewallpaper-01.webp",
+    "ratio": 0.562,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2679,6 +3321,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/mobilewallpaper-02.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/mobilewallpaper-02.webp",
+    "ratio": 0.562,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2687,6 +3331,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/mobilewallpaper-03.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/mobilewallpaper-03.webp",
+    "ratio": 0.562,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2695,6 +3341,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/corporate-asset/mobilewallpaper-04.jpg",
+    "thumb": "/fathopes/_thumbs/corporate-asset/mobilewallpaper-04.webp",
+    "ratio": 0.562,
     "category": "Corporate Asset",
     "catSlug": "corporate-asset",
     "type": "image",
@@ -2703,6 +3351,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/brand-video/episode-1.mp4",
+    "thumb": "/fathopes/brand-video/episode-1.mp4",
+    "ratio": 1.778,
     "category": "Brand Video",
     "catSlug": "brand-video",
     "type": "video",
@@ -2711,6 +3361,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/ai-video/identity.mp4",
+    "thumb": "/fathopes/ai-video/identity.mp4",
+    "ratio": 1.778,
     "category": "AI Video",
     "catSlug": "ai-video",
     "type": "video",
@@ -2719,6 +3371,8 @@ export const FATHOPES_MEDIA: FathopesMediaItem[] = [
   },
   {
     "src": "/fathopes/fathopes-vendor-app/vendor-app-guide.mp4",
+    "thumb": "/fathopes/fathopes-vendor-app/vendor-app-guide.mp4",
+    "ratio": 1.778,
     "category": "FatHopes Vendor App",
     "catSlug": "fathopes-vendor-app",
     "type": "video",
