@@ -47,3 +47,7 @@ dev.db
 data/
 .env.local
 study-output/
+
+# FatHopes footage: large source + generated public copies (regenerate with scripts/sync-fathopes-media.mjs)
+/fathopes-footages/
+/public/fathopes/
