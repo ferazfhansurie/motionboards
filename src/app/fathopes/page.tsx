@@ -7,6 +7,11 @@ import { useAppStore } from "@/lib/store";
 import { UILayer } from "@/components/ui/ui-layer";
 import { FATHOPES_MEDIA, FATHOPES_CATEGORIES, FATHOPES_TOTAL } from "@/lib/fathopes-media";
 
+// When NEXT_PUBLIC_FATHOPES_BASE is set (e.g. the R2 public bucket URL) media is
+// served from there; otherwise it falls back to /public so local dev just works.
+const MEDIA_BASE = (process.env.NEXT_PUBLIC_FATHOPES_BASE || "").replace(/\/$/, "");
+const mediaUrl = (src: string) => (MEDIA_BASE ? `${MEDIA_BASE}${src}` : src);
+
 export default function FathopesMediaPage() {
   const { theme } = useAppStore();
   const isDark = theme === "dark";
@@ -119,10 +124,10 @@ export default function FathopesMediaPage() {
               }}
             >
               {m.type === "video" ? (
-                <video src={m.src} muted loop playsInline preload="metadata" className="h-full w-full object-cover" />
+                <video src={mediaUrl(m.src)} muted loop playsInline preload="metadata" className="h-full w-full object-cover" />
               ) : (
                 <img
-                  src={m.src}
+                  src={mediaUrl(m.src)}
                   alt={m.name}
                   loading="lazy"
                   className={`h-full w-full ${m.png ? "object-contain p-2" : "object-cover"}`}
@@ -217,7 +222,7 @@ function Lightbox({
             <p className="text-[12px] font-bold truncate">{item.name} · {index + 1} / {total}</p>
           </div>
           <div className="flex items-center gap-2">
-            <a href={item.src} download className="rounded-full border-2 p-1.5" style={{ borderColor: ink, color: ink }} title="Download">
+            <a href={mediaUrl(item.src)} download className="rounded-full border-2 p-1.5" style={{ borderColor: ink, color: ink }} title="Download">
               <Download className="h-4 w-4" />
             </a>
             <button onClick={onClose} className="rounded-full border-2 p-1.5" style={{ borderColor: ink, color: ink }}>
@@ -227,9 +232,9 @@ function Lightbox({
         </div>
         <div className="flex items-center justify-center bg-black" style={{ maxHeight: "80vh" }}>
           {item.type === "video" ? (
-            <video src={item.src} controls autoPlay preload="metadata" className="max-h-[80vh] w-full" />
+            <video src={mediaUrl(item.src)} controls autoPlay preload="metadata" className="max-h-[80vh] w-full" />
           ) : (
-            <img src={item.src} alt={item.name} className="max-h-[80vh] w-full object-contain" />
+            <img src={mediaUrl(item.src)} alt={item.name} className="max-h-[80vh] w-full object-contain" />
           )}
         </div>
       </div>
