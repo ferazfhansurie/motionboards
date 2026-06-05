@@ -2603,3 +2603,105 @@ export async function revokeApiKey(userId: string, keyId: string): Promise<boole
   `;
   return rows.length > 0;
 }
+
+// --- FatHopes media gallery (the /fathopes page) ---
+//
+// A flat, shared library (not per-user) — anyone signed in can add or remove.
+// `src` and `thumb` are R2 key paths beginning with "/fathopes/..."; the page
+// prefixes them with NEXT_PUBLIC_FATHOPES_BASE to build the public URL.
+
+export interface FathopesItem {
+  id: string;
+  src: string;
+  thumb: string;
+  ratio: number;
+  category: string;
+  catSlug: string;
+  type: "image" | "video";
+  name: string;
+  createdAt: string;
+}
+
+let fathopesTableInitialized = false;
+
+async function ensureFathopesTable(): Promise<void> {
+  if (fathopesTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_fathopes_media (
+      id TEXT PRIMARY KEY,
+      src TEXT NOT NULL,
+      thumb TEXT NOT NULL,
+      ratio REAL NOT NULL DEFAULT 1,
+      category TEXT NOT NULL DEFAULT 'Uncategorised',
+      cat_slug TEXT NOT NULL DEFAULT 'uncategorised',
+      type TEXT NOT NULL DEFAULT 'image',
+      name TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS mb_fathopes_src_idx ON mb_fathopes_media (src)`;
+  await sql`CREATE INDEX IF NOT EXISTS mb_fathopes_cat_idx ON mb_fathopes_media (cat_slug)`;
+  fathopesTableInitialized = true;
+}
+
+export function fathopesSlug(s: string): string {
+  return (
+    s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "uncategorised"
+  );
+}
+
+function rowToFathopes(row: Record<string, unknown>): FathopesItem {
+  return {
+    id: row.id as string,
+    src: row.src as string,
+    thumb: row.thumb as string,
+    ratio: Number(row.ratio) || 1,
+    category: row.category as string,
+    catSlug: row.cat_slug as string,
+    type: (row.type as "image" | "video") || "image",
+    name: (row.name as string) || "",
+    createdAt: (row.created_at as Date).toISOString(),
+  };
+}
+
+export async function listFathopesMedia(): Promise<FathopesItem[]> {
+  await ensureFathopesTable();
+  const rows = await sql`
+    SELECT * FROM mb_fathopes_media
+    ORDER BY cat_slug ASC, created_at ASC, name ASC
+  `;
+  return rows.map(rowToFathopes);
+}
+
+export async function createFathopesMedia(input: {
+  src: string;
+  thumb: string;
+  ratio: number;
+  category: string;
+  type: "image" | "video";
+  name: string;
+}): Promise<FathopesItem> {
+  await ensureFathopesTable();
+  const id = `fh_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const category = (input.category || "Uncategorised").toString().slice(0, 80);
+  const catSlug = fathopesSlug(category);
+  const ratio = Number.isFinite(input.ratio) && input.ratio > 0 ? input.ratio : 1;
+  const rows = await sql`
+    INSERT INTO mb_fathopes_media (id, src, thumb, ratio, category, cat_slug, type, name)
+    VALUES (${id}, ${input.src}, ${input.thumb}, ${ratio}, ${category}, ${catSlug}, ${input.type}, ${input.name.slice(0, 200)})
+    ON CONFLICT (src) DO UPDATE SET thumb = EXCLUDED.thumb, ratio = EXCLUDED.ratio, category = EXCLUDED.category, cat_slug = EXCLUDED.cat_slug
+    RETURNING *
+  `;
+  return rowToFathopes(rows[0]);
+}
+
+// Returns the deleted row's R2 keys so the caller can purge the objects.
+export async function deleteFathopesMedia(id: string): Promise<{ src: string; thumb: string } | null> {
+  await ensureFathopesTable();
+  const rows = await sql`
+    DELETE FROM mb_fathopes_media WHERE id = ${id}
+    RETURNING src, thumb
+  `;
+  if (!rows.length) return null;
+  return { src: rows[0].src as string, thumb: rows[0].thumb as string };
+}
