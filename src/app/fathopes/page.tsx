@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, X, Download, ChevronLeft, ChevronRight, Play, Trash2, Upload, Loader2,
+  ArrowLeft, X, Download, ChevronLeft, ChevronRight, Play, Trash2, Upload, Loader2, Sparkles,
   Images as ImagesIcon, Image as ImageIcon, Film, Folder,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { UILayer } from "@/components/ui/ui-layer";
 import { askConfirm, askPrompt, showToast, updateToast } from "@/lib/ui-store";
+import { FathopesAgent, type AgentRef } from "@/components/fathopes/agent-panel";
 
 const MEDIA_BASE = (process.env.NEXT_PUBLIC_FATHOPES_BASE || "").replace(/\/$/, "");
 const mediaUrl = (src: string) => (MEDIA_BASE ? `${MEDIA_BASE}${src}` : src);
@@ -67,6 +68,13 @@ export default function FathopesMediaPage() {
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [references, setReferences] = useState<AgentRef[]>([]);
+
+  function addReference(item: MediaItem) {
+    setReferences((prev) => (prev.some((r) => r.id === item.id) ? prev : [...prev, { id: item.id, src: item.src, name: item.name, type: item.type }]));
+    setAgentOpen(true);
+  }
 
   async function load() {
     setLoading(true);
@@ -310,8 +318,17 @@ export default function FathopesMediaPage() {
           onPrev={() => setLightbox((i) => (i === null ? i : (i - 1 + items.length) % items.length))}
           onNext={() => setLightbox((i) => (i === null ? i : (i + 1) % items.length))}
           onDelete={() => removeItem(items[lightbox])}
+          onUseAsReference={() => { addReference(items[lightbox]); setLightbox(null); }}
         />
       )}
+
+      <FathopesAgent
+        open={agentOpen}
+        setOpen={setAgentOpen}
+        references={references}
+        setReferences={setReferences}
+        onSaved={(item) => setAllItems((prev) => [...prev, item])}
+      />
 
       <UILayer />
     </div>
@@ -326,8 +343,8 @@ function MobileChip({ label, count, active, onClick, c, accent }: { label: strin
   );
 }
 
-function Lightbox({ item, index, total, onClose, onPrev, onNext, onDelete }: {
-  item: MediaItem; index: number; total: number; onClose: () => void; onPrev: () => void; onNext: () => void; onDelete: () => void;
+function Lightbox({ item, index, total, onClose, onPrev, onNext, onDelete, onUseAsReference }: {
+  item: MediaItem; index: number; total: number; onClose: () => void; onPrev: () => void; onNext: () => void; onDelete: () => void; onUseAsReference: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-[150] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }} onClick={onClose}>
@@ -337,6 +354,7 @@ function Lightbox({ item, index, total, onClose, onPrev, onNext, onDelete }: {
           <p className="truncate text-[13px] font-medium">{item.name} · {index + 1} / {total}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={onUseAsReference} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white" style={{ background: "#f26522" }} title="Use as AI reference"><Sparkles className="h-4 w-4" /> Use as reference</button>
           <a href={mediaUrl(item.src)} download className="rounded-full p-2 hover:bg-white/10" title="Download"><Download className="h-5 w-5" /></a>
           <button onClick={onDelete} className="rounded-full p-2 hover:bg-white/10" style={{ color: "#ff6b6b" }} title="Delete"><Trash2 className="h-5 w-5" /></button>
           <button onClick={onClose} className="rounded-full p-2 hover:bg-white/10" title="Close"><X className="h-5 w-5" /></button>
