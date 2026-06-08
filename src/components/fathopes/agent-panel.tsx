@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, X, Send, Loader2, Check, Plus, Wand2, Search, Eye } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { useAppStore } from "@/lib/store";
 import { models } from "@/lib/models";
 import { runGeneration } from "@/lib/fathopes-agent-gen";
@@ -83,7 +86,13 @@ interface GenResult {
 // A short, always-on summary: just what categories exist and how big they are.
 // The full list lives behind find_media so we don't pay for it every turn.
 function buildMediaContext(library: LibraryItem[]): string {
-  if (!library.length) return "";
+  const defaults = [
+    "## GENERATION DEFAULTS",
+    "- Default IMAGE model is **Nano Banana 2** (model id: gemini-3.1-flash-image-preview). Use it for any image generation unless the user explicitly names a different image model. It accepts reference images.",
+    "- ALWAYS use the user's media as input when relevant: if they attached references or named gallery items, pass that media's URL as input_image_url (images) or input_video_url (videos) to start_generation. Don't generate from scratch when a reference was given — feed it in.",
+  ];
+  if (!library.length) return defaults.join("\n");
+
   const counts = new Map<string, number>();
   for (const it of library) counts.set(it.category, (counts.get(it.category) || 0) + 1);
   const summary = Array.from(counts.entries()).map(([c, n]) => `${c} (${n})`).join(", ");
@@ -96,7 +105,9 @@ function buildMediaContext(library: LibraryItem[]): string {
     "",
     `The gallery has ${library.length} items across these categories: ${summary}.`,
     "",
-    "Flow when the user says e.g. \"animate the Strand Mall truck shot\": call find_media({category:'Strand Mall'}) → optionally view_media on a candidate to confirm → start_generation with the chosen URL. Don't ask the user to attach media you can look up yourself.",
+    "Flow when the user says e.g. \"animate the Strand Mall truck shot\": call find_media({category:'Strand Mall'}) → optionally view_media on a candidate to confirm → start_generation with the chosen URL as input_image_url. Don't ask the user to attach media you can look up yourself.",
+    "",
+    ...defaults,
   ].join("\n");
 }
 
@@ -375,7 +386,7 @@ export function FathopesAgent({
             <div key={mi} className="space-y-2">
               {parts.map((p, pi) => {
                 if (p.type === "text" && p.text.trim()) {
-                  return <div key={pi} className="flex justify-start"><div className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-bl-sm px-3 py-2 text-[13px]" style={{ background: c.bubble }}>{p.text}</div></div>;
+                  return <div key={pi} className="flex justify-start"><div className="max-w-[88%] rounded-2xl rounded-bl-sm px-3 py-2 text-[13px]" style={{ background: c.bubble }}><Md text={p.text} isDark={isDark} /></div></div>;
                 }
                 if (p.type === "tool_use") {
                   if (p.name === "find_media") return <ToolChip key={pi} icon={<Search className="h-3 w-3" />} label="Searched the gallery" c={c} />;
@@ -390,7 +401,7 @@ export function FathopesAgent({
           );
         })}
 
-        {streamingText && <div className="flex justify-start"><div className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-bl-sm px-3 py-2 text-[13px]" style={{ background: c.bubble }}>{streamingText}</div></div>}
+        {streamingText && <div className="flex justify-start"><div className="max-w-[88%] rounded-2xl rounded-bl-sm px-3 py-2 text-[13px]" style={{ background: c.bubble }}><Md text={streamingText} isDark={isDark} /></div></div>}
         {busy && !streamingText && <div className="flex items-center gap-2 text-[12px]" style={{ color: c.dim }}><Loader2 className="h-3.5 w-3.5 animate-spin" /> thinking…</div>}
       </div>
 
@@ -425,6 +436,14 @@ export function FathopesAgent({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Md({ text, isDark }: { text: string; isDark: boolean }) {
+  return (
+    <div className={`markdown-body ${isDark ? "md-dark" : "md-light"}`}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{text}</ReactMarkdown>
     </div>
   );
 }
