@@ -87,9 +87,11 @@ interface GenResult {
 // The full list lives behind find_media so we don't pay for it every turn.
 function buildMediaContext(library: LibraryItem[]): string {
   const defaults = [
-    "## GENERATION DEFAULTS",
-    "- Default IMAGE model is **Nano Banana 2** (model id: gemini-3.1-flash-image-preview). Use it for any image generation unless the user explicitly names a different image model. It accepts reference images.",
-    "- ALWAYS use the user's media as input when relevant: if they attached references or named gallery items, pass that media's URL as input_image_url (images) or input_video_url (videos) to start_generation. Don't generate from scratch when a reference was given — feed it in.",
+    "## GENERATION DEFAULTS (STRICT)",
+    "- For EVERY image generation you MUST use Nano Banana 2 — model_id exactly `gemini-3.1-flash-image-preview`. This is the mandatory default.",
+    "- Do NOT use ChatGPT Image 2 (gpt-image-2), FLUX, or any other image model UNLESS the user explicitly names it in their message (e.g. \"use gpt image\"). Posters, ads, hero shots — still Nano Banana 2 by default. When unsure which image model, it's Nano Banana 2.",
+    "- If the user says \"use nano banana\" / \"nano banana 2\", that is gemini-3.1-flash-image-preview.",
+    "- ALWAYS feed the user's media in as input when relevant: if they attached references or named gallery items, pass that media's URL as input_image_url (images) or input_video_url (videos). Don't generate from scratch when a reference was given.",
   ];
   if (!library.length) return defaults.join("\n");
 
@@ -164,7 +166,7 @@ export function FathopesAgent({
 
   // When a generation needs review, stash the base history + any tool_results
   // already produced this turn, so we can submit them together once it resolves.
-  const pendingRef = useRef<{ base: ApiMsg[]; stash: Part[] } | null>(null);
+  const pendingRef = useRef<{ base: ApiMsg[]; stash: Part[]; genId: string } | null>(null);
   const libRef = useRef(library);
   libRef.current = library;
 
@@ -314,7 +316,7 @@ export function FathopesAgent({
     }
 
     // A generation is proposed — show the review card; stash the rest.
-    pendingRef.current = { base: committed, stash: autoResults };
+    pendingRef.current = { base: committed, stash: autoResults, genId: genUse.id };
     const inp = genUse.input;
     setResult(genUse.id, {
       status: "review",
@@ -338,9 +340,29 @@ export function FathopesAgent({
     const refNote = references.length
       ? `\n\n[Reference media the user attached — you may pass these URLs as input_image_url / input_video_url:\n${references.map((r) => `${r.type}: ${mediaUrl(r.src)}`).join("\n")}]`
       : "";
-    const parts: Part[] = [{ type: "text", text: (text || "Use these references.") + refNote }];
-    for (const r of references.filter((r) => r.type === "image")) parts.push({ type: "image_url", image_url: { url: mediaUrl(r.src) } });
-    const next = [...history, { role: "user" as const, content: parts }];
+    const newParts: Part[] = [{ type: "text", text: (text || "Use these references.") + refNote }];
+    for (const r of references.filter((r) => r.type === "image")) newParts.push({ type: "image_url", image_url: { url: mediaUrl(r.src) } });
+
+    // If a generation review is still open, the assistant's previous tool_use
+    // has no tool_result yet — sending a bare user turn would 400. Resolve it
+    // (treat the new message as an implicit cancel) in the SAME user turn so
+    // every tool_use is answered.
+    const pend = pendingRef.current;
+    if (pend) {
+      setResult(pend.genId, { status: "cancelled" });
+      const resolved: Part[] = [
+        ...pend.stash,
+        { type: "tool_result", tool_use_id: pend.genId, content: "The user sent a new instruction instead of approving — treat the previous proposal as cancelled and follow the new message below." },
+      ];
+      pendingRef.current = null;
+      const next: ApiMsg[] = [...pend.base, { role: "user", content: [...resolved, ...newParts] }];
+      setHistory(next);
+      setReferences(() => []);
+      await runClaude(next);
+      return;
+    }
+
+    const next = [...history, { role: "user" as const, content: newParts }];
     setHistory(next);
     setReferences(() => []);
     await runClaude(next);
