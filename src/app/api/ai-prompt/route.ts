@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
     }
 
-    const { messages } = await req.json();
+    const { messages, mediaContext } = await req.json();
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
@@ -215,6 +215,16 @@ export async function POST(req: NextRequest) {
         cache_control: { type: "ephemeral" },
       },
     ];
+    // Optional caller-supplied context (e.g. the FatHopes gallery sends its
+    // full media library so the agent can recall items and use their URLs as
+    // generation inputs). Cached separately so multi-turn chats reuse it.
+    if (typeof mediaContext === "string" && mediaContext.trim()) {
+      systemBlocks.push({
+        type: "text",
+        text: mediaContext.slice(0, 80000),
+        cache_control: { type: "ephemeral" },
+      });
+    }
     if (userInstruction) {
       systemBlocks.push({
         type: "text",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, X, Send, Loader2, Check, Plus, Wand2 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { models } from "@/lib/models";
@@ -20,6 +20,35 @@ export interface AgentRef {
 export interface SavedItem {
   id: string; src: string; thumb: string; ratio: number;
   category: string; catSlug: string; type: "image" | "video"; name: string;
+}
+
+export interface LibraryItem {
+  id: string; src: string; name: string; category: string; type: "image" | "video";
+}
+
+// Compact, grouped catalog of the whole gallery so the agent can recall items
+// and use their public URLs directly as generation inputs.
+function buildMediaContext(library: LibraryItem[]): string {
+  if (!library.length) return "";
+  const byCat = new Map<string, LibraryItem[]>();
+  for (const it of library) {
+    if (!byCat.has(it.category)) byCat.set(it.category, []);
+    byCat.get(it.category)!.push(it);
+  }
+  const lines: string[] = [
+    "## FATHOPES MEDIA LIBRARY (the user's gallery — you have full access)",
+    "",
+    "You are assisting inside the user's FatHopes media gallery (not the canvas). Their entire library is listed below, grouped by category. You CAN reference and recall any of it directly. When the user mentions media by description, name, or category (e.g. \"the river cleanup photo\", \"D.R. UP\", \"a Strand Mall shot\"), find the matching entry here and use its URL — pass it as input_image_url (images) or input_video_url (videos) to start_generation. You do NOT need the user to attach it manually. You may also answer questions about what's in the library.",
+    "",
+    `Total: ${library.length} items.`,
+    "",
+  ];
+  for (const [cat, items] of byCat) {
+    lines.push(`### ${cat} (${items.length})`);
+    for (const it of items) lines.push(`- ${it.name} [${it.type}] ${mediaUrl(it.src)}`);
+    lines.push("");
+  }
+  return lines.join("\n");
 }
 
 // Minimal message shapes matching /api/ai-prompt's contract.
@@ -64,13 +93,14 @@ async function readNDJSON(res: Response, onEvent: (e: Record<string, unknown>) =
 }
 
 export function FathopesAgent({
-  open, setOpen, references, setReferences, onSaved,
+  open, setOpen, references, setReferences, onSaved, library,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
   references: AgentRef[];
   setReferences: (fn: (prev: AgentRef[]) => AgentRef[]) => void;
   onSaved: (item: SavedItem) => void;
+  library: LibraryItem[];
 }) {
   const { theme } = useAppStore();
   const isDark = theme === "dark";
@@ -85,6 +115,7 @@ export function FathopesAgent({
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const mediaContext = useMemo(() => buildMediaContext(library), [library]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -105,7 +136,7 @@ export function FathopesAgent({
       const res = await fetch("/api/ai-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: curHistory }),
+        body: JSON.stringify({ messages: curHistory, mediaContext }),
       });
       if (res.status === 401) { setStreamingText(""); pushAssistant("Please log in to use the AI agent."); setBusy(false); return; }
       if (!res.ok || !res.body) { pushAssistant("The AI agent is unavailable right now."); setBusy(false); return; }
@@ -252,7 +283,7 @@ export function FathopesAgent({
         {history.length === 0 && !streamingText && (
           <div className="mt-6 text-center text-[13px]" style={{ color: c.dim }}>
             <Wand2 className="mx-auto mb-2 h-6 w-6" style={{ color: accent }} />
-            Ask me to make an image or video.<br />Add gallery media as references first, then say what to do with it.
+            I know your whole FatHopes library ({library.length} items).<br />Ask about it, or tell me what to make — I can pull any item in as a reference.
           </div>
         )}
 

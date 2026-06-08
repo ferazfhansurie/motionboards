@@ -328,6 +328,7 @@ export default function FathopesMediaPage() {
         references={references}
         setReferences={setReferences}
         onSaved={(item) => setAllItems((prev) => [...prev, item])}
+        library={allItems}
       />
 
       <UILayer />
