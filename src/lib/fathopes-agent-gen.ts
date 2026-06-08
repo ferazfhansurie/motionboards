@@ -12,6 +12,7 @@ export interface RunGenArgs {
   prompt: string;
   options?: Record<string, unknown>;
   inputImageUrl?: string;
+  inputImageUrls?: string[];
   inputVideoUrl?: string;
 }
 
@@ -32,7 +33,8 @@ export async function runGeneration(
   args: RunGenArgs,
   onProgress?: (text: string) => void,
 ): Promise<RunGenResult> {
-  const { modelId, prompt, options, inputImageUrl, inputVideoUrl } = args;
+  const { modelId, prompt, options, inputImageUrl, inputImageUrls, inputVideoUrl } = args;
+  const allImages = (inputImageUrls && inputImageUrls.length ? inputImageUrls : inputImageUrl ? [inputImageUrl] : []).filter(Boolean);
   const model = models.find((m) => m.id === modelId);
   if (!model) return { error: `Model "${modelId}" not found.`, outputType: "image", modelName: modelId };
   if (model.disabled) return { error: model.disabledReason || `${model.name} is unavailable.`, outputType: "image", modelName: model.name };
@@ -47,7 +49,8 @@ export async function runGeneration(
       body: JSON.stringify({
         model: modelId,
         prompt,
-        inputImage: inputImageUrl || null,
+        inputImage: allImages[0] || null,
+        inputImages: allImages.length > 1 ? allImages : undefined,
         inputVideo: inputVideoUrl || null,
         generationOptions: options || {},
       }),

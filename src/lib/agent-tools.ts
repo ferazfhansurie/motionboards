@@ -80,7 +80,12 @@ Pick model_id from the catalog in your system prompt. Don't invent ids.`,
         },
         input_image_url: {
           type: "string",
-          description: "URL of an image to use as the model's image input — required for i2i / i2v / s2e and any model that has a required image input slot. Only set if you have an actual URL the user has provided or that came back from a previous start_generation call. Otherwise omit and ask the user for an image first.",
+          description: "URL of a single image to use as the model's image input — for i2i / i2v / s2e and any model with a required image input slot. Only set if you have an actual URL the user provided or that came from a previous result. Otherwise omit and ask first.",
+        },
+        input_image_urls: {
+          type: "array",
+          items: { type: "string" },
+          description: "Multiple reference image URLs — use this (instead of input_image_url) when blending/referencing several images at once with a multi-reference model like Nano Banana 2 (gemini-3.1-flash-image-preview, up to 6 refs). Pass every reference the user wants included.",
         },
         input_video_url: {
           type: "string",

@@ -74,6 +74,7 @@ interface GenResult {
   prompt: string;
   options?: Record<string, unknown>;
   inputImageUrl?: string;
+  inputImageUrls?: string[];
   inputVideoUrl?: string;
   progress?: string;
   outputUrl?: string;
@@ -91,7 +92,7 @@ function buildMediaContext(library: LibraryItem[]): string {
     "- For EVERY image generation you MUST use Nano Banana 2 — model_id exactly `gemini-3.1-flash-image-preview`. This is the mandatory default.",
     "- Do NOT use ChatGPT Image 2 (gpt-image-2), FLUX, or any other image model UNLESS the user explicitly names it in their message (e.g. \"use gpt image\"). Posters, ads, hero shots — still Nano Banana 2 by default. When unsure which image model, it's Nano Banana 2.",
     "- If the user says \"use nano banana\" / \"nano banana 2\", that is gemini-3.1-flash-image-preview.",
-    "- ALWAYS feed the user's media in as input when relevant: if they attached references or named gallery items, pass that media's URL as input_image_url (images) or input_video_url (videos). Don't generate from scratch when a reference was given.",
+    "- ALWAYS feed the user's media in as input when relevant: if they attached references or named gallery items, pass them to start_generation. For ONE image use input_image_url; for SEVERAL reference images (Nano Banana 2 supports up to 6) use input_image_urls with ALL of them. Don't generate from scratch when references were given — include every image the user means.",
   ];
   if (!library.length) return defaults.join("\n");
 
@@ -318,12 +319,14 @@ export function FathopesAgent({
     // A generation is proposed — show the review card; stash the rest.
     pendingRef.current = { base: committed, stash: autoResults, genId: genUse.id };
     const inp = genUse.input;
+    const imgUrls = Array.isArray(inp.input_image_urls) ? (inp.input_image_urls as unknown[]).map(String) : [];
     setResult(genUse.id, {
       status: "review",
       modelId: String(inp.model_id || ""),
       prompt: String(inp.prompt || ""),
       options: (inp.options as Record<string, unknown>) || {},
       inputImageUrl: inp.input_image_url ? String(inp.input_image_url) : undefined,
+      inputImageUrls: imgUrls.length ? imgUrls : undefined,
       inputVideoUrl: inp.input_video_url ? String(inp.input_video_url) : undefined,
     });
     setBusy(false);
@@ -375,7 +378,7 @@ export function FathopesAgent({
     setResult(id, { status: "running", progress: "Starting…" });
     setBusy(true);
     const out = await runGeneration(
-      { modelId: r.modelId, prompt: r.prompt, options: r.options, inputImageUrl: r.inputImageUrl, inputVideoUrl: r.inputVideoUrl },
+      { modelId: r.modelId, prompt: r.prompt, options: r.options, inputImageUrl: r.inputImageUrl, inputImageUrls: r.inputImageUrls, inputVideoUrl: r.inputVideoUrl },
       (p) => setResult(id, { progress: p }),
     );
     setResult(id, { status: out.error ? "failed" : "done", outputUrl: out.outputUrl, outputType: out.outputType, modelName: out.modelName, error: out.error, progress: undefined });
@@ -578,9 +581,20 @@ function GenCard({
   onApprove: () => void; onCancel: () => void; onEdit: (p: string) => void; onSave: () => void;
 }) {
   const modelName = models.find((m) => m.id === r.modelId)?.name || r.modelId;
+  const refImages = (r.inputImageUrls && r.inputImageUrls.length ? r.inputImageUrls : r.inputImageUrl ? [r.inputImageUrl] : []);
   return (
     <div className="rounded-xl border p-2.5 text-[12px]" style={{ borderColor: c.line, background: c.tile }}>
       <div className="mb-1.5 flex items-center gap-1.5 font-semibold" style={{ color: accent }}><Wand2 className="h-3.5 w-3.5" /> {modelName}</div>
+
+      {(refImages.length > 0 || r.inputVideoUrl) && (
+        <div className="mb-2">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: c.dim }}>References used</p>
+          <div className="flex flex-wrap gap-1">
+            {refImages.map((u, i) => <img key={i} src={u} alt="" className="h-11 w-11 rounded object-cover" style={{ background: c.bubble }} />)}
+            {r.inputVideoUrl && <video src={r.inputVideoUrl} muted className="h-11 w-11 rounded object-cover" style={{ background: c.bubble }} />}
+          </div>
+        </div>
+      )}
       {r.status === "review" ? (
         <>
           <textarea value={r.prompt} onChange={(e) => onEdit(e.target.value)} rows={3} className="w-full resize-none rounded-md border bg-transparent p-1.5 text-[12px] outline-none" style={{ borderColor: c.line, color: c.text }} />
