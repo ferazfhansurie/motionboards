@@ -74,6 +74,7 @@ export default function FathopesMediaPage() {
   function addReference(item: MediaItem) {
     setReferences((prev) => (prev.some((r) => r.id === item.id) ? prev : [...prev, { id: item.id, src: item.src, name: item.name, type: item.type }]));
     setAgentOpen(true);
+    showToast(`Added “${item.name}” as reference`, { kind: "success" });
   }
 
   async function load() {
@@ -290,7 +291,14 @@ export default function FathopesMediaPage() {
               {items.map((m, i) => {
                 const ratio = m.ratio || (m.type === "video" ? 16 / 9 : 1);
                 return (
-                  <button key={m.id} onClick={() => setLightbox(i)} className="group relative overflow-hidden" style={{ height: rowHeight, flexGrow: ratio, flexBasis: `${ratio * rowHeight}px`, background: c.tile }}>
+                  <button
+                    key={m.id}
+                    onClick={() => setLightbox(i)}
+                    onContextMenu={(e) => { e.preventDefault(); addReference(m); }}
+                    title="Click to open · Right-click to use as AI reference"
+                    className="group relative overflow-hidden"
+                    style={{ height: rowHeight, flexGrow: ratio, flexBasis: `${ratio * rowHeight}px`, background: c.tile }}
+                  >
                     {m.type === "video" ? (
                       <>
                         <video src={mediaUrl(m.src)} muted playsInline preload="metadata" className="h-full w-full object-cover" />

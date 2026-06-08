@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, X, Send, Loader2, Check, Plus, Wand2, Search, Eye } from "lucide-react";
+import { Sparkles, X, Send, Loader2, Check, Plus, Wand2, Search, Eye, MessageSquare, Trash2, PenSquare } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -156,11 +156,79 @@ export function FathopesAgent({
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaContext = useMemo(() => buildMediaContext(library), [library]);
 
+  // Conversations (saved per-user in the DB).
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chats, setChats] = useState<{ id: string; title: string; updatedAt: string }[]>([]);
+  const [showChats, setShowChats] = useState(false);
+  const saveSigRef = useRef<string>("");
+
   // When a generation needs review, stash the base history + any tool_results
   // already produced this turn, so we can submit them together once it resolves.
   const pendingRef = useRef<{ base: ApiMsg[]; stash: Part[] } | null>(null);
   const libRef = useRef(library);
   libRef.current = library;
+
+  // Load the thread list when the panel first opens.
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/fathopes/chats").then((r) => (r.ok ? r.json() : { chats: [] })).then((d) => setChats(d.chats || [])).catch(() => {});
+  }, [open]);
+
+  function deriveTitle(msgs: ApiMsg[]): string {
+    for (const m of msgs) {
+      if (m.role !== "user") continue;
+      const parts = Array.isArray(m.content) ? m.content : [{ type: "text", text: m.content } as Part];
+      const txt = parts.filter((p): p is Extract<Part, { type: "text" }> => p.type === "text").map((p) => p.text.split("\n\n[Reference media")[0]).join(" ").trim();
+      if (txt) return txt.slice(0, 60);
+    }
+    return "New chat";
+  }
+
+  // Auto-save the active thread after each settled turn (includes generation
+  // results so a reopened thread restores its cards).
+  useEffect(() => {
+    if (busy || !history.length) return;
+    const sig = `${chatId}|${history.length}|${Object.values(results).map((r) => r.status).join(",")}`;
+    if (saveSigRef.current === sig) return;
+    saveSigRef.current = sig;
+    (async () => {
+      try {
+        const res = await fetch("/api/fathopes/chats", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: chatId, title: deriveTitle(history), data: { messages: history, results } }),
+        });
+        if (!res.ok) return;
+        const { chat } = await res.json();
+        if (!chatId) setChatId(chat.id);
+        setChats((prev) => [{ id: chat.id, title: chat.title, updatedAt: chat.updatedAt }, ...prev.filter((c) => c.id !== chat.id)]);
+      } catch { /* ignore (e.g. not logged in) */ }
+    })();
+  }, [history, results, busy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function newChat() {
+    setHistory([]); setResults({}); setChatId(null); pendingRef.current = null;
+    saveSigRef.current = ""; setShowChats(false);
+  }
+
+  async function selectChat(id: string) {
+    setShowChats(false);
+    try {
+      const res = await fetch(`/api/fathopes/chats?id=${encodeURIComponent(id)}`);
+      if (!res.ok) return;
+      const { chat } = await res.json();
+      const data = (chat.data || {}) as { messages?: ApiMsg[]; results?: Record<string, GenResult> };
+      const msgs = data.messages || [];
+      const rs = data.results || {};
+      setHistory(msgs); setResults(rs); setChatId(chat.id); pendingRef.current = null;
+      saveSigRef.current = `${chat.id}|${msgs.length}|${Object.values(rs).map((r) => r.status).join(",")}`;
+    } catch { /* ignore */ }
+  }
+
+  async function deleteChat(id: string) {
+    await fetch(`/api/fathopes/chats?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+    setChats((prev) => prev.filter((c) => c.id !== id));
+    if (id === chatId) newChat();
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -349,14 +417,41 @@ export function FathopesAgent({
       className="fixed bottom-5 right-5 z-[120] flex w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border shadow-2xl"
       style={{ background: c.bg, color: c.text, borderColor: c.line, height: "min(640px, calc(100vh - 2.5rem))" }}
     >
-      <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: c.line }}>
+      <div className="flex items-center gap-2 border-b px-3 py-3" style={{ borderColor: c.line }}>
         <span className="flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ background: accent }}><Sparkles className="h-4 w-4" /></span>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="text-[13px] font-bold leading-tight">ADletic AI</p>
-          <p className="text-[11px] leading-tight" style={{ color: c.dim }}>Knows your gallery · generates media</p>
+          <p className="truncate text-[11px] leading-tight" style={{ color: c.dim }}>{chatId ? (chats.find((x) => x.id === chatId)?.title || "Conversation") : "Knows your gallery · generates media"}</p>
         </div>
-        <button onClick={() => setOpen(false)} className="rounded-full p-1.5" style={{ color: c.dim }}><X className="h-4 w-4" /></button>
+        <button onClick={() => setShowChats((v) => !v)} title="Conversations" className="rounded-lg p-1.5" style={{ color: showChats ? accent : c.dim }}><MessageSquare className="h-4 w-4" /></button>
+        <button onClick={newChat} title="New chat" className="rounded-lg p-1.5" style={{ color: c.dim }}><PenSquare className="h-4 w-4" /></button>
+        <button onClick={() => setOpen(false)} title="Close" className="rounded-lg p-1.5" style={{ color: c.dim }}><X className="h-4 w-4" /></button>
       </div>
+
+      {showChats && (
+        <div className="absolute inset-x-0 bottom-0 top-[57px] z-10 flex flex-col" style={{ background: c.bg }}>
+          <button onClick={newChat} className="m-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold text-white" style={{ background: accent }}>
+            <Plus className="h-4 w-4" /> New chat
+          </button>
+          <div className="flex-1 overflow-y-auto px-2 pb-2">
+            {chats.length === 0 ? (
+              <p className="px-2 py-4 text-center text-[12px]" style={{ color: c.dim }}>No saved conversations yet.</p>
+            ) : (
+              chats.map((ch) => (
+                <div
+                  key={ch.id}
+                  className="group flex items-center gap-2 rounded-lg px-2.5 py-2"
+                  style={{ background: ch.id === chatId ? c.tile : "transparent" }}
+                >
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" style={{ color: c.dim }} />
+                  <button onClick={() => selectChat(ch.id)} className="flex-1 truncate text-left text-[13px]">{ch.title || "Untitled"}</button>
+                  <button onClick={() => deleteChat(ch.id)} className="rounded p-1 opacity-60 hover:opacity-100" style={{ color: "#dc2626" }} title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
         {history.length === 0 && !streamingText && (

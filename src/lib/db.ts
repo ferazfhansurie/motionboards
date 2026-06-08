@@ -2705,3 +2705,82 @@ export async function deleteFathopesMedia(id: string): Promise<{ src: string; th
   if (!rows.length) return null;
   return { src: rows[0].src as string, thumb: rows[0].thumb as string };
 }
+
+// --- FatHopes agent conversations ---
+//
+// Per-user chat threads for the gallery's floating agent. The whole UI state
+// (messages + generation results) is stored as one JSONB blob so a thread
+// restores exactly, including inline generation cards.
+
+export interface FathopesChatSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+let fathopesChatsTableInitialized = false;
+
+async function ensureFathopesChatsTable(): Promise<void> {
+  if (fathopesChatsTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_fathopes_chats (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT 'New chat',
+      data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS mb_fathopes_chats_user_idx ON mb_fathopes_chats (user_id, updated_at DESC)`;
+  fathopesChatsTableInitialized = true;
+}
+
+export async function listFathopesChats(userId: string): Promise<FathopesChatSummary[]> {
+  await ensureFathopesChatsTable();
+  const rows = await sql`
+    SELECT id, title, updated_at FROM mb_fathopes_chats
+    WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 100
+  `;
+  return rows.map((r) => ({ id: r.id as string, title: r.title as string, updatedAt: (r.updated_at as Date).toISOString() }));
+}
+
+export async function getFathopesChat(id: string, userId: string): Promise<{ id: string; title: string; data: unknown } | null> {
+  await ensureFathopesChatsTable();
+  const rows = await sql`SELECT id, title, data FROM mb_fathopes_chats WHERE id = ${id} AND user_id = ${userId}`;
+  if (!rows.length) return null;
+  const raw = rows[0].data;
+  const data = typeof raw === "string" ? JSON.parse(raw) : raw;
+  return { id: rows[0].id as string, title: rows[0].title as string, data };
+}
+
+export async function upsertFathopesChat(
+  userId: string,
+  input: { id?: string; title: string; data: unknown },
+): Promise<FathopesChatSummary> {
+  await ensureFathopesChatsTable();
+  const title = (input.title || "New chat").toString().slice(0, 120);
+  const json = JSON.stringify(input.data ?? {});
+  if (input.id) {
+    const rows = await sql`
+      UPDATE mb_fathopes_chats SET title = ${title}, data = ${json}::jsonb, updated_at = NOW()
+      WHERE id = ${input.id} AND user_id = ${userId}
+      RETURNING id, title, updated_at
+    `;
+    if (rows.length) return { id: rows[0].id as string, title: rows[0].title as string, updatedAt: (rows[0].updated_at as Date).toISOString() };
+  }
+  const id = input.id || `fhc_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const rows = await sql`
+    INSERT INTO mb_fathopes_chats (id, user_id, title, data)
+    VALUES (${id}, ${userId}, ${title}, ${json}::jsonb)
+    ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, data = EXCLUDED.data, updated_at = NOW()
+    RETURNING id, title, updated_at
+  `;
+  return { id: rows[0].id as string, title: rows[0].title as string, updatedAt: (rows[0].updated_at as Date).toISOString() };
+}
+
+export async function deleteFathopesChat(id: string, userId: string): Promise<boolean> {
+  await ensureFathopesChatsTable();
+  const rows = await sql`DELETE FROM mb_fathopes_chats WHERE id = ${id} AND user_id = ${userId} RETURNING id`;
+  return rows.length > 0;
+}
