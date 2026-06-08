@@ -106,7 +106,7 @@ type ToolUseBlock = {
 type ToolResultBlock = {
   type: "tool_result";
   tool_use_id: string;
-  content: string;
+  content: string | unknown[]; // string, or an array of content blocks (e.g. image + text)
   is_error?: boolean;
 };
 
@@ -142,7 +142,7 @@ function toAnthropicContent(content: ChatMessage["content"]): string | Anthropic
       out.push({
         type: "tool_result",
         tool_use_id: p.tool_use_id as string,
-        content: p.content as string,
+        content: p.content as Anthropic.ToolResultBlockParam["content"],
         is_error: (p.is_error as boolean) || undefined,
       });
     } else if (t === "image" && p.source) {
@@ -164,10 +164,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
     }
 
-    const { messages, mediaContext } = await req.json();
+    const { messages, mediaContext, extraTools } = await req.json();
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
+
+    // Page-specific tools (e.g. the FatHopes gallery's find_media / view_media).
+    // Declarations only — execution is entirely client-side. Merged on top of
+    // the shared registry so the canvas agent is unaffected when none are sent.
+    type ExtraTool = { name: string; description?: string; input_schema: Record<string, unknown> };
+    const mergedTools = [
+      ...ANTHROPIC_TOOLS,
+      ...(Array.isArray(extraTools)
+        ? (extraTools as ExtraTool[])
+            .filter((t) => t && typeof t.name === "string" && t.input_schema)
+            .slice(0, 8)
+            .map((t) => ({ name: t.name, description: String(t.description || ""), input_schema: t.input_schema }))
+        : []),
+    ];
 
     // Trim to last 20 messages — generous, since tool_use/tool_result pairs
     // can chain through several turns and we don't want to lose context.
@@ -245,7 +259,7 @@ export async function POST(req: NextRequest) {
       model: chatModel,
       max_tokens: 4096,
       system: systemBlocks,
-      tools: ANTHROPIC_TOOLS,
+      tools: mergedTools,
       messages: anthMessages,
     };
     const streamOptions: Record<string, unknown> = {};
