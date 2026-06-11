@@ -4,6 +4,12 @@ import { requireUser } from "@/lib/auth";
 import { models } from "@/lib/models";
 import { downloadOutput, getHistoryOutputs, getJobStatus, pickOutputFile } from "@/lib/comfy";
 
+// Re-hosting a finished video (download -> buffer -> Neon bytea insert) can take
+// well over the platform default for large 1080p clips. Without this, the
+// Seedance re-host gets killed mid-download and the temporary provider URL is
+// stored instead, which then 404s on the next page refresh.
+export const maxDuration = 300;
+
 // Translate Veo error strings into something actionable. Google's default
 // messages are verbose and rarely tell the user *why* — "Veo could not
 // generate N videos based on the prompt provided. You will not be charged…
@@ -268,18 +274,31 @@ export async function GET(req: NextRequest) {
           }
 
           // Re-host in Neon so the URL survives Ark's storage TTL and shares
-          // our 14-day sweep with every other generation.
-          let outputUrl = videoUrl;
-          try {
-            const vidRes = await fetch(videoUrl);
-            if (vidRes.ok) {
+          // our 14-day sweep with every other generation. Ark's video_url
+          // expires within ~24h, so unlike Replicate's long-lived CDN we must
+          // NOT fall back to it — a saved Ark URL works once, then 404s on the
+          // next refresh. Retry a few times, then fail hard (like Sora) so the
+          // user gets a free retry instead of a video that dies overnight.
+          let outputUrl: string | null = null;
+          for (let attempt = 0; attempt < 3 && !outputUrl; attempt++) {
+            try {
+              if (attempt > 0) await new Promise((r) => setTimeout(r, 750 * attempt));
+              const vidRes = await fetch(videoUrl);
+              if (!vidRes.ok) throw new Error(`Ark video fetch returned ${vidRes.status}`);
               const buffer = Buffer.from(await vidRes.arrayBuffer());
+              if (buffer.length === 0) throw new Error("Ark video download was empty");
               const mimeType = vidRes.headers.get("content-type") || "video/mp4";
               const { id } = await putFile(buffer, mimeType, user.id);
               outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
+            } catch (dlErr) {
+              console.error(`Failed to re-host Ark video (attempt ${attempt + 1}/3):`, dlErr);
             }
-          } catch (dlErr) {
-            console.error("Failed to re-host Ark video:", dlErr);
+          }
+          if (!outputUrl) {
+            // Don't store the short-lived Ark URL — it would break on refresh.
+            // Charge happens only on the success path below, so the user pays nothing.
+            await finalizeGeneration(generationId, { status: "failed", error: "The video generated but we couldn't save it to permanent storage. You weren't charged — please try again." });
+            return NextResponse.json({ status: "failed", error: "Couldn't save the generated video to permanent storage. Please try again." });
           }
 
           const charge = await chargeForGeneration({ userId: user.id, generationId, modelId });
