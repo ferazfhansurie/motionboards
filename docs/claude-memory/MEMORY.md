@@ -1,0 +1,12 @@
+- [BisnesGPT server SSH access](bisnesgpt_ssh.md) — SSH alias `bisnesgpt-remote` via Cloudflare tunnel; pm2 on remote; wrapper at `scripts/bisnesgpt.sh`
+- [User role and creative practice](user_role.md) — Firaz runs ADletic Agency, builds MotionBoards, produces Malaysian-localised ad spots
+- [Yaroflasher prompting style reference](reference_yaroflasher.md) — the prompting North Star: long single-prompt multi-ref Seedance runs, real photos for cast, ASCII paste-ready under 2000 chars
+- [Seedance 2.0 prompts must verify under 2000 chars](feedback_seedance_charlimit.md) — always output two versions: long brief + paste-ready compressed, `wc -c` verified
+- [Use real photos for characters, AI for things](feedback_real_photos_for_characters.md) — NB2 generates objects/environments/backplates only; characters always come from uploaded real photos
+- [Strip car brand names from video prompts](feedback_no_branded_cars_in_video_prompts.md) — Seedance flags "Honda Civic" / "Mazda 2" etc as sensitive; use generic descriptors + let @ImageN carry identity
+- [Nano Banana 2 has a 13000-character prompt limit](feedback_nano_banana_2k_chars.md) — practical cap is 13K (not 2K); write full briefs, only verify with wc -c if approaching 13K
+- [TikTok personal brand — workout / hybrid athlete](project_tiktok_personal_brand.md) — ongoing advisor workstream; flat at 100–2k, goal 50k in 6 months, 3–4x/week
+- [TikTok content must feel unplanned](feedback_tiktok_unscripted.md) — frame as triggers/moments to catch, not scripts; lean DOWN in production; only applies to @faeezree, not ADletic ad work
+- [KL conversational Malay for VO, not Indonesian AI voices](feedback_kl_malay_voice.md) — dub real KL voices or force KL Manglish markers + schwa; in-model TTS defaults to Indonesian and sounds AI
+- [Gen-Z "funny but kinda serious" content formula](feedback_content_genz_funny_serious.md) — default for branded short-form: Office-style recognition humor + a real turn, recurring characters/catchphrases, episodic, lo-fi real people (not @faeezree)
+- [PUSH Life — Office-style mockumentary series](project_pushlife_office_sitcom.md) — FatHopes UCO-collection depot crew; dry confessionals, grounded in real oil-collection world (NOT generic gen-z skits); cast + tone bible

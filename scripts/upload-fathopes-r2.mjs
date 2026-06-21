@@ -72,13 +72,17 @@ async function main() {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
     forcePathStyle: true,
+    // Fail a stuck connection fast instead of hanging the whole run.
+    requestHandler: { connectionTimeout: 8000, requestTimeout: 120000 },
+    maxAttempts: 4,
   });
 
   const files = await walk(PUBLIC_DEST);
   console.log(`Uploading ${files.length} files to R2 bucket "${bucket}"...`);
 
-  let uploaded = 0, skipped = 0, failed = 0;
-  for (const full of files) {
+  let uploaded = 0, skipped = 0, failed = 0, done = 0;
+
+  async function handle(full) {
     const rel = path.relative(path.join(ROOT, "public"), full).split(path.sep).join("/"); // e.g. fathopes/super-hero/x.png
     const ext = path.extname(full).toLowerCase();
     const body = await fs.readFile(full);
@@ -86,7 +90,7 @@ async function main() {
     // Skip if an identically-sized object already exists.
     try {
       const head = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: rel }));
-      if (head.ContentLength === body.length) { skipped++; continue; }
+      if (head.ContentLength === body.length) { skipped++; return; }
     } catch { /* not present — upload below */ }
 
     try {
@@ -98,12 +102,26 @@ async function main() {
         CacheControl: "public, max-age=31536000, immutable",
       }));
       uploaded++;
-      if (uploaded % 25 === 0) console.log(`  ...${uploaded} uploaded`);
     } catch (e) {
       failed++;
       console.error(`  FAILED ${rel}: ${e.message}`);
     }
   }
+
+  // Upload with a small concurrency pool — much faster than sequential.
+  const CONCURRENCY = 6;
+  let cursor = 0;
+  async function worker() {
+    while (cursor < files.length) {
+      const idx = cursor++;
+      await handle(files[idx]);
+      done++;
+      if (done % 25 === 0 || done === files.length) {
+        console.log(`  ${done}/${files.length} processed (uploaded=${uploaded} skipped=${skipped} failed=${failed})`);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
   console.log(`\nDone. uploaded=${uploaded} skipped=${skipped} failed=${failed}`);
   console.log(`Public base: ${publicBase.replace(/\/$/, "")}/fathopes/...`);

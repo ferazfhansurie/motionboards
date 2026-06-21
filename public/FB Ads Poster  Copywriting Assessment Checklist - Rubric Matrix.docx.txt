@@ -1,0 +1,281 @@
+﻿FB Ads Poster & Copywriting Assessment Checklist + Rubric Matrix
+From a Senior Facebook Ads Marketing Manager — use this as the mandatory pre-launch gate. If the final weighted score is below baseline, DO NOT LAUNCH PAID ADS (it will waste ad spend).
+________________
+
+
+How to use this checklist (quick)
+1. Score each main element (1–4) against the rubric descriptors.
+2. Compute Weighted Score = (Score ÷ 4) × Element Weight.
+3. Sum all weighted scores → Total /100.
+4. Compare to baseline: Prospecting / cold audience baseline = 85; Retargeting / warm audience baseline = 75. If below baseline → HOLD and fix issues noted.
+________________
+
+
+Weights (total = 100)
+* Attention (visual & headline): 20
+* Interest (opening lines, relevance): 15
+* Desire (benefits, PAS — pain & agitate): 15
+* Offer (value proposition, clarity, urgency): 15
+* Credential (social proof, trust signals): 10
+* Action (CTA clarity & friction): 10
+* Compliance & Technical (policy, creative specs, tracking): 15
+________________
+
+
+Rubric matrix — detailed checklist
+1) ATTENTION — Visual & Headline (Weight 20)
+Scoring focuses on whether the creative stops the scroll and clearly signals what the ad is about.
+Sub-criteria (score 1–4 applies to overall Attention):
+* Visual Impact
+
+   * 4 — Powerful single focal point, strong contrast, human presence or striking iconography, on-brand.
+   * 3 — Clear focal point, decent composition; may need slight improvement in visual hierarchy.
+   * 2 — Busy or bland; focal point unclear.
+   * 1 — Confusing or low-quality image; will not stop the scroll.
+   * Headline Hook (≤8 words ideal)
+
+      * 4 — Instant benefit or provocative question; tailored to audience.
+      * 3 — Benefit but weak specificity.
+      * 2 — Vague statement; passive.
+      * 1 — No headline or irrelevant tagline.
+      * Readability (mobile-first)
+
+         * 4 — Text large, legible on mobile, clear contrast.
+         * 3 — Readable but borderline on small screens.
+         * 2 — Hard to read on mobile.
+         * 1 — Illegible on mobile.
+Actionable fail signs: image noisy, headline unrelated to offer, text too small.
+________________
+
+
+2) INTEREST — Opening Copy & Relevance (Weight 15)
+Does copy create immediate relevance and emotional engagement in the first 1–2 lines?
+         * Audience Relevance
+
+            * 4 — Opens with audience-specific pain or situation.
+            * 3 — Generic relevance; could be more audience-specific.
+            * 2 — Weak audience fit.
+            * 1 — Off-target.
+            * Hook Continuation (first two lines)
+
+               * 4 — Expands headline with curiosity or a strong promise.
+               * 3 — Continues the headline but lacks punch.
+               * 2 — Slow start; loses attention.
+               * 1 — No hook.
+               * PAS — Pain identification (P)
+
+                  * 4 — Clearly states the real, specific pain the audience feels.
+                  * 3 — Pain is present but generic.
+                  * 2 — Pain unclear.
+                  * 1 — No pain mentioned.
+________________
+
+
+3) DESIRE — Benefits, Emotional Triggers, PAS Agitation (Weight 15)
+Builds desire by agitating the pain and presenting benefit-driven outcomes.
+                  * Agitate the Pain (A in PAS)
+
+                     * 4 — Amplifies consequences if pain continues; emotionally resonant.
+                     * 3 — Some agitation but could be stronger.
+                     * 2 — Minimal agitation.
+                     * 1 — Skips agitation.
+                     * Benefit Statements (not features)
+
+                        * 4 — Clear tangible benefits (time, money, status, ease), measurable when possible.
+                        * 3 — Benefits present but mixed with features.
+                        * 2 — Mostly features.
+                        * 1 — No benefits.
+                        * Transformation / Desired Outcome
+
+                           * 4 — Paints a believable ‘after’ state; short-term + long-term outcomes.
+                           * 3 — Vague transformation.
+                           * 2 — Weak future-state description.
+                           * 1 — None.
+________________
+
+
+4) OFFER — Clarity, Value, Urgency, PAS Solution (Weight 15)
+Is the offer crystal clear and valuable? Does it solve the pain (S in PAS)?
+                           * Offer Clarity
+
+                              * 4 — Exactly what user gets, price or free, period, duration, next step.
+                              * 3 — Mostly clear but missing one small detail.
+                              * 2 — Confusing offer elements.
+                              * 1 — Offer unclear or hidden.
+                              * Value Proposition & ROI
+
+                                 * 4 — Explicit value (e.g., save X, earn Y, reduce Z) or clear free-value.
+                                 * 3 — Value implied but not quantified.
+                                 * 2 — Weak value; no reason to act.
+                                 * 1 — No value shown.
+                                 * Urgency / Scarcity / CTA trigger
+
+                                    * 4 — Honest urgency or scarcity (limited seats, deadline) with expiry.
+                                    * 3 — Mild urgency, weak proof.
+                                    * 2 — No urgency.
+                                    * 1 — Fake urgency or misleading claim.
+                                    * PAS — Solution & Steps (S)
+
+                                       * 4 — Clear, simple steps to solve pain; confidence in outcome.
+                                       * 3 — Solution present but lacks step clarity.
+                                       * 2 — Solution vague.
+                                       * 1 — No solution described.
+________________
+
+
+5) CREDENTIAL — Trust, Social Proof, Guarantees (Weight 10)
+Signals that reduce perceived risk.
+                                       * Social Proof (testimonials, logos, numbers)
+
+                                          * 4 — Relevant testimonial, case stat, or trusted client logos visible & credible.
+                                          * 3 — Generic testimonial or number; could be more specific.
+                                          * 2 — Minimal proof.
+                                          * 1 — No proof.
+                                          * Guarantees / Risk Reducers
+
+                                             * 4 — Money-back, trial, or strong guarantee stated.
+                                             * 3 — Implicit risk reducer but not explicit.
+                                             * 2 — Weak/no guarantees.
+                                             * 1 — No risk reducer.
+                                             * Authority Signals (years, awards, certs)
+
+                                                * 4 — Clean, concise authority indicators included.
+                                                * 3 — Some authority but cluttered.
+                                                * 2 — Weak authority.
+                                                * 1 — None.
+________________
+
+
+6) ACTION — CTA & Conversion Friction (Weight 10)
+Is the next step obvious and easy?
+                                                * CTA Clarity
+
+                                                   * 4 — Direct command: “Book 15-min consult”, “Get 30% off now”, “Download guide” — single clear button/line.
+                                                   * 3 — CTA present but multiple CTAs causing confusion.
+                                                   * 2 — CTA vague (“Learn more”).
+                                                   * 1 — No CTA.
+                                                   * Friction (forms, steps, link correctness)
+
+                                                      * 4 — 1-click or single-field lead form; link verified; fast-loading landing page.
+                                                      * 3 — Slight friction (multi-field) but acceptable.
+                                                      * 2 — Several steps; long form.
+                                                      * 1 — Broken link or landing mismatch.
+                                                      * CTA Visual Prominence
+
+                                                         * 4 — CTA stands out visually (button shape, size) and repeated in copy.
+                                                         * 3 — Present but not prominent.
+                                                         * 2 — Hard to spot.
+                                                         * 1 — Missing.
+________________
+
+
+7) COMPLIANCE & TECHNICAL — Policy, Specs, Tracking (Weight 15)
+Ads must pass platform rules and technical specs.
+                                                         * FB Policy Compliance (no prohibited content, no misleading claims)
+
+                                                            * 4 — Fully compliant; legal, no exaggerated health/financial claims without substantiation.
+                                                            * 3 — Minor wording risk; should be rephrased.
+                                                            * 2 — Potential policy flag; likely to be disapproved.
+                                                            * 1 — Non-compliant content.
+                                                            * Creative Specs & File Quality
+
+                                                               * 4 — Correct sizes, safe zones, <3MB (if needed), high resolution, correct aspect ratio, font embedding ok.
+                                                               * 3 — Minor tech issue (small crop).
+                                                               * 2 — Multiple spec violations.
+                                                               * 1 — Unusable file.
+                                                               * Tracking & Pixel
+
+                                                                  * 4 — Pixel events set, UTM tags present, landing page has tracking + fast TTFB.
+                                                                  * 3 — Basic tracking present; e.g., only landing page tag.
+                                                                  * 2 — No tracking or broken events.
+                                                                  * 1 — Tracking will not record conversions.
+                                                                  * Text-to-Image Ratio & Read Restrictions (best practice)
+
+                                                                     * 4 — Minimal text overlay; copy primarily in primary text.
+                                                                     * 3 — Moderate text; likely fine.
+                                                                     * 2 — Heavy text that reduces reach.
+                                                                     * 1 — Too much text or text as image-only.
+________________
+
+
+Scoring template (example table you can copy)
+Element
+	Weight
+	Score (1–4)
+	Weighted = (Score/4)*Weight
+	Attention
+	20
+	3
+	15.0
+	Interest
+	15
+	3
+	11.25
+	Desire
+	15
+	2
+	7.5
+	Offer
+	15
+	3
+	11.25
+	Credential
+	10
+	3
+	7.5
+	Action
+	10
+	4
+	10.0
+	Compliance
+	15
+	4
+	15.0
+	TOTAL
+	100
+	
+
+	77.5
+	Interpretation: Total 77.5 → Below prospecting baseline 85 → DO NOT LAUNCH. Fix Desire and Offer weaknesses per the feedback below.
+________________
+
+
+Quick pre-launch QA (5 steps every ad MUST pass)
+                                                                     1. One-line test: Can someone explain the ad's offer in one sentence within 3 seconds?
+                                                                     2. Mobile preview: Check creative, headline, first two lines on a small screen.
+                                                                     3. Landing match: Click ad → landing page message and offer match 1:1.
+                                                                     4. Tracking check: Pixel fires and UTM recorded. Test a dummy conversion.
+                                                                     5. Policy scan: No exaggerated health/financial claims; no restricted content; images of minors, before/after, or risky content flagged.
+________________
+
+
+Decision rule (explicit)
+                                                                     * If Total Score < Baseline → HOLD (no paid spend).
+                                                                     * If Total Score ≥ Baseline → LAUNCH (but monitor first 24–72 hours closely).
+Recommended baselines (strict): Prospecting = 85, Retargeting = 75. Team lead may lower retargeting to 70 for urgent tests with small budgets, but only with documented rationale.
+________________
+
+
+If the ad fails: Root-cause feedback snippets (copy-paste to designer/sales exec)
+                                                                     * Attention fail: “Visual doesn’t stop the scroll. Replace with single focal image (happy customer / strong product shot). Increase headline contrast and shorten to 6–8 words. Mobile preview required.”
+                                                                     * Interest fail: “Opening lines aren’t audience-specific. Add a one-line pain statement referencing [audience job/title/industry].”
+                                                                     * Desire fail: “Benefits are feature-heavy. Rewrite to show 2–3 measurable benefits (time saved, % increase, money saved). Add an emotional sentence that shows the cost of inaction.”
+                                                                     * Offer fail: “Offer unclear. State exactly what they get, the price or free value, and the expiry. Add 3-step promise: what → how → guarantee.”
+                                                                     * Credential fail: “Add one short testimonial or client logo and a clear guarantee (7-day refund / free trial). Replace generic claims with customer proof.”
+                                                                     * Action fail: “Make CTA a single clear action; reduce form fields to 2 or use instant form.”
+                                                                     * Compliance fail: “Reword the claim to a substantiated statement; remove sensitive imagery. Verify pixel & UTM.”
+________________
+
+
+Mini checklist to accompany the ad file (submit with ad for review)
+                                                                     * [ ] Mobile preview attached (screenshot)
+                                                                     * [ ] Landing page screenshot + match statement (headline & offer)
+                                                                     * [ ] Pixel + UTMs verified (logs/screenshots)
+                                                                     * [ ] Creative source files included (PSD/AI/PNG/JPEG)
+                                                                     * [ ] 1-line ad summary (what → who → CTA)
+                                                                     * [ ] Final Rubric Score and decision (PASS or HOLD)
+________________
+
+
+Closing / Tone for team
+Treat this as your ad-safety checklist — paid ads amplify mistakes fast. Use the rubric, be ruthless about the baseline, and only start spend when the ad earns it. If you want, I can convert this into a one-page printable scorecard or a checklist Google Sheet with automatic scoring.

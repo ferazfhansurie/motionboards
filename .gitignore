@@ -51,3 +51,15 @@ study-output/
 # FatHopes footage: large source + generated public copies (regenerate with scripts/sync-fathopes-media.mjs)
 /fathopes-footages/
 /public/fathopes/
+
+# --- AI-CONTEXT housekeeping (added 2026-06-21) ---
+# MCP config holds secrets (Google Ads token / OAuth)
+.mcp.json
+# Claude local-only files
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+# nested build output
+src/components/board/.next/
+# separate nested git repos (not part of MotionBoards)
+/adleticagency/
+/adletic-inbox/
