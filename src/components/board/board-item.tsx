@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star, RotateCcw } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -1535,6 +1535,20 @@ export function BoardItemCard({
               <span className="text-[9px] font-semibold text-[#f26522] bg-[#f26522]/10 px-1.5 py-0.5 rounded-full">
                 {item.cost}
               </span>
+            )}
+            {item.type === "generation" && (item.model || item.prompt) && (
+              <button
+                type="button"
+                title="Reuse — load this prompt, model & references into the prompt bar"
+                className={`ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${isDark ? "text-gray-400 hover:bg-white/10 hover:text-[#f26522]" : "text-gray-400 hover:bg-gray-100 hover:text-[#f26522]"}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  useAppStore.getState().reuseGeneration(item);
+                  showToast("Prompt, model & references loaded — tweak and generate", { kind: "success" });
+                }}
+              >
+                <RotateCcw className="h-3 w-3" /> Reuse
+              </button>
             )}
           </div>
         )}

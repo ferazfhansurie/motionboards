@@ -25,7 +25,7 @@ import { getModelById, findMultiRefSlot, type ModelOptions, type AIModel } from 
 import { requireAuth } from "@/lib/auth-gate";
 import { askConfirm, askPrompt, showToast } from "@/lib/ui-store";
 import { track } from "@/lib/track";
-import { Pencil, MessageCircle } from "lucide-react";
+import { Pencil, MessageCircle, ScanFace, Check } from "lucide-react";
 import { AIGreetingCard } from "./ai-greeting-card";
 
 function getEstimatedCost(model: AIModel | null, opts: Record<string, unknown>): string {
@@ -179,6 +179,11 @@ export function PromptBar() {
   // Hover-only dropdowns never opened on iOS/Android — this drives a click-toggle.
   const [openOptKey, setOpenOptKey] = useState<string | null>(null);
   const optionPillsRef = useRef<HTMLDivElement>(null);
+  // My Assets — ByteDance real-human characters the user registered once and
+  // reuses for consistent identity. Only relevant on byteplus/Seedance models;
+  // selecting one injects `asset://<id>` into the reference_images slot.
+  const [myAssets, setMyAssets] = useState<Array<{ id: string; name: string; status: string; assetId: string | null; assetType: string; thumbFileId: string | null }>>([]);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const {
     selectedModelId,
     setModelPanelOpen,
@@ -200,6 +205,8 @@ export function PromptBar() {
     setTemplatesOpen,
     pendingPrompt,
     setPendingPrompt,
+    pendingAssetIds,
+    setPendingAssetIds,
     isProfileOpen,
     setProfileOpen,
     isHistoryOpen,
@@ -392,6 +399,70 @@ export function PromptBar() {
             </div>
           );
         })}
+
+        {/* My Assets picker — real-human character lock. Only on byteplus/Seedance. */}
+        {isByteplusModel && (() => {
+          const isOpen = openOptKey === "__assets";
+          const count = selectedAssetIds.length;
+          return (
+            <div className="relative">
+              <button
+                type="button"
+                className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  count > 0
+                    ? "bg-[#f26522] text-white shadow-md shadow-[#f26522]/20"
+                    : isDark
+                    ? "bg-[#161b22] text-gray-200 border border-gray-700 hover:border-[#f26522] shadow-sm"
+                    : "bg-white text-gray-700 border border-gray-200 hover:border-[#f26522] shadow-sm"
+                }`}
+                title="My Assets — lock a real-human character"
+                onClick={() => setOpenOptKey(isOpen ? null : "__assets")}
+              >
+                <ScanFace className="w-3 h-3" />
+                {count > 0 ? `${count} character${count === 1 ? "" : "s"}` : "Cast"}
+                <ChevronDown className="w-2.5 h-2.5 opacity-70" />
+              </button>
+              {isOpen && (
+                <div className="absolute bottom-full left-0 pb-1 z-50">
+                  <div className={`rounded-xl border shadow-2xl overflow-hidden min-w-[190px] max-w-[240px] ${isDark ? "bg-[#0d1117] border-gray-700" : "bg-white border-gray-200"}`}>
+                    <div className="p-1.5 flex flex-col gap-0.5 max-h-[220px] overflow-y-auto">
+                      {myAssets.length === 0 ? (
+                        <p className={`px-2 py-2 text-[10px] leading-relaxed ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                          No ready characters yet. Request one below.
+                        </p>
+                      ) : (
+                        myAssets.map((a) => {
+                          const sel = selectedAssetIds.includes(a.id);
+                          return (
+                            <button
+                              key={a.id}
+                              className={`flex items-center gap-2 text-[10px] px-2 py-1.5 rounded-lg text-left transition-all ${
+                                sel ? "bg-[#f26522]/15 text-[#f26522]" : isDark ? "text-gray-300 hover:bg-white/10" : "text-gray-600 hover:bg-gray-50"
+                              }`}
+                              onClick={() => toggleAsset(a.id)}
+                            >
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded bg-[#f26522]/10 text-[#f26522]">
+                                {a.thumbFileId ? <img src={`/api/files/${a.thumbFileId}`} alt="" className="h-full w-full object-cover" /> : <ScanFace className="h-3 w-3" />}
+                              </span>
+                              <span className="flex-1 truncate font-medium">{a.name}</span>
+                              {sel && <Check className="h-3 w-3 shrink-0" />}
+                            </button>
+                          );
+                        })
+                      )}
+                      <button
+                        className={`mt-0.5 flex items-center gap-1.5 border-t px-2 py-1.5 text-[10px] font-semibold ${isDark ? "border-gray-800 text-gray-400 hover:text-[#f26522]" : "border-gray-100 text-gray-500 hover:text-[#f26522]"}`}
+                        onClick={() => { setOpenOptKey(null); useAppStore.getState().setFoldersOpen(false); useAppStore.getState().setAssetsOpen(true); }}
+                      >
+                        <Plus className="h-3 w-3" /> Request a character
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -410,7 +481,7 @@ export function PromptBar() {
 
   useEffect(() => { setOpenOptKey(null); }, [selectedModelId]);
 
-  // Consume pending prompt from templates panel
+  // Consume pending prompt from templates panel / generation reuse
   useEffect(() => {
     if (pendingPrompt) {
       setPrompt(pendingPrompt);
@@ -418,7 +489,41 @@ export function PromptBar() {
     }
   }, [pendingPrompt, setPendingPrompt]);
 
+  // Consume the Cast selection restored by reuseGeneration.
+  useEffect(() => {
+    if (pendingAssetIds) {
+      setSelectedAssetIds(pendingAssetIds);
+      setPendingAssetIds(null);
+    }
+  }, [pendingAssetIds, setPendingAssetIds]);
+
   const selectedModel = selectedModelId ? getModelById(selectedModelId) : null;
+  const isByteplusModel = selectedModel?.provider === "byteplus";
+
+  // Load the user's registered characters the first time a byteplus/Seedance
+  // model is selected (they're only usable there).
+  useEffect(() => {
+    if (!isByteplusModel || myAssets.length > 0) return;
+    fetch("/api/assets")
+      .then((r) => r.json())
+      // Only READY characters (verified, asset_id filled) are usable in a run.
+      .then((d) => setMyAssets((d?.assets || []).filter((a: { status?: string; assetId?: string | null }) => a.status === "completed" && a.assetId)))
+      .catch(() => {});
+  }, [isByteplusModel, myAssets.length]);
+
+  // Toggle a character in/out of the current generation. Selecting appends an
+  // `@Image{n}` tag to the prompt so Seedance knows which ref locks identity;
+  // n is the character's 1-based position in the reference_images array (assets
+  // are prepended in selection order at generate time).
+  const toggleAsset = (assetId: string) => {
+    setSelectedAssetIds((prev) => {
+      if (prev.includes(assetId)) return prev.filter((x) => x !== assetId);
+      const next = [...prev, assetId];
+      const tag = `@Image${next.length}`;
+      setPrompt((p) => (p.includes(tag) ? p : (p.trim() ? `${p.trim()} ${tag}` : tag)));
+      return next;
+    });
+  };
 
   const getCenterPosition = (w: number, h: number) => ({
     x: (-panX + window.innerWidth / 2 - w / 2) / zoom,
@@ -625,6 +730,13 @@ export function PromptBar() {
       progressText: "Starting...",
       expectedDuration: estimateDurationForModel(selectedModel.id, selectedModel.speed),
       createdAt: new Date().toISOString(),
+      // Snapshot the setup so a later "Reuse" restores prompt + model + refs.
+      sourceInputRefs: [...inputRefs],
+      sourceStartFrameId: startFrameId,
+      sourceEndFrameId: endFrameId,
+      sourceAudioInputId: audioInputId,
+      sourceGenerationOptions: { ...generationOptions },
+      sourceAssetIds: isByteplusModel ? [...selectedAssetIds] : [],
     };
 
     addItem(genItem);
@@ -856,7 +968,17 @@ export function PromptBar() {
         r.type === "psd-layer" ||
         (r.type === "generation" && r.outputType === "image")
       ));
-      const inputImagesList = (await Promise.all(imageRefItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
+      const canvasImageUrls = (await Promise.all(imageRefItems.map((r) => resolveUrl(r)))).filter(Boolean) as string[];
+      // Prepend any selected My-Assets characters as `asset://<id>` refs so
+      // they land at @Image1, @Image2... (matching the tags toggleAsset wrote
+      // into the prompt). Only meaningful on byteplus/Seedance models.
+      const assetRefUrls = isByteplusModel
+        ? selectedAssetIds
+            .map((id) => myAssets.find((a) => a.id === id)?.assetId)
+            .filter((x): x is string => !!x)
+            .map((assetId) => `asset://${assetId}`)
+        : [];
+      const inputImagesList = [...assetRefUrls, ...canvasImageUrls];
       // `inputVideos` mirrors the same pattern for the model's plural
       // video slot (reference_videos). Send the full list of video refs
       // so Seedance / Kling Omni can use up to 3 of them, not just the

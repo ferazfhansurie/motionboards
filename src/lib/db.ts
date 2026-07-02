@@ -120,14 +120,17 @@ export async function getUserById(id: string): Promise<User | undefined> {
   return rows.length > 0 ? rowToUser(rows[0]) : undefined;
 }
 
-// Operator email with access to the admin surfaces (logs, registered users).
-// Kept alongside the `role === "admin"` DB flag — either grants access, so
-// the owner email works out-of-the-box without a DB update.
+// Operator emails with access to the admin surfaces (logs, registered users,
+// the real-human asset request queue). Kept alongside the `role === "admin"`
+// DB flag — any match grants access, so owner emails work out-of-the-box
+// without a DB update. ADMIN_EMAIL stays a single value for back-compat
+// (funnel exclusion references it); ADMIN_EMAILS is the full allowlist.
 export const ADMIN_EMAIL = "hello@adleticagency.com";
+export const ADMIN_EMAILS = [ADMIN_EMAIL, "faeez@fathopesenergy.com"];
 
 export function isAdmin(user: User | null | undefined): boolean {
   if (!user) return false;
-  return user.role === "admin" || user.email.toLowerCase() === ADMIN_EMAIL;
+  return user.role === "admin" || ADMIN_EMAILS.includes(user.email.toLowerCase());
 }
 
 export async function listUsers(limit = 500): Promise<User[]> {
@@ -1894,6 +1897,172 @@ export async function deleteFolderItem(itemId: string, userId: string): Promise<
       AND folder_id IN (SELECT id FROM mb_folders WHERE user_id = ${userId})
     RETURNING id
   `;
+  return rows.length > 0;
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// My Assets — a REQUEST QUEUE for ByteDance real-human characters. The
+// biometric face verification is account-bound and UI-only by design (portrait
+// rights), and every Seedance call goes through ONE shared company Ark key, so
+// the verified asset must live under that company account. Rather than expect
+// each user to have a BytePlus login, users submit a request with reference
+// photos; an operator (see isAdmin) does the verification on the company
+// account, pastes back the resulting `asset_id`, and marks it ready. Only then
+// can the requesting user reference it as `asset://<id>` in generations.
+// ────────────────────────────────────────────────────────────────────────
+export type AssetStatus = "pending" | "completed" | "failed";
+
+export interface MbAsset {
+  id: string;
+  userId: string;
+  name: string;
+  status: AssetStatus;
+  assetId: string | null;       // filled by the operator on completion
+  assetType: string;
+  thumbFileId: string | null;
+  refPhotoIds: string[];        // user-uploaded reference photos for verification
+  note: string;                 // requester's note to the operator
+  adminNote: string;            // operator's note / failure reason
+  description: string;
+  createdAt: string;
+  // Only present on the admin queue (joined from mb_users):
+  requesterEmail?: string;
+  requesterName?: string;
+}
+
+let assetsTableInitialized = false;
+
+async function ensureAssetsTable(): Promise<void> {
+  if (assetsTableInitialized) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS mb_assets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT 'Untitled',
+      status TEXT NOT NULL DEFAULT 'pending',
+      asset_id TEXT,
+      asset_type TEXT NOT NULL DEFAULT 'real-human',
+      thumb_file_id TEXT,
+      ref_photo_ids TEXT DEFAULT '[]',
+      note TEXT DEFAULT '',
+      admin_note TEXT DEFAULT '',
+      description TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+  // Idempotent upgrades for tables created by an earlier revision of this file.
+  await sql`ALTER TABLE mb_assets ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'`;
+  await sql`ALTER TABLE mb_assets ADD COLUMN IF NOT EXISTS ref_photo_ids TEXT DEFAULT '[]'`;
+  await sql`ALTER TABLE mb_assets ADD COLUMN IF NOT EXISTS note TEXT DEFAULT ''`;
+  await sql`ALTER TABLE mb_assets ADD COLUMN IF NOT EXISTS admin_note TEXT DEFAULT ''`;
+  await sql`ALTER TABLE mb_assets ALTER COLUMN asset_id DROP NOT NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS mb_assets_user_idx ON mb_assets (user_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS mb_assets_status_idx ON mb_assets (status, created_at DESC)`;
+  assetsTableInitialized = true;
+}
+
+function parsePhotoIds(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw as string[];
+  if (typeof raw === "string" && raw.trim()) {
+    try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch { return []; }
+  }
+  return [];
+}
+
+function rowToAsset(row: Record<string, unknown>): MbAsset {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    name: row.name as string,
+    status: ((row.status as string) || "pending") as AssetStatus,
+    assetId: (row.asset_id as string) || null,
+    assetType: (row.asset_type as string) || "real-human",
+    thumbFileId: (row.thumb_file_id as string) || null,
+    refPhotoIds: parsePhotoIds(row.ref_photo_ids),
+    note: (row.note as string) || "",
+    adminNote: (row.admin_note as string) || "",
+    description: (row.description as string) || "",
+    createdAt: (row.created_at as Date).toISOString(),
+    ...(row.requester_email ? { requesterEmail: row.requester_email as string } : {}),
+    ...(row.requester_name ? { requesterName: row.requester_name as string } : {}),
+  };
+}
+
+// A user's own requests, all statuses.
+export async function listAssets(userId: string): Promise<MbAsset[]> {
+  await ensureAssetsTable();
+  const rows = await sql`
+    SELECT * FROM mb_assets
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+  `;
+  return rows.map(rowToAsset);
+}
+
+// Operator queue: every request across all users, pending first.
+export async function listAllAssetRequests(): Promise<MbAsset[]> {
+  await ensureAssetsTable();
+  const rows = await sql`
+    SELECT a.*, u.email AS requester_email, u.name AS requester_name
+    FROM mb_assets a
+    LEFT JOIN mb_users u ON u.id = a.user_id
+    ORDER BY (a.status = 'pending') DESC, a.created_at DESC
+  `;
+  return rows.map(rowToAsset);
+}
+
+export async function createAssetRequest(
+  userId: string,
+  opts: { name: string; refPhotoIds?: string[]; note?: string; thumbFileId?: string | null; assetType?: string; description?: string }
+): Promise<MbAsset> {
+  await ensureAssetsTable();
+  const id = `as_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const safeName = (opts.name || "Untitled").toString().slice(0, 80);
+  const safeType = (opts.assetType || "real-human").toString().slice(0, 40);
+  const safeNote = (opts.note || "").toString().slice(0, 1000);
+  const safeDesc = (opts.description || "").toString().slice(0, 500);
+  const photos = JSON.stringify((opts.refPhotoIds || []).slice(0, 12));
+  const thumb = opts.thumbFileId || (opts.refPhotoIds && opts.refPhotoIds[0]) || null;
+  const rows = await sql`
+    INSERT INTO mb_assets (id, user_id, name, status, asset_type, thumb_file_id, ref_photo_ids, note, description)
+    VALUES (${id}, ${userId}, ${safeName}, 'pending', ${safeType}, ${thumb}, ${photos}, ${safeNote}, ${safeDesc})
+    RETURNING *
+  `;
+  return rowToAsset(rows[0]);
+}
+
+// Requester can rename their own request; operator can rename any (admin=true).
+export async function renameAsset(id: string, userId: string, name: string, isAdminUser = false): Promise<boolean> {
+  await ensureAssetsTable();
+  const safeName = (name || "Untitled").toString().slice(0, 80);
+  const rows = isAdminUser
+    ? await sql`UPDATE mb_assets SET name = ${safeName} WHERE id = ${id} RETURNING id`
+    : await sql`UPDATE mb_assets SET name = ${safeName} WHERE id = ${id} AND user_id = ${userId} RETURNING id`;
+  return rows.length > 0;
+}
+
+// Operator-only: resolve a request. status 'completed' requires an assetId.
+export async function updateAssetStatus(
+  id: string,
+  opts: { status: AssetStatus; assetId?: string | null; adminNote?: string }
+): Promise<boolean> {
+  await ensureAssetsTable();
+  const safeAssetId = opts.status === "completed" ? (opts.assetId || "").toString().slice(0, 200) : (opts.assetId ?? null);
+  const safeAdminNote = (opts.adminNote || "").toString().slice(0, 1000);
+  const rows = await sql`
+    UPDATE mb_assets
+    SET status = ${opts.status}, asset_id = ${safeAssetId}, admin_note = ${safeAdminNote}
+    WHERE id = ${id}
+    RETURNING id
+  `;
+  return rows.length > 0;
+}
+
+export async function deleteAsset(id: string, userId: string, isAdminUser = false): Promise<boolean> {
+  await ensureAssetsTable();
+  const rows = isAdminUser
+    ? await sql`DELETE FROM mb_assets WHERE id = ${id} RETURNING id`
+    : await sql`DELETE FROM mb_assets WHERE id = ${id} AND user_id = ${userId} RETURNING id`;
   return rows.length > 0;
 }
 

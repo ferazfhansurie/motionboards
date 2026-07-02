@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef } from "react";
-import { ZoomIn, ZoomOut, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus, Type, PenTool, MousePointer, Link2, Sun, Moon, FolderOpen, Users, MessageSquare, Library } from "lucide-react";
+import { ZoomIn, ZoomOut, Undo, Redo, HelpCircle, FileUp, Download, ScrollText, ImagePlus, Type, PenTool, MousePointer, Link2, Sun, Moon, FolderOpen, Users, MessageSquare, Library, ScanFace } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { parsePsdBuffer, buildPsdFromItems, downloadPsd } from "@/lib/psd";
 import { requireAuth } from "@/lib/auth-gate";
 
 export function Toolbar() {
-  const { zoom, setZoom, setPan, panX, panY, items, addItem, boardName, undo, redo, undoStack, redoStack, activeCanvasTool, setActiveCanvasTool, theme, setTheme, drawingColor, setDrawingColor, drawingStrokeWidth, setDrawingStrokeWidth, isFoldersOpen, setFoldersOpen } = useAppStore();
+  const { zoom, setZoom, setPan, panX, panY, items, addItem, boardName, undo, redo, undoStack, redoStack, activeCanvasTool, setActiveCanvasTool, theme, setTheme, drawingColor, setDrawingColor, drawingStrokeWidth, setDrawingStrokeWidth, isFoldersOpen, setFoldersOpen, isAssetsOpen, setAssetsOpen } = useAppStore();
   const isDark = theme === "dark";
   const psdInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -344,10 +344,23 @@ export function Toolbar() {
           </button>
           <button
             className={`${btnBase} ${isFoldersOpen ? capAccent : capInactive}`}
-            onClick={() => setFoldersOpen(!isFoldersOpen)}
+            onClick={() => {
+              if (!isFoldersOpen) setAssetsOpen(false);
+              setFoldersOpen(!isFoldersOpen);
+            }}
             title="Folders"
           >
             <FolderOpen className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className={`${btnBase} ${isAssetsOpen ? capAccent : capInactive}`}
+            onClick={() => {
+              if (!isAssetsOpen) setFoldersOpen(false);
+              setAssetsOpen(!isAssetsOpen);
+            }}
+            title="My Assets — real-human characters"
+          >
+            <ScanFace className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

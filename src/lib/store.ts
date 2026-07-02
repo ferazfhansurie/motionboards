@@ -219,6 +219,16 @@ export interface BoardItem {
   progressText?: string;
   expectedDuration?: number; // seconds, for progress estimation
   starred?: boolean;
+  // Snapshot of the setup that produced this generation, so a "Reuse" click can
+  // reload the exact prompt, model, references and options back into the prompt
+  // bar. Populated at generate time; ids point at canvas items that may since
+  // have been deleted (reuse filters those out).
+  sourceInputRefs?: string[];
+  sourceStartFrameId?: string | null;
+  sourceEndFrameId?: string | null;
+  sourceAudioInputId?: string | null;
+  sourceGenerationOptions?: Record<string, unknown>;
+  sourceAssetIds?: string[]; // My-Assets character ids selected in the Cast picker
   // File size of the uploaded/dropped asset. Written when we know it
   // (drop, paste, folder-add). Used to pre-flight per-model input limits
   // before a generate call — so a 50 MB video can live on the canvas fine
@@ -302,6 +312,9 @@ export interface AppState {
   // Templates panel
   isTemplatesOpen: boolean;
   pendingPrompt: string | null;
+  // Cast-picker selection to restore when reusing a past generation. Consumed
+  // by the prompt bar (which owns the live selection), then cleared.
+  pendingAssetIds: string[] | null;
 
   // Panels
   isDashboardOpen: boolean;
@@ -349,6 +362,9 @@ export interface AppState {
   // Folders panel
   isFoldersOpen: boolean;
 
+  // My Assets panel (ByteDance real-human / digital-character assets)
+  isAssetsOpen: boolean;
+
   // Single-tab session lock — set by the heartbeat poll when another tab
   // (same browser or different device) currently owns the session. While
   // this is true, autosaves are paused and the canvas surfaces a blocking
@@ -389,6 +405,8 @@ export interface AppState {
   setModelPanelOpen: (open: boolean) => void;
   setTemplatesOpen: (open: boolean) => void;
   setPendingPrompt: (prompt: string | null) => void;
+  setPendingAssetIds: (ids: string[] | null) => void;
+  reuseGeneration: (item: BoardItem) => void;
   setDashboardOpen: (open: boolean) => void;
   setProfileOpen: (open: boolean) => void;
   setHistoryOpen: (open: boolean) => void;
@@ -444,6 +462,7 @@ export interface AppState {
   restoreBoardsSnapshot: (snapshot: unknown) => void;
   setConnectingFromId: (id: string | null) => void;
   setFoldersOpen: (open: boolean) => void;
+  setAssetsOpen: (open: boolean) => void;
   setMultiTabLockout: (info: AppState["multiTabLockout"]) => void;
   setTakeoverInProgress: (v: boolean) => void;
   setCanvasMounted: (v: boolean) => void;
@@ -511,6 +530,7 @@ export const useAppStore = create<AppState>((set) => {
   })(),
   pendingChatSeed: null,
   pendingPrompt: null,
+  pendingAssetIds: null,
   startFrameId: null,
   endFrameId: null,
   inputRefs: [],
@@ -530,6 +550,7 @@ export const useAppStore = create<AppState>((set) => {
   autoConnectGenerations: typeof window !== "undefined" ? localStorage.getItem("motionboards_autoconnect") !== "false" : true,
   connectingFromId: null,
   isFoldersOpen: false,
+  isAssetsOpen: false,
   multiTabLockout: null,
   takeoverInProgress: false,
   canvasMounted: false,
@@ -608,6 +629,7 @@ export const useAppStore = create<AppState>((set) => {
     }),
   setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
   setFoldersOpen: (isFoldersOpen) => set({ isFoldersOpen }),
+  setAssetsOpen: (isAssetsOpen) => set({ isAssetsOpen }),
   setMultiTabLockout: (multiTabLockout) => set({ multiTabLockout }),
   setTakeoverInProgress: (takeoverInProgress) => set({ takeoverInProgress }),
   setCanvasMounted: (canvasMounted) => set({ canvasMounted }),
@@ -725,6 +747,27 @@ export const useAppStore = create<AppState>((set) => {
   setModelPanelOpen: (isModelPanelOpen) => set({ isModelPanelOpen }),
   setTemplatesOpen: (isTemplatesOpen) => set({ isTemplatesOpen }),
   setPendingPrompt: (pendingPrompt) => set({ pendingPrompt }),
+  setPendingAssetIds: (pendingAssetIds) => set({ pendingAssetIds }),
+  // Reload a past generation's full setup (model, prompt, references, options,
+  // cast) into the prompt bar so the user can tweak and re-run. Ref ids that no
+  // longer exist on the canvas are dropped. Options are applied directly rather
+  // than via setSelectedModel, which would reset them.
+  reuseGeneration: (item) =>
+    set((s) => {
+      const existing = new Set(s.items.map((i) => i.id));
+      const keep = (ids?: string[]) => (ids || []).filter((id) => existing.has(id));
+      const keepOne = (id?: string | null) => (id && existing.has(id) ? id : null);
+      return {
+        selectedModelId: item.model || s.selectedModelId,
+        generationOptions: { ...(item.sourceGenerationOptions || {}) },
+        inputRefs: keep(item.sourceInputRefs),
+        startFrameId: keepOne(item.sourceStartFrameId),
+        endFrameId: keepOne(item.sourceEndFrameId),
+        audioInputId: keepOne(item.sourceAudioInputId),
+        pendingPrompt: item.prompt || "",
+        pendingAssetIds: item.sourceAssetIds && item.sourceAssetIds.length ? item.sourceAssetIds : null,
+      };
+    }),
   setDashboardOpen: (isDashboardOpen) => set({ isDashboardOpen }),
   setProfileOpen: (isProfileOpen) => set({ isProfileOpen, isHistoryOpen: false }),
   setHistoryOpen: (isHistoryOpen) => set({ isHistoryOpen, isProfileOpen: false }),
