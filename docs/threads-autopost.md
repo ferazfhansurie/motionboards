@@ -16,9 +16,17 @@ not a marketing bot, and is written to trigger the signals Threads' algorithm re
 **Phases (trust-first rollout)** — derived from `THREADS_CAMPAIGN_START`:
 | Days | Phase | Content | FatHopes? |
 |---|---|---|---|
-| 1–3 (`THREADS_AUDIENCE_DAYS`) | audience | relatable KL money talk, side income, general cashback/referral hacks | no |
+| 1–3 (`THREADS_AUDIENCE_DAYS`) | audience | personal KL money/life statements first, then relatable money talk | no |
 | 4–6 (`THREADS_INTRO_DAYS`) | intro | mostly money talk; FatHopes slipped in ~every other day as one tip | light |
 | 7+ | fathopes | app as the natural fix, still in-voice | yes |
+
+**Engagement ramp** — because a brand-new account should not act like an influencer:
+| Days | Behaviour |
+|---|---|
+| 1–2 | short personal statements only; no "korang?" questions, no advice-thread energy |
+| 3–4 | mostly statements; only a casual question if it feels like a friend texting |
+| 5–7 | light conversation; about half the posts can invite replies |
+| 8+ | community mode; reply-pulling questions are okay, still not bait |
 
 **Moods** — most posts are the steady baseline; with probability `THREADS_MOOD_CHANCE`
 (default 0.28 ≈ 1 in 3.5) a post takes on a mood: `low` (tired/"idk mayn"), `hyped`,
@@ -27,7 +35,7 @@ not a marketing bot, and is written to trigger the signals Threads' algorithm re
 **Virality levers baked into the prompt** (from Threads 2026 algorithm behaviour —
 replies > likes, early velocity, hook in first 2 lines):
 - Hook must land in line 1 (only 2–3 lines show before "more").
-- ~2 in 3 posts end with a genuine reply-pulling question (no like/follow bait, no rage-bait).
+- Reply questions ramp up slowly: none on days 1–2, light by day 5, normal community mode after day 8.
 - One optional topic tag per post (model emits `TAG: …`, published via `topic_tag`).
 - Recent posts are fed back in each run so it never repeats a hook/angle.
 

@@ -50,10 +50,10 @@ SOUND HUMAN (critical):
 - Let a real typo slip through about 1 in 4 posts (missed letter, double space) — never so much it's unreadable.
 - Vary length + rhythm. Never formulaic. Real, specific details (numbers, places, tiny moments) beat generic every time.
 
-MAKE IT SPREAD (Threads rewards REPLIES + fast early engagement, not likes):
-- Line 1 is everything — only 2–3 lines show before "more". Open with a hook: a hot-ish take, a relatable gripe, a "eh korang pernah tak…", or a specific money realisation.
-- Roughly 2 in 3 posts should END by pulling a reply out of people — a genuine question ("korang pun sama tak?", "camne korg buat?", "betul x ni?"). NOT "like/follow" bait and NOT rage-bait — both get throttled on Threads.
-- Keep it light even when ranting; combative/toxic negativity gets suppressed.
+LINE 1 IS EVERYTHING:
+- Only 2–3 lines show before "more". Open with the strongest thing — a hot-ish take, a relatable gripe, or a specific real moment. No throat-clearing, no "so today I…".
+- Keep it light even when ranting; combative/toxic negativity gets suppressed on Threads.
+- HOW MUCH you ask for replies depends entirely on the ENGAGEMENT stage below — follow that instruction exactly, it overrides any instinct to always end with a question.
 
 OUTPUT FORMAT:
 - Output the post text ONLY. Then OPTIONALLY one final line exactly "TAG: <one topic, 1–3 words>" (e.g. "TAG: Minyak", "TAG: Cost Of Living"). No hashtags anywhere, no quotes, no preamble, no explanation, no options.
@@ -101,6 +101,20 @@ function phaseInstruction(info: PhaseInfo): string {
     return `CAMPAIGN PHASE — SOFT INTRO (day ${day}). Post general relatable money content (cost of living, saving hacks, side income, cashback). DO NOT mention FatHopes in this particular post — keep building trust between the plugs.`;
   }
   return `CAMPAIGN PHASE — FATHOPES FORWARD (day ${day}). Now talk about FatHopes more directly — still the same voice, still hook-first and relatable, the app as the natural fix to a real petrol/money gripe. Vary the angle: price rant / points math / "why didn't I do this earlier" / friend rec / cashback flex. "link kat bio".\n\n${FATHOPES_FACTS}`;
+}
+
+function engagementInstruction(info: PhaseInfo): string {
+  const day = info.dayIndex + 1;
+  if (day <= 2) {
+    return `ENGAGEMENT STAGE — NOBODY KNOWS YOU YET (day ${day}). Do NOT act like an influencer. No "korang?" questions, no advice-thread energy, no audience prompts, no "what do you think?". Post like a normal person with 0 followers: short personal statements, small observations, tiny money/life moments. It can be just one line. Let people discover the voice first.`;
+  }
+  if (day <= 4) {
+    return `ENGAGEMENT STAGE — WARMING UP (day ${day}). Still mostly statements. You may ask a very casual question only if it feels like something a friend would text, but do not force it. Prioritise personal detail and shortness over engagement.`;
+  }
+  if (day <= 7) {
+    return `ENGAGEMENT STAGE — LIGHT CONVERSATION (day ${day}). About half the posts can end with an easy reply-puller. Make it natural and low-pressure, not creator bait.`;
+  }
+  return `ENGAGEMENT STAGE — COMMUNITY MODE (day ${day}). You can now invite replies more often because the account has a bit of context. Still avoid like/follow bait and anything that sounds like a brand page.`;
 }
 
 /**
@@ -156,7 +170,9 @@ export async function generateFathopesPost(
     : `This is one of the first posts on the account — set the tone.`;
 
   const moodSteer = MOOD_STEER[mood];
-  const system = [VOICE_CORE, phaseInstruction(phase), moodSteer].filter(Boolean).join("\n\n");
+  const system = [VOICE_CORE, phaseInstruction(phase), engagementInstruction(phase), moodSteer]
+    .filter(Boolean)
+    .join("\n\n");
 
   const msg = await anthropic.messages.create({
     model: CONTENT_MODEL,
