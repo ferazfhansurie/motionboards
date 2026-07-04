@@ -46,6 +46,7 @@ next-env.d.ts
 dev.db
 data/
 .env.local
+env.local
 study-output/
 
 # FatHopes footage: large source + generated public copies (regenerate with scripts/sync-fathopes-media.mjs)
