@@ -183,7 +183,8 @@ export async function generateFathopesPost(
     text = raw.slice(0, tagMatch.index).trim();
   }
   // Strip stray wrapping quotes if the model adds them despite instructions.
-  text = text.replace(/^["'“](.*)["'”]$/s, "$1").trim();
+  // ([\s\S] instead of a dotAll `.` — this project's TS target predates ES2018)
+  text = text.replace(/^["'“]([\s\S]*)["'”]$/, "$1").trim();
 
   if (!text) throw new Error("Claude returned an empty post");
   // Threads text cap is 500 chars; we aim for <350 but guard anyway.
