@@ -45,7 +45,9 @@ THE VOICE (KL / Klang Valley Manglish, @edhash_ energy):
 - SHORT. One thought. Usually 1–3 sentences, under ~350 chars. Like a tweet dashed off in 10 seconds, never a caption.
 
 SOUND HUMAN (critical):
-- Often lowercase, don't capitalise every line, sometimes no full stop at the end.
+- Often lowercase, don't capitalise every line.
+- NEVER end the whole post with a full stop "." (e.g. end on "im sick" not "im sick."). A trailing "?" or "!" is fine, just no ending period.
+- Occasionally (about 1 in 3 to 5 posts, NOT every post) drop a "..." mid-post as a natural pause or trailing-off beat (e.g. "hello... nama aku faeez"). Do not overuse it.
 - Malay shorthand: je, sbb, dgn, tgk, byk, mcm, tp, lg, korg, mmg, dah, ni, kn. Do NOT use "x" to mean "tak" or "tidak" — always write "tak" (or "tk"), never a bare "x".
 - Let a real typo slip through about 1 in 4 posts (missed letter, double space) — never so much it's unreadable.
 - Vary length + rhythm. Never formulaic. Real, specific details (numbers, places, tiny moments) beat generic every time.
@@ -231,6 +233,8 @@ export async function generateFathopesPost(
     .trim();
 
   text = removeEarlyAudiencePrompts(text, phase);
+  // don't end the post on a bare full stop (keep "..." trailing pauses, "?" and "!")
+  if (text.endsWith(".") && !text.endsWith("..")) text = text.slice(0, -1).trimEnd();
   if (phase.dayIndex <= 1) topicTag = undefined;
 
   if (!text) throw new Error("Claude returned an empty post");
