@@ -38,6 +38,7 @@ replies > likes, early velocity, hook in first 2 lines):
 - Reply questions ramp up slowly: none on days 1–2, light by day 5, normal community mode after day 8.
 - One optional topic tag per post (model emits `TAG: …`, published via `topic_tag`).
 - Recent posts are fed back in each run so it never repeats a hook/angle.
+- Days 1–2 have a hard safety guard: any generated question/audience-prompt line is stripped, and topic tags are disabled.
 
 ## One-time setup
 

@@ -117,6 +117,23 @@ function engagementInstruction(info: PhaseInfo): string {
   return `ENGAGEMENT STAGE — COMMUNITY MODE (day ${day}). You can now invite replies more often because the account has a bit of context. Still avoid like/follow bait and anything that sounds like a brand page.`;
 }
 
+function removeEarlyAudiencePrompts(text: string, info: PhaseInfo): string {
+  if (info.dayIndex > 1) return text;
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const kept = lines.filter((line) => {
+    if (line.includes("?")) return false;
+    if (/\b(korang|korg|you guys|anyone|what do you think)\b/i.test(line)) return false;
+    return true;
+  });
+
+  const fallback = lines[0]?.replace(/\?/g, ".").trim() || text.replace(/\?/g, ".").trim();
+  return (kept.length ? kept.join("\n\n") : fallback).trim();
+}
+
 /**
  * Work out which campaign phase we're in from the day count since
  * THREADS_CAMPAIGN_START (YYYY-MM-DD). Falls back to "today = day 0" if unset
@@ -201,6 +218,9 @@ export async function generateFathopesPost(
   // Strip stray wrapping quotes if the model adds them despite instructions.
   // ([\s\S] instead of a dotAll `.` — this project's TS target predates ES2018)
   text = text.replace(/^["'“]([\s\S]*)["'”]$/, "$1").trim();
+
+  text = removeEarlyAudiencePrompts(text, phase);
+  if (phase.dayIndex <= 1) topicTag = undefined;
 
   if (!text) throw new Error("Claude returned an empty post");
   // Threads text cap is 500 chars; we aim for <350 but guard anyway.
