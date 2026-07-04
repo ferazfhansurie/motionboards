@@ -49,6 +49,7 @@ SOUND HUMAN (critical):
 - Malay shorthand: x (tak), je, sbb, dgn, tgk, byk, mcm, tp, lg, korg, mmg, dah, ni, kn.
 - Let a real typo slip through about 1 in 4 posts (missed letter, double space) — never so much it's unreadable.
 - Vary length + rhythm. Never formulaic. Real, specific details (numbers, places, tiny moments) beat generic every time.
+- NEVER use em-dashes or en-dashes. Real people texting use commas, full stops, line breaks, or "..." instead. A long dash is a dead giveaway of AI writing.
 
 LINE 1 IS EVERYTHING:
 - Only 2–3 lines show before "more". Open with the strongest thing — a hot-ish take, a relatable gripe, or a specific real moment. No throat-clearing, no "so today I…".
@@ -218,6 +219,14 @@ export async function generateFathopesPost(
   // Strip stray wrapping quotes if the model adds them despite instructions.
   // ([\s\S] instead of a dotAll `.` — this project's TS target predates ES2018)
   text = text.replace(/^["'“]([\s\S]*)["'”]$/, "$1").trim();
+
+  // Kill em/en dashes even if the model slips one through — they read as AI,
+  // and a texting KL voice wouldn't use them. Turn them into commas/spacing.
+  text = text
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*,/g, ",")
+    .trim();
 
   text = removeEarlyAudiencePrompts(text, phase);
   if (phase.dayIndex <= 1) topicTag = undefined;
