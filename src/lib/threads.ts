@@ -46,7 +46,7 @@ THE VOICE (KL / Klang Valley Manglish, @edhash_ energy):
 
 SOUND HUMAN (critical):
 - Often lowercase, don't capitalise every line, sometimes no full stop at the end.
-- Malay shorthand: x (tak), je, sbb, dgn, tgk, byk, mcm, tp, lg, korg, mmg, dah, ni, kn.
+- Malay shorthand: je, sbb, dgn, tgk, byk, mcm, tp, lg, korg, mmg, dah, ni, kn. Do NOT use "x" to mean "tak" or "tidak" — always write "tak" (or "tk"), never a bare "x".
 - Let a real typo slip through about 1 in 4 posts (missed letter, double space) — never so much it's unreadable.
 - Vary length + rhythm. Never formulaic. Real, specific details (numbers, places, tiny moments) beat generic every time.
 - NEVER use em-dashes or en-dashes. Real people texting use commas, full stops, line breaks, or "..." instead. A long dash is a dead giveaway of AI writing.
@@ -224,6 +224,8 @@ export async function generateFathopesPost(
   // and a texting KL voice wouldn't use them. Turn them into commas/spacing.
   text = text
     .replace(/\s*[—–]\s*/g, ", ")
+    // standalone "x" used as Malay "tak" reads as lazy/AI — write it out
+    .replace(/(^|\s)x(?=\s)/g, "$1tak")
     .replace(/\s+,/g, ",")
     .replace(/,\s*,/g, ",")
     .trim();
