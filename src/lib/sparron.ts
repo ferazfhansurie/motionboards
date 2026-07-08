@@ -67,6 +67,13 @@ const MAX_AGE_HOURS = Number(process.env.SPARRON_MAX_AGE_HOURS || 72);
 // How many recent media / posts to scan for comments each run.
 const SCAN = Number(process.env.SPARRON_MEDIA_SCAN || 10);
 
+// Instagram DMs only: when on (default), Sparron replies ONLY to brand-new
+// conversations — first contact from someone we've never messaged. Any IG DM
+// thread we've ever replied in (an "existing person") is left alone. This does
+// NOT affect FB Messenger, IG comments, or FB comments. Flip to "0" to restore
+// full continue-the-conversation behavior on IG DMs.
+const IG_DM_NEW_ONLY = (process.env.SPARRON_IG_DM_NEW_ONLY ?? "1") !== "0";
+
 // ---------------------------------------------------------------------------
 // DB — Neon serverless, same tagged-template pattern as src/lib/db.ts.
 // ---------------------------------------------------------------------------
@@ -405,18 +412,24 @@ async function collectDms(ctx: PageContext, platform: "instagram" | "messenger")
   const out: Candidate[] = [];
   const selfId = platform === "instagram" ? ctx.igId : ctx.pageId;
   const surface: Surface = platform === "instagram" ? "ig_dm" : "fb_dm";
-  // The IG conversations edge is heavy and sometimes rate-errors; ask for ids
-  // only and fetch messages per-conversation. Best-effort — bail quietly.
-  const conv = await graphGet<{ data?: Array<{ id: string }>; error?: GraphError }>(
+  // On IG DMs we optionally reply to NEW conversations only (see IG_DM_NEW_ONLY).
+  // To detect "existing" threads reliably we need message_count (to know when
+  // our reply scrolled out of the fetch window) and a wider message window to
+  // scan for any prior reply of ours.
+  const igNewOnly = platform === "instagram" && IG_DM_NEW_ONLY;
+  const msgLimit = igNewOnly ? "25" : "8";
+  // The IG conversations edge is heavy and sometimes rate-errors; ask for the
+  // minimum and fetch messages per-conversation. Best-effort — bail quietly.
+  const conv = await graphGet<{ data?: Array<{ id: string; message_count?: number }>; error?: GraphError }>(
     `${ctx.pageId}/conversations`,
-    { platform, fields: "id", limit: "20" },
+    { platform, fields: igNewOnly ? "id,message_count" : "id", limit: "20" },
     ctx.pageToken,
   );
   if (conv.error || !conv.data) return out;
   for (const cv of conv.data) {
     const mm = await graphGet<{
       data?: Array<{ id: string; message?: string; created_time?: string; from?: { id?: string; name?: string; username?: string } }>;
-    }>(`${cv.id}/messages`, { fields: "id,message,from,created_time", limit: "8" }, ctx.pageToken);
+    }>(`${cv.id}/messages`, { fields: "id,message,from,created_time", limit: msgLimit }, ctx.pageToken);
     const msgs = mm.data || [];
     if (!msgs.length) continue;
     const last = msgs[0]; // newest first
@@ -424,6 +437,15 @@ async function collectDms(ctx: PageContext, platform: "instagram" | "messenger")
     if (!fromId || fromId === selfId) continue; // we replied last
     const tsMs = parseTs(last.created_time);
     if (!freshEnough(tsMs)) continue;
+    // IG-DM new-only gate: skip anyone we've ever engaged. "Existing" =
+    // we've replied somewhere in the visible window, OR the thread has more
+    // messages than we fetched (older history exists that we can't see, so a
+    // brand-new first-contact it is not).
+    if (igNewOnly) {
+      const weEverReplied = msgs.some((m) => m.from?.id === selfId);
+      const olderBeyondWindow = typeof cv.message_count === "number" && cv.message_count > msgs.length;
+      if (weEverReplied || olderBeyondWindow) continue;
+    }
     // PSID = the participant's id (from the newest inbound message).
     const history = [...msgs]
       .reverse()
@@ -561,15 +583,22 @@ export async function triageAndDraft(c: Candidate): Promise<Triage> {
   return { action, reason: (parsed.reason || "").slice(0, 200), reply };
 }
 
-// Final voice guard, same spirit as the Threads poster: kill dashes, fix bare
-// "x", don't end on a bare full stop. (ES2017 target — no dotAll, use [\s\S].)
+// Final voice guard, same spirit as the Threads poster: kill EVERY long dash,
+// normalise smart quotes, fix bare "x", don't end on a bare full stop, so an
+// auto-reply reads exactly like the owner types. (ES2017 target — no dotAll.)
 export function cleanVoice(text: string): string {
   let t = text.replace(/^["'“]([\s\S]*)["'”]$/, "$1").trim();
+  // Smart/curly quotes -> straight.
+  t = t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
   t = t
-    .replace(/\s*[—–]\s*/g, ", ")
+    // Any long dash (em —, en –, horizontal bar ―, figure
+    // ‒, minus −) OR an ASCII double-hyphen used as a dash -> comma.
+    // Single hyphens inside words (buy-back, e-full) are left untouched.
+    .replace(/\s*(?:--+|[‒–—―−])\s*/g, ", ")
     .replace(/(^|\s)x(?=\s)/g, "$1tak")
     .replace(/\s+,/g, ",")
     .replace(/,\s*,/g, ",")
+    .replace(/^,\s*/, "")
     .trim();
   if (t.endsWith(".") && !t.endsWith("..")) t = t.slice(0, -1).trimEnd();
   return t.slice(0, 900);
