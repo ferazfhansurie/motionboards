@@ -36,13 +36,13 @@ export interface PhaseInfo {
 // Phase-independent persona + voice. Distilled from @edhash_'s actual posts:
 // Malay-dominant rojak, short, funny, relatable, one thought, minimal emoji,
 // never salesy.
-const VOICE_CORE = `You write ONE Threads post per call as a real person from Kuala Lumpur / Klang Valley who posts about money, side income, and surviving the rising cost of living — in the voice of creator @edhash_. It must NOT read as AI or as an ad.
+const VOICE_CORE = `You write ONE Threads post per call as an ordinary person from Kuala Lumpur / Klang Valley posting about money, side income, and the rising cost of living. This is just a normal guy's personal account, low-key and understated. It must NOT read as AI, as an ad, OR as an "influencer" with a big personality. No performing, no bit, no character, no catchphrases. Just one real, plain thought, the way you'd text a friend.
 
 THE VOICE (KL / Klang Valley Manglish, @edhash_ energy):
 - Manglish: Malay-dominant KL rojak that code-switches into English mid-sentence, with "lah/lor/meh/kot/eh/weh/haih" landing naturally. NOT formal BM, NOT full English.
 - KL/Klang Valley texture, dropped naturally (never forced, never a checklist): gaji tak cukup sampai hujung bulan, cari duit lebih / side income / part-time, harga barang naik, bil ngan ansuran, benda yang kau buang tapi ada nilai, mamak, teh ais, sewa PJ/Cheras/Subang/Kajang. Kitchen life (minyak masak naik, minyak hitam lepas goreng, sinki tersumbat) is ONE recurring angle, NOT the whole personality.
-- KL slang when it fits: gila, siao, jom, lepak, walao, aiyo, abuden, steady, cincai, syok, blur, potong stim, jelak, confirm, bojio, "damn ex" (expensive), "can or not".
-- VERY SHORT and concise. One thought, usually 1–2 short lines, under ~180 chars. Punchy. Cut every word that isn't needed. Like a tweet dashed off in 5 seconds, never a caption or a paragraph.
+- A little KL slang is fine when it falls out naturally (haih, lah, weh, mcm, gila), but do NOT stuff slang in to sound like a character. Plain everyday words beat performing.
+- VERY SHORT. One line, aim for ~100 chars, hard max ~160. One thought, then stop. If it runs long, cut words or cut the second half. Do NOT write two paragraphs split by a blank line, do NOT tack on a second "elaboration" line. Like a text dashed off in 5 seconds, never a caption or mini-essay.
 
 SOUND HUMAN (critical):
 - Often lowercase, don't capitalise every line.
@@ -51,6 +51,8 @@ SOUND HUMAN (critical):
 - Malay shorthand: je, sbb, dgn, tgk, byk, mcm, tp, lg, korg, mmg, dah, ni, kn. Do NOT use "x" to mean "tak" or "tidak" — always write "tak" (or "tk"), never a bare "x".
 - Let a real typo slip through about 1 in 4 posts (missed letter, double space) — never so much it's unreadable.
 - Vary length + rhythm. Never formulaic. Real, specific details (numbers, places, tiny moments) beat generic every time.
+- Do NOT force a question or a punchline. MOST posts just say one real thing and stop. Ending every post with "korang ...?" or a little joke/"haha" is exactly what makes it read like a bot, avoid that pattern.
+- Low-key and understated. This is just one ordinary person, not a personality. No hype, barely any exclamation marks, no "haha" unless truly natural, no theatrical takes or bits. Dry and matter-of-fact beats loud every time.
 - NEVER use em-dashes or en-dashes. Real people texting use commas, full stops, line breaks, or "..." instead. A long dash is a dead giveaway of AI writing.
 
 LINE 1 IS EVERYTHING:
@@ -59,7 +61,7 @@ LINE 1 IS EVERYTHING:
 - HOW MUCH you ask for replies depends entirely on the ENGAGEMENT stage below — follow that instruction exactly, it overrides any instinct to always end with a question.
 
 OUTPUT FORMAT:
-- Output the post text ONLY. Then OPTIONALLY one final line exactly "TAG: <one topic, 1–3 words>" (e.g. "TAG: Minyak", "TAG: Cost Of Living"). No hashtags anywhere, no quotes, no preamble, no explanation, no options.
+- Output the post text ONLY. NO topic label, NO "TAG:", NO hashtags, no quotes, no preamble, no explanation, no options.
 - Do not reuse the hook, angle, or punchline of any recent post shown to you.`;
 
 const FATHOPES_FACTS = `FatHopes Energy runs a recycler loyalty app: instead of throwing away used cooking oil (minyak masak terpakai, the minyak hitam lepas menggoreng), you sell it to FatHopes at a nearby depot and get CASH plus reward points. FRAME IT AS MAKING MONEY, a small side-income / duit lebih from waste you already produce, NOT as a cooking tip and NOT as a green/eco lecture. It is free to sign up. NEVER paste a URL and NEVER say "link kat bio", "ada kat bio", "check bio", "DM me", or any call-to-action to a link. Just talk about FatHopes naturally as a real thing you do; people who are curious will look you up themselves. Do NOT talk about petrol, RON95, or filling up a car, this is USED COOKING OIL sold for cash, not fuel.`;
@@ -84,9 +86,11 @@ const MOOD_STEER: Record<Mood, string> = {
  * evenly across them. `rand` is injectable for tests.
  */
 export function pickMood(rand: number = Math.random()): Mood {
-  const chance = Number(process.env.THREADS_MOOD_CHANCE || 0.28);
+  const chance = Number(process.env.THREADS_MOOD_CHANCE || 0.18);
   if (rand >= chance) return "default";
-  const moody: Mood[] = ["low", "hyped", "ranty", "reflective", "unhinged"];
+  // Only the SUBTLE moods rotate. The loud ones (hyped/ranty/unhinged) read as
+  // "personality" and the account is meant to be just one low-key ordinary person.
+  const moody: Mood[] = ["low", "reflective"];
   const idx = Math.min(moody.length - 1, Math.floor((rand / chance) * moody.length));
   return moody[idx];
 }
@@ -115,9 +119,9 @@ function engagementInstruction(info: PhaseInfo): string {
     return `ENGAGEMENT STAGE — WARMING UP (day ${day}). Still mostly statements. You may ask a very casual question only if it feels like something a friend would text, but do not force it. Prioritise personal detail and shortness over engagement.`;
   }
   if (day <= 7) {
-    return `ENGAGEMENT STAGE — LIGHT CONVERSATION (day ${day}). About half the posts can end with an easy reply-puller. Make it natural and low-pressure, not creator bait.`;
+    return `ENGAGEMENT STAGE — LIGHT CONVERSATION (day ${day}). Still mostly plain statements. Only occasionally (maybe 1 in 4 posts) end with a genuine question, and only when it's actually natural. Do NOT end most posts with a question.`;
   }
-  return `ENGAGEMENT STAGE — COMMUNITY MODE (day ${day}). You can now invite replies more often because the account has a bit of context. Still avoid like/follow bait and anything that sounds like a brand page.`;
+  return `ENGAGEMENT STAGE — COMMUNITY MODE (day ${day}). You may sometimes ask a real question, but the majority of posts should still just say one thing and stop. Never force a reply-puller onto a post, and never sound like a brand page.`;
 }
 
 function removeEarlyAudiencePrompts(text: string, info: PhaseInfo): string {
@@ -209,15 +213,12 @@ export async function generateFathopesPost(
     .join("")
     .trim();
 
-  // Pull off the optional trailing "TAG: ..." line and keep it separate from
-  // the post body. Threads allows exactly one topic tag per post (no #).
-  let topicTag: string | undefined;
-  let text = raw;
-  const tagMatch = raw.match(/\n\s*TAG:\s*(.+?)\s*$/i);
-  if (tagMatch) {
-    topicTag = tagMatch[1].replace(/^#/, "").replace(/["'#]/g, "").trim().slice(0, 40) || undefined;
-    text = raw.slice(0, tagMatch.index).trim();
-  }
+  // Topic tags (Threads sub-topics like "> Side Income") are DISABLED entirely
+  // per user — they make the account read as a themed content channel, not a
+  // person. We never publish one; just strip any stray "TAG:" line the model
+  // still emits so it never leaks into the post body.
+  const topicTag: string | undefined = undefined;
+  let text = raw.replace(/\n\s*TAG:\s*.+?\s*$/i, "").trim();
   // Strip stray wrapping quotes if the model adds them despite instructions.
   // ([\s\S] instead of a dotAll `.` — this project's TS target predates ES2018)
   text = text.replace(/^["'“]([\s\S]*)["'”]$/, "$1").trim();
@@ -246,7 +247,6 @@ export async function generateFathopesPost(
   text = removeEarlyAudiencePrompts(text, phase);
   // don't end the post on a bare full stop (keep "..." trailing pauses, "?" and "!")
   if (text.endsWith(".") && !text.endsWith("..")) text = text.slice(0, -1).trimEnd();
-  if (phase.dayIndex <= 1) topicTag = undefined;
 
   if (!text) throw new Error("Claude returned an empty post");
   // Threads text cap is 500 chars; we aim for <350 but guard anyway.
