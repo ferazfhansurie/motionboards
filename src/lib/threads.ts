@@ -62,7 +62,7 @@ OUTPUT FORMAT:
 - Output the post text ONLY. Then OPTIONALLY one final line exactly "TAG: <one topic, 1–3 words>" (e.g. "TAG: Minyak", "TAG: Cost Of Living"). No hashtags anywhere, no quotes, no preamble, no explanation, no options.
 - Do not reuse the hook, angle, or punchline of any recent post shown to you.`;
 
-const FATHOPES_FACTS = `FatHopes Energy runs a recycler loyalty app: instead of throwing away used cooking oil (minyak masak terpakai, the minyak hitam lepas menggoreng), you sell it to FatHopes at a nearby depot and get CASH plus reward points. FRAME IT AS MAKING MONEY, a small side-income / duit lebih from waste you already produce, NOT as a cooking tip and NOT as a green/eco lecture. It is free to sign up. The signup link lives in bio, so posts NEVER paste a URL, at most "link kat bio" / "ada kat bio". Do NOT talk about petrol, RON95, or filling up a car, this is USED COOKING OIL sold for cash, not fuel.`;
+const FATHOPES_FACTS = `FatHopes Energy runs a recycler loyalty app: instead of throwing away used cooking oil (minyak masak terpakai, the minyak hitam lepas menggoreng), you sell it to FatHopes at a nearby depot and get CASH plus reward points. FRAME IT AS MAKING MONEY, a small side-income / duit lebih from waste you already produce, NOT as a cooking tip and NOT as a green/eco lecture. It is free to sign up. NEVER paste a URL and NEVER say "link kat bio", "ada kat bio", "check bio", "DM me", or any call-to-action to a link. Just talk about FatHopes naturally as a real thing you do; people who are curious will look you up themselves. Do NOT talk about petrol, RON95, or filling up a car, this is USED COOKING OIL sold for cash, not fuel.`;
 
 // The account behaves like a person with moods, not a content machine. MOST
 // posts are the steady baseline voice; every so often a mood colours the post
@@ -99,11 +99,11 @@ function phaseInstruction(info: PhaseInfo): string {
   }
   if (info.phase === "intro") {
     if (info.mentionFathopes) {
-      return `CAMPAIGN PHASE — SOFT INTRO (day ${day}). Still a relatable money / side-income person, NOT an ad. In THIS post, mention FatHopes CASUALLY as one small way you started making extra money: you now SELL your used cooking oil instead of buang it. Weave it into a real money moment, framed as duit lebih, not a hard sell. You may say "link kat bio" once, lightly.\n\n${FATHOPES_FACTS}`;
+      return `CAMPAIGN PHASE — SOFT INTRO (day ${day}). Still a relatable money / side-income person, NOT an ad. In THIS post, mention FatHopes CASUALLY as one small way you started making extra money: you now SELL your used cooking oil instead of buang it. Weave it into a real money moment, framed as duit lebih, not a hard sell. Do NOT say "link kat bio" or point to any link.\n\n${FATHOPES_FACTS}`;
     }
     return `CAMPAIGN PHASE — SOFT INTRO (day ${day}). Post general relatable MONEY content (cost of living, gaji tak cukup, side income, saving hacks, duit lebih). DO NOT mention FatHopes in this particular post — keep building trust between the plugs.`;
   }
-  return `CAMPAIGN PHASE — FATHOPES FORWARD (day ${day}). Now talk about FatHopes more directly, still the same voice, still hook-first and relatable, framed as EXTRA MONEY: the used cooking oil you normally buang boleh dijual dapat duit + points, free sign up, depot berdekatan. Vary the angle: duit lebih from something you buang / how much money you throw away every month / kenapa tak buat dari dulu / side-income flex / member rec. "link kat bio".\n\n${FATHOPES_FACTS}`;
+  return `CAMPAIGN PHASE — FATHOPES FORWARD (day ${day}). Now talk about FatHopes more directly, still the same voice, still hook-first and relatable, framed as EXTRA MONEY: the used cooking oil you normally buang boleh dijual dapat duit + points, free sign up, depot berdekatan. Vary the angle: duit lebih from something you buang / how much money you throw away every month / kenapa tak buat dari dulu / side-income flex / member rec. Do NOT say "link kat bio" or point to any link, just talk about it naturally.\n\n${FATHOPES_FACTS}`;
 }
 
 function engagementInstruction(info: PhaseInfo): string {
@@ -230,6 +230,17 @@ export async function generateFathopesPost(
     .replace(/(^|\s)x(?=\s)/g, "$1tak")
     .replace(/\s+,/g, ",")
     .replace(/,\s*,/g, ",")
+    .trim();
+
+  // Belt-and-suspenders: the account wants NO "link in bio" CTA and no URLs.
+  // Strip the common phrasings if the model slips one in, then tidy spacing.
+  text = text
+    .replace(/\s*[,.]?\s*(?:link|links)\s*(?:kat|kt|dalam|dlm|dekat|dkt|in)?\s*bio\b[.!]*/gi, "")
+    .replace(/\s*[,.]?\s*ada\s*(?:kat|kt|dalam|dlm)?\s*bio\b[.!]*/gi, "")
+    .replace(/\s*[,.]?\s*(?:cek|check)\s*(?:kat|kt|dalam|dlm)?\s*bio\b[.!]*/gi, "")
+    .replace(/\bhttps?:\/\/\S+/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([.!?,])/g, "$1")
     .trim();
 
   text = removeEarlyAudiencePrompts(text, phase);
