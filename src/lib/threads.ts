@@ -101,13 +101,12 @@ function phaseInstruction(info: PhaseInfo): string {
   if (info.phase === "audience") {
     return `CAMPAIGN PHASE — AUDIENCE BUILDING (day ${day}). You are NOT promoting anything. Post relatable MONEY content for Malaysians: cost of living, gaji tak cukup sampai hujung bulan, harga barang naik, small ways to earn or save extra (side income, part-time, jual barang, cashback, duit lebih hacks), tiny money wins and Ls. Kitchen/cooking money moments are FINE as one occasional angle, NOT every post. Be relatable to anyone chasing extra income, not just people who cook. DO NOT mention FatHopes or any single branded app. NO "link kat bio". Pure relatability + value. Vary the angle each day.`;
   }
-  if (info.phase === "intro") {
-    if (info.mentionFathopes) {
-      return `CAMPAIGN PHASE — SOFT INTRO (day ${day}). Still a relatable money / side-income person, NOT an ad. In THIS post, mention FatHopes CASUALLY as one small way you started making extra money: you now SELL your used cooking oil instead of buang it. Weave it into a real money moment, framed as duit lebih, not a hard sell. Do NOT say "link kat bio" or point to any link.\n\n${FATHOPES_FACTS}`;
-    }
-    return `CAMPAIGN PHASE — SOFT INTRO (day ${day}). Post general relatable MONEY content (cost of living, gaji tak cukup, side income, saving hacks, duit lebih). DO NOT mention FatHopes in this particular post — keep building trust between the plugs.`;
+  // intro + fathopes phases: this is a relatable KL money/life account that only
+  // OCCASIONALLY, and lightly, mentions FatHopes. Most posts are NOT about it.
+  if (info.mentionFathopes) {
+    return `CAMPAIGN PHASE — OCCASIONAL MENTION (day ${day}). You are a relatable KL money-and-life person, NOT an ad and NOT a FatHopes account. This is one of the rare posts that mentions FatHopes. Do it LIGHTLY: a small side-note dropped into a real money or cooking moment, e.g. you sell your used cooking oil for a bit of extra cash instead of buang. ONE casual line max, not the point of the post, not a flex, not a hard sell, no "kenapa tak buat dari dulu" energy. Do NOT say "link kat bio".\n\n${FATHOPES_FACTS}`;
   }
-  return `CAMPAIGN PHASE — FATHOPES FORWARD (day ${day}). Now talk about FatHopes more directly, still the same voice, still hook-first and relatable, framed as EXTRA MONEY: the used cooking oil you normally buang boleh dijual dapat duit + points, free sign up, depot berdekatan. Vary the angle: duit lebih from something you buang / how much money you throw away every month / kenapa tak buat dari dulu / side-income flex / member rec. Do NOT say "link kat bio" or point to any link, just talk about it naturally.\n\n${FATHOPES_FACTS}`;
+  return `CAMPAIGN PHASE — RELATABLE, NO BRAND (day ${day}). Post relatable MONEY / everyday-life content for Malaysians: cost of living, gaji tak cukup sampai hujung bulan, harga barang naik, side income, saving hacks, small money wins and Ls, the odd kitchen/cooking moment. DO NOT mention FatHopes or ANY brand in this post at all. The account is mostly NOT about FatHopes, keep it real and relatable.`;
 }
 
 function engagementInstruction(info: PhaseInfo): string {
@@ -157,11 +156,15 @@ export function resolvePhase(now: Date = new Date()): PhaseInfo {
   const nowDay = Math.floor(now.getTime() / dayMs);
   const dayIndex = Math.max(0, nowDay - startDay);
 
+  // FatHopes is mentioned only OCCASIONALLY and lightly — the account is mostly
+  // relatable money/life content, not a FatHopes channel. Mention chance is
+  // decided per post (tunable via THREADS_MENTION_CHANCE).
+  const introChance = Number(process.env.THREADS_MENTION_CHANCE_INTRO || 0.2);
+  const fwdChance = Number(process.env.THREADS_MENTION_CHANCE || 0.33);
   if (dayIndex < audienceDays) return { phase: "audience", dayIndex, mentionFathopes: false };
   if (dayIndex < audienceDays + introDays)
-    // In the intro window, plug FatHopes roughly every other day.
-    return { phase: "intro", dayIndex, mentionFathopes: dayIndex % 2 === 1 };
-  return { phase: "fathopes", dayIndex, mentionFathopes: true };
+    return { phase: "intro", dayIndex, mentionFathopes: Math.random() < introChance };
+  return { phase: "fathopes", dayIndex, mentionFathopes: Math.random() < fwdChance };
 }
 
 export interface GeneratedPost {
