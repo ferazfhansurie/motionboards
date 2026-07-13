@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken, isAdmin, renameAsset, deleteAsset, updateAssetStatus, type AssetStatus } from "@/lib/db";
+import { getUserFromToken, isAdmin, renameAsset, deleteAsset, updateAssetStatus, addAssetPhotos, type AssetStatus } from "@/lib/db";
 
 // PATCH handles two cases:
 //   - operator resolves a request: body { status, assetId?, adminNote? } (admin only)
@@ -14,8 +14,14 @@ export async function PATCH(
     const user = await getUserFromToken(token);
     if (!user) return NextResponse.json({ error: "Session expired" }, { status: 401 });
     const { id } = await params;
-    const body = (await req.json()) as { name?: string; status?: string; assetId?: string | null; adminNote?: string };
+    const body = (await req.json()) as { name?: string; status?: string; assetId?: string | null; adminNote?: string; addPhotoIds?: string[] };
     const admin = isAdmin(user);
+
+    if (Array.isArray(body.addPhotoIds) && body.addPhotoIds.length > 0) {
+      const asset = await addAssetPhotos(id, body.addPhotoIds, user.id, admin);
+      if (!asset) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ asset });
+    }
 
     if (body.status) {
       if (!admin) return NextResponse.json({ error: "Admin access required" }, { status: 403 });

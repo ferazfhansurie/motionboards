@@ -120,13 +120,18 @@ export async function getUserById(id: string): Promise<User | undefined> {
   return rows.length > 0 ? rowToUser(rows[0]) : undefined;
 }
 
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  const rows = await sql`SELECT * FROM mb_users WHERE LOWER(email) = LOWER(${email})`;
+  return rows.length > 0 ? rowToUser(rows[0]) : undefined;
+}
+
 // Operator emails with access to the admin surfaces (logs, registered users,
 // the real-human asset request queue). Kept alongside the `role === "admin"`
 // DB flag — any match grants access, so owner emails work out-of-the-box
 // without a DB update. ADMIN_EMAIL stays a single value for back-compat
 // (funnel exclusion references it); ADMIN_EMAILS is the full allowlist.
 export const ADMIN_EMAIL = "hello@adleticagency.com";
-export const ADMIN_EMAILS = [ADMIN_EMAIL, "faeez@fathopesenergy.com"];
+export const ADMIN_EMAILS = [ADMIN_EMAIL, "faeez@fathopesenergy.com", "admin@adleticagency.com"];
 
 export function isAdmin(user: User | null | undefined): boolean {
   if (!user) return false;
@@ -2056,6 +2061,53 @@ export async function updateAssetStatus(
     RETURNING id
   `;
   return rows.length > 0;
+}
+
+// Operator imports an EXISTING ByteDance asset group (already verified on the
+// console) straight into a target user's library as Ready — no request step.
+// This is how pre-made groups (e.g. Faeez's) appear for the linked account.
+export async function adminCreateAsset(
+  targetUserId: string,
+  opts: { name: string; assetId: string; refPhotoIds?: string[]; note?: string }
+): Promise<MbAsset> {
+  await ensureAssetsTable();
+  const id = `as_${Date.now()}_${randomBytes(4).toString("hex")}`;
+  const safeName = (opts.name || "Untitled").toString().slice(0, 80);
+  const safeAssetId = (opts.assetId || "").toString().slice(0, 200);
+  const photos = JSON.stringify((opts.refPhotoIds || []).slice(0, 12));
+  const thumb = (opts.refPhotoIds && opts.refPhotoIds[0]) || null;
+  const safeNote = (opts.note || "").toString().slice(0, 1000);
+  const rows = await sql`
+    INSERT INTO mb_assets (id, user_id, name, status, asset_id, asset_type, thumb_file_id, ref_photo_ids, admin_note)
+    VALUES (${id}, ${targetUserId}, ${safeName}, 'completed', ${safeAssetId}, 'real-human', ${thumb}, ${photos}, ${safeNote})
+    RETURNING *
+  `;
+  return rowToAsset(rows[0]);
+}
+
+// Append reference photos to an existing group asset (owner, or operator for
+// any). Merges + de-dupes, caps at 12. Note: this updates the MotionBoards
+// record only — the actual ByteDance group's photos are managed on the console.
+export async function addAssetPhotos(
+  id: string,
+  photoIds: string[],
+  userId: string,
+  isAdminUser = false
+): Promise<MbAsset | null> {
+  await ensureAssetsTable();
+  const rows = isAdminUser
+    ? await sql`SELECT * FROM mb_assets WHERE id = ${id}`
+    : await sql`SELECT * FROM mb_assets WHERE id = ${id} AND user_id = ${userId}`;
+  if (rows.length === 0) return null;
+  const current = parsePhotoIds(rows[0].ref_photo_ids);
+  const merged = Array.from(new Set([...current, ...photoIds.filter((x) => typeof x === "string")])).slice(0, 12);
+  const thumb = (rows[0].thumb_file_id as string) || merged[0] || null;
+  const updated = await sql`
+    UPDATE mb_assets SET ref_photo_ids = ${JSON.stringify(merged)}, thumb_file_id = ${thumb}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rowToAsset(updated[0]);
 }
 
 export async function deleteAsset(id: string, userId: string, isAdminUser = false): Promise<boolean> {

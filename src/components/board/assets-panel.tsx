@@ -14,6 +14,7 @@ import {
   XCircle,
   Inbox,
   ImagePlus,
+  FolderPlus,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { askConfirm, askPrompt, showToast, updateToast } from "@/lib/ui-store";
@@ -51,6 +52,24 @@ export function AssetReadyNotifier() {
   return null;
 }
 
+// Upload image files to /api/upload and return their file ids.
+async function uploadImages(files: FileList | File[], max = 12): Promise<string[]> {
+  const list = Array.from(files).slice(0, max);
+  const ids: string[] = [];
+  for (const file of list) {
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "content-type": file.type || "application/octet-stream", "x-filename": file.name },
+      body: file,
+    }).then((r) => r.json()).catch(() => null);
+    if (res?.url) {
+      const id = (res.url as string).split("/").pop();
+      if (id) ids.push(id);
+    }
+  }
+  return ids;
+}
+
 type AssetStatus = "pending" | "completed" | "failed";
 
 interface Asset {
@@ -70,7 +89,7 @@ interface Asset {
 
 // Operators who see the fulfillment queue. Mirrors ADMIN_EMAILS in db.ts —
 // server enforces the real check; this only decides whether to show the tab.
-const ADMIN_EMAILS = ["hello@adleticagency.com", "faeez@fathopesenergy.com"];
+const ADMIN_EMAILS = ["hello@adleticagency.com", "faeez@fathopesenergy.com", "admin@adleticagency.com"];
 const MODELARK_CONSOLE_URL = "https://console.byteplus.com/ark";
 const MODELARK_GUIDE_URL = "https://docs.byteplus.com/en/docs/ModelArk/2315856";
 
@@ -98,6 +117,40 @@ export function AssetsPanel() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [addGroupOpen, setAddGroupOpen] = useState(false);
+  const photoTargetRef = useRef<{ id: string; from: "mine" | "queue" } | null>(null);
+  const addPhotosInputRef = useRef<HTMLInputElement>(null);
+
+  // Append photos to an existing group asset (own asset, or any as operator).
+  function triggerAddPhotos(id: string, from: "mine" | "queue") {
+    photoTargetRef.current = { id, from };
+    addPhotosInputRef.current?.click();
+  }
+  async function onAddPhotosPicked(files: FileList) {
+    const target = photoTargetRef.current;
+    if (!target || files.length === 0) return;
+    setBusy(true);
+    const toastId = showToast("Uploading photos…", { kind: "loading" });
+    try {
+      const ids = await uploadImages(files);
+      if (ids.length === 0) { updateToast(toastId, { kind: "error", message: "Upload failed." }); return; }
+      const res = await fetch(`/api/assets/${target.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addPhotoIds: ids }),
+      }).then((r) => r.json());
+      if (res?.asset) {
+        const apply = (prev: Asset[]) => prev.map((a) => (a.id === target.id ? { ...a, refPhotoIds: res.asset.refPhotoIds, thumbFileId: res.asset.thumbFileId } : a));
+        setMine(apply);
+        setQueue(apply);
+        updateToast(toastId, { kind: "success", message: `Added ${ids.length} photo${ids.length === 1 ? "" : "s"}.` });
+      } else {
+        updateToast(toastId, { kind: "error", message: res?.error || "Failed." });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function loadMine() {
     setLoading(true);
@@ -278,6 +331,7 @@ export function AssetsPanel() {
                         )}
                       </div>
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                        <button onClick={() => triggerAddPhotos(a.id, "mine")} disabled={busy} title="Add photos" className={`rounded p-1 ${sub} hover:text-[#f26522]`}><ImagePlus className="h-3.5 w-3.5" /></button>
                         <button onClick={() => renameAsset(a)} title="Rename" className={`rounded p-1 ${sub} hover:text-[#f26522]`}><Pencil className="h-3.5 w-3.5" /></button>
                         <button onClick={() => removeAsset(a.id)} title="Delete" className={`rounded p-1 ${sub} hover:text-red-500`}><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
@@ -287,15 +341,25 @@ export function AssetsPanel() {
               </div>
             </>
           ) : (
-            <QueueView
-              queue={queue}
-              loading={loading}
-              busy={busy}
-              isDark={isDark}
-              onMarkReady={markReady}
-              onMarkFailed={markFailed}
-              onDelete={(id) => removeAsset(id, true)}
-            />
+            <>
+              <button
+                onClick={() => setAddGroupOpen(true)}
+                disabled={busy}
+                className={`mb-2 flex w-full items-center gap-2 rounded-xl border border-dashed px-3 py-3 text-[12px] font-semibold transition-colors ${isDark ? "border-gray-800 text-gray-300 hover:border-[#f26522] hover:text-[#f26522]" : "border-gray-200 text-gray-600 hover:border-[#f26522] hover:text-[#f26522]"}`}
+              >
+                <FolderPlus className="h-4 w-4" /> Add existing group
+              </button>
+              <QueueView
+                queue={queue}
+                loading={loading}
+                busy={busy}
+                isDark={isDark}
+                onMarkReady={markReady}
+                onMarkFailed={markFailed}
+                onDelete={(id) => removeAsset(id, true)}
+                onAddPhotos={(id) => triggerAddPhotos(id, "queue")}
+              />
+            </>
           )}
         </div>
 
@@ -304,6 +368,16 @@ export function AssetsPanel() {
         </div>
       </div>
 
+      {/* Shared hidden input for "add photos" on any asset row. */}
+      <input
+        ref={addPhotosInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => { if (e.target.files) onAddPhotosPicked(e.target.files); e.target.value = ""; }}
+      />
+
       {wizardOpen && (
         <RequestWizard
           isDark={isDark}
@@ -311,12 +385,23 @@ export function AssetsPanel() {
           onCreated={(asset) => { setMine((prev) => [asset, ...prev]); setWizardOpen(false); }}
         />
       )}
+
+      {addGroupOpen && (
+        <AddGroupModal
+          isDark={isDark}
+          onClose={() => setAddGroupOpen(false)}
+          onCreated={(asset) => {
+            setQueue((prev) => [asset, ...prev]);
+            setAddGroupOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function QueueView({
-  queue, loading, busy, isDark, onMarkReady, onMarkFailed, onDelete,
+  queue, loading, busy, isDark, onMarkReady, onMarkFailed, onDelete, onAddPhotos,
 }: {
   queue: Asset[];
   loading: boolean;
@@ -325,6 +410,7 @@ function QueueView({
   onMarkReady: (a: Asset, assetId: string) => void;
   onMarkFailed: (a: Asset) => void;
   onDelete: (id: string) => void;
+  onAddPhotos: (id: string) => void;
 }) {
   const text = isDark ? "text-white" : "text-[#0d1117]";
   const sub = isDark ? "text-gray-500" : "text-gray-400";
@@ -348,6 +434,7 @@ function QueueView({
           onMarkReady={onMarkReady}
           onMarkFailed={onMarkFailed}
           onDelete={onDelete}
+          onAddPhotos={onAddPhotos}
           isDark={isDark}
         />
       ))}
@@ -356,7 +443,7 @@ function QueueView({
 }
 
 function QueueItem({
-  a, busy, text, sub, card, inputCls, onMarkReady, onMarkFailed, onDelete, isDark,
+  a, busy, text, sub, card, inputCls, onMarkReady, onMarkFailed, onDelete, onAddPhotos, isDark,
 }: {
   a: Asset;
   busy: boolean;
@@ -367,6 +454,7 @@ function QueueItem({
   onMarkReady: (a: Asset, assetId: string) => void;
   onMarkFailed: (a: Asset) => void;
   onDelete: (id: string) => void;
+  onAddPhotos: (id: string) => void;
   isDark: boolean;
 }) {
   const [assetId, setAssetId] = useState(a.assetId || "");
@@ -378,15 +466,21 @@ function QueueItem({
       </div>
       <p className={`mb-2 truncate text-[10px] ${sub}`}>{a.requesterEmail || a.requesterName || "Unknown requester"}</p>
 
-      {a.refPhotoIds.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {a.refPhotoIds.map((fid) => (
-            <a key={fid} href={`/api/files/${fid}`} target="_blank" rel="noopener noreferrer" title="Open full size">
-              <img src={`/api/files/${fid}`} alt="" className="h-14 w-14 rounded-lg object-cover" />
-            </a>
-          ))}
-        </div>
-      )}
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {a.refPhotoIds.map((fid) => (
+          <a key={fid} href={`/api/files/${fid}`} target="_blank" rel="noopener noreferrer" title="Open full size">
+            <img src={`/api/files/${fid}`} alt="" className="h-14 w-14 rounded-lg object-cover" />
+          </a>
+        ))}
+        <button
+          onClick={() => onAddPhotos(a.id)}
+          disabled={busy}
+          title="Add photos to this group"
+          className={`flex h-14 w-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed text-[8px] font-semibold ${isDark ? "border-gray-700 text-gray-500 hover:border-[#f26522] hover:text-[#f26522]" : "border-gray-300 text-gray-400 hover:border-[#f26522] hover:text-[#f26522]"}`}
+        >
+          <ImagePlus className="h-4 w-4" /> Add
+        </button>
+      </div>
       {a.note && <p className={`mb-2 text-[10px] italic ${sub}`}>&ldquo;{a.note}&rdquo;</p>}
 
       {a.status === "completed" ? (
@@ -424,6 +518,119 @@ function QueueItem({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Operator: import an already-verified ByteDance group into a target account.
+function AddGroupModal({
+  isDark, onClose, onCreated,
+}: {
+  isDark: boolean;
+  onClose: () => void;
+  onCreated: (asset: Asset) => void;
+}) {
+  const [email, setEmail] = useState("admin@adleticagency.com");
+  const [name, setName] = useState("");
+  const [assetId, setAssetId] = useState("");
+  const [photoIds, setPhotoIds] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const card = isDark ? "bg-[#0d1117] border-gray-800" : "bg-white border-gray-200";
+  const text = isDark ? "text-white" : "text-[#0d1117]";
+  const sub = isDark ? "text-gray-400" : "text-gray-500";
+  const inputCls = `w-full rounded-lg border px-3 py-2 text-[12px] outline-none ${isDark ? "bg-[#161b22] border-gray-800 text-white placeholder:text-gray-600 focus:border-[#f26522]" : "bg-white border-gray-200 text-[#0d1117] placeholder:text-gray-400 focus:border-[#f26522]"}`;
+
+  async function pickPhotos(files: FileList) {
+    setUploading(true);
+    try {
+      const ids = await uploadImages(files, 12 - photoIds.length);
+      setPhotoIds((prev) => [...prev, ...ids].slice(0, 12));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function submit() {
+    if (!email.trim()) { showToast("Enter the account email to link to.", { kind: "error" }); return; }
+    if (!assetId.trim()) { showToast("Paste the asset_id.", { kind: "error" }); return; }
+    setSaving(true);
+    const toastId = showToast("Adding group…", { kind: "loading" });
+    try {
+      const res = await fetch("/api/assets/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), name: name.trim() || "Untitled", assetId: assetId.trim(), refPhotoIds: photoIds }),
+      }).then((r) => r.json());
+      if (res?.asset) {
+        updateToast(toastId, { kind: "success", message: `Group linked to ${email.trim()}.` });
+        onCreated(res.asset);
+      } else {
+        updateToast(toastId, { kind: "error", message: res?.error || "Could not add." });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className={`w-full max-w-[420px] rounded-2xl border p-5 ${card}`} onClick={(e) => e.stopPropagation()} style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className={`flex items-center gap-2 text-[15px] font-bold ${text}`}><FolderPlus className="h-4 w-4 text-[#f26522]" /> Add existing group</h3>
+          <button className={`rounded-lg p-1 ${sub} hover:opacity-70`} onClick={onClose}><X className="h-4 w-4" /></button>
+        </div>
+        <p className={`mb-4 text-[12px] leading-relaxed ${sub}`}>
+          Import a group you already verified on the ByteDance console. It&apos;s added as <span className="font-semibold text-emerald-500">Ready</span> and
+          linked to the account below, so it shows in that account&apos;s Cast picker.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className={`mb-1 block text-[11px] font-semibold ${sub}`}>Link to account (email)</label>
+            <input className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@adleticagency.com" />
+          </div>
+          <div>
+            <label className={`mb-1 block text-[11px] font-semibold ${sub}`}>Character name</label>
+            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Aisyatun" />
+          </div>
+          <div>
+            <label className={`mb-1 block text-[11px] font-semibold ${sub}`}>ByteDance asset_id</label>
+            <input className={`${inputCls} font-mono`} value={assetId} onChange={(e) => setAssetId(e.target.value)} placeholder="asset-2026..." />
+          </div>
+          <div>
+            <label className={`mb-1 block text-[11px] font-semibold ${sub}`}>Reference photos (optional)</label>
+            {photoIds.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {photoIds.map((id) => (
+                  <div key={id} className="relative">
+                    <img src={`/api/files/${id}`} alt="" className="h-14 w-14 rounded-lg object-cover" />
+                    <button onClick={() => setPhotoIds((prev) => prev.filter((x) => x !== id))} className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5 text-white"><X className="h-2.5 w-2.5" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading || photoIds.length >= 12}
+              className={`flex w-full items-center justify-center gap-2 rounded-lg border border-dashed py-3 text-[11px] font-semibold ${isDark ? "border-gray-800 text-gray-400 hover:border-[#f26522]" : "border-gray-200 text-gray-500 hover:border-[#f26522]"} disabled:opacity-50`}
+            >
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+              {photoIds.length > 0 ? "Add more photos" : "Upload photos"}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) pickPhotos(e.target.files); e.target.value = ""; }} />
+          </div>
+          <button
+            onClick={submit}
+            disabled={saving || !email.trim() || !assetId.trim()}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#f26522] px-4 py-2.5 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Add group"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
