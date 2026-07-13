@@ -347,6 +347,50 @@ export const models: AIModel[] = [
 **Limit:** 8s only — that's the model's max output. For longer sequences, chain S2E clips.`,
   },
 
+  {
+    id: "gemini-omni-flash-preview",
+    name: "Gemini Omni Flash T2V",
+    provider: "gemini", type: "t2v", category: "Video",
+    description: "Google's Gemini Omni Flash — fast conversational text-to-video with native audio. 720p, 3-10s.",
+    cost: "~RM2.50", creditCost: 250, speed: "~1m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Video description" },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s", "10s"], default: "8s", label: "Duration (target)" },
+      resolution: { values: ["720p"], default: "720p", label: "Resolution" },
+    },
+    guide: `**Gemini Omni Flash — Google's fast, conversational video model.** Text (and optionally an image) in, a short 720p clip with native audio out. Runs on the new Interactions API.
+
+**Prompt patterns:**
+- Describe a single continuous shot: "A marble rolling fast on a chain-reaction track, continuous smooth camera follow."
+- Native audio is always on — mention the sound you want ("gentle rain, distant thunder") right in the prompt.
+- No separate negative-prompt field — fold negatives into the text ("no text overlays, no watermark").
+
+**Specs:** 720p, 24 FPS, ~3-10s. Duration is a target, not a hard guarantee (the model picks the natural length). Aspect ratio 16:9 or 9:16.
+
+**Preview model:** it's fast and cheap for iteration; for locked hero shots, Veo 3.1 Fast / Seedance 2.0 Pro give more control.`,
+  },
+
+  {
+    id: "gemini-omni-flash-preview/i2v",
+    name: "Gemini Omni Flash I2V",
+    provider: "gemini", type: "i2v", category: "Video",
+    description: "Gemini Omni Flash image-to-video — animate a still with native audio. 720p, up to 10s.",
+    cost: "~RM2.50", creditCost: 250, speed: "~1m", stable: true,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How to animate the image" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate", maxMB: 20 },
+    ],
+    options: {
+      aspect_ratio: { values: ["16:9", "9:16"], default: "16:9", label: "Aspect Ratio" },
+      duration: { values: ["4s", "6s", "8s", "10s"], default: "8s", label: "Duration (target)" },
+      resolution: { values: ["720p"], default: "720p", label: "Resolution" },
+    },
+    guide: `**Gemini Omni Flash image-to-video.** Feed a still + a motion description; it animates into a short 720p clip with native audio. Describe the MOTION, not the scene (the scene is the image): "slow push-in, hair drifting in the breeze, ambient street noise". Duration is a target (~3-10s), not guaranteed.`,
+  },
+
   // ────────────────────────────────────────────────────────────────────
   // Seedance 2.0 Pro — Dreamina direct (ByteDance Ark). Same model the
   // Replicate entries above route to, but called directly. Cheaper at

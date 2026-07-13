@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
     // already set the flag keep working unchanged.
     if (!geminiVideo && !openaiVideo && !replicateVideo && !byteplusVideo && !comfyVideo && modelId) {
       const m = modelId.toLowerCase();
-      if (/^veo-/.test(m)) geminiVideo = "true";
+      if (/^veo-/.test(m) || /gemini-omni-flash/.test(m)) geminiVideo = "true";
       else if (/^dreamina-seedance/.test(m)) byteplusVideo = "true";
       else if (/^sora/.test(m) || /^gpt-video/.test(m)) openaiVideo = "true";
       else if (/^comfy/.test(m)) comfyVideo = "true";
@@ -123,6 +123,55 @@ export async function GET(req: NextRequest) {
               googleAuthOptions: { credentials: JSON.parse(gcpServiceAccount!) },
             })
           : new GoogleGenAI({ apiKey: veoApiKey });
+
+        // Gemini Omni Flash polls the Interactions API, not the operations API.
+        // (It came in through the same geminiVideo poll flag.)
+        if (/gemini-omni-flash/.test(modelId || "")) {
+          const omniAi = veoApiKey ? new GoogleGenAI({ apiKey: veoApiKey }) : ai;
+          const interaction = await omniAi.interactions.get(requestId) as unknown as {
+            status: string;
+            outputs?: Array<{ type: string; data?: string; uri?: string; mime_type?: string }>;
+          };
+
+          if (interaction.status === "completed") {
+            const vid = (interaction.outputs || []).find((o) => o.type === "video");
+            if (vid && (vid.data || vid.uri)) {
+              let outputUrl: string;
+              try {
+                if (vid.data) {
+                  const buffer = Buffer.from(vid.data, "base64");
+                  const { id } = await putFile(buffer, vid.mime_type || "video/mp4", user.id);
+                  outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
+                } else {
+                  outputUrl = vid.uri!;
+                  const r = await fetch(vid.uri!);
+                  if (r.ok) {
+                    const buffer = Buffer.from(await r.arrayBuffer());
+                    const { id } = await putFile(buffer, r.headers.get("content-type") || "video/mp4", user.id);
+                    outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
+                  }
+                }
+              } catch (storeErr) {
+                console.error("Failed to store Omni Flash video:", storeErr);
+                outputUrl = vid.uri || "";
+              }
+              const charge = await chargeForGeneration({ userId: user.id, generationId, modelId, durationSec, resolution: resolutionParam });
+              const costDisplay = `RM${(charge.totalCredits / 100).toFixed(2)}`;
+              await finalizeGeneration(generationId, { status: "completed", outputUrl });
+              return NextResponse.json({ status: "completed", outputUrl, actualCost: costDisplay });
+            }
+            await finalizeGeneration(generationId, { status: "failed", error: "Omni Flash returned no video. Rephrase the prompt or try again." });
+            return NextResponse.json({ status: "failed", error: "Omni Flash returned no video. Rephrase the prompt or try again." });
+          }
+          if (["failed", "cancelled", "incomplete"].includes(interaction.status)) {
+            const msg = interaction.status === "incomplete"
+              ? "Omni Flash stopped early. Try a shorter or clearer prompt."
+              : "Omni Flash generation failed. Try again or rephrase.";
+            await finalizeGeneration(generationId, { status: "failed", error: msg });
+            return NextResponse.json({ status: "failed", error: msg });
+          }
+          return NextResponse.json({ status: "processing", log: "Generating video..." });
+        }
 
         // Poll using operation name stored in requestId
         const opStub = new GenerateVideosOperation();

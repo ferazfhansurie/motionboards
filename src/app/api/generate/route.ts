@@ -715,6 +715,43 @@ export async function POST(req: NextRequest) {
             videoConfig.lastFrame = { imageBytes: lastBuffer.toString("base64"), mimeType: lastMime };
           }
 
+          // --- Gemini Omni Flash: uses the Interactions API, not generateVideos.
+          // A background interaction returns an id we poll (reusing the same
+          // geminiVideo poll flag; the status route branches on the model id).
+          if (modelInfo.id.startsWith("gemini-omni-flash")) {
+            // The Interactions endpoint is a Gemini API (AI Studio) surface —
+            // prefer the API key path when one is configured.
+            const omniAi = apiKey ? new GoogleGenAI({ apiKey }) : ai;
+            const aspect = (input.aspect_ratio as string) || modelInfo.options?.aspect_ratio?.default;
+            const durSecs = parseInt(((input.duration as string) || modelInfo.options?.duration?.default || "8s").toString().replace("s", ""));
+
+            // Multimodal input: optional image (I2V) + the text prompt. Reuse the
+            // image bytes already fetched above for I2V.
+            const omniInput: Array<Record<string, unknown>> = [];
+            if (imageInput) {
+              omniInput.push({ type: "image", data: imageInput.imageBytes, mime_type: imageInput.mimeType });
+            }
+            omniInput.push({ type: "text", text: prompt?.trim() || "Generate a video" });
+
+            const omniModelId = modelId.replace(/\/(i2v|s2e)$/, "");
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const interaction = await omniAi.interactions.create({
+              model: omniModelId,
+              input: omniInput,
+              background: true,
+              store: true,
+              response_format: { type: "video", aspect_ratio: aspect && aspect !== "auto" ? aspect : undefined, duration_seconds: durSecs, delivery: "uri" },
+            } as any) as unknown as { id: string };
+
+            return NextResponse.json({
+              generationId: generation.id,
+              requestId: interaction.id,
+              modelId,
+              status: "processing",
+              geminiVideo: true,
+            });
+          }
+
           // Strip /i2v, /s2e suffixes — Gemini uses same model for all modes.
           // Vertex AI uses -001 suffix; AI Studio uses -preview suffix.
           let geminiModelId = modelId.replace(/\/(i2v|s2e)$/, "");
