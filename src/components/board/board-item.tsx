@@ -175,11 +175,27 @@ function CopyablePrompt({ prompt, isDark }: { prompt: string; isDark: boolean })
 // Global cache of loaded image URLs — survives component remounts
 const loadedImageCache = new Set<string>();
 
+// Self-heal a video item's aspect ratio from the real video dimensions, the
+// same way images self-correct on <img onLoad>. Keeps the item's on-canvas
+// width and fixes only the height to the true ratio, so copy/paste, resizes, or
+// items created with a mismatched aspect (e.g. the prompt bar's AR setting) can't
+// leave a video squished — there's otherwise no video equivalent of the image fix.
+function correctVideoAspect(v: HTMLVideoElement, item: BoardItem) {
+  if (!v.videoWidth || !v.videoHeight) return;
+  const w = item.width || v.videoWidth;
+  const expectedH = Math.round(w * (v.videoHeight / v.videoWidth));
+  if (Math.abs((item.height || 0) - expectedH) > 2) {
+    useAppStore.getState().updateItem(item.id, { height: expectedH });
+  }
+}
+
 // Inline player for uploaded / dropped video items on the canvas. Same UX
 // as GeneratedVideo: click to play with native controls + audio; click again
 // to pause. Mousedown is swallowed during playback so timeline scrub doesn't
 // trigger the canvas item drag.
-function UploadedVideoPreview({ src, height }: { src: string; height?: number }) {
+function UploadedVideoPreview({ item }: { item: BoardItem }) {
+  const src = item.outputUrl || item.src;
+  const height = item.height;
   const [playing, setPlaying] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -201,6 +217,7 @@ function UploadedVideoPreview({ src, height }: { src: string; height?: number })
     const v = videoRef.current;
     if (!v) return;
     try { if (v.currentTime === 0) v.currentTime = 0.001; } catch { /* ignore */ }
+    correctVideoAspect(v, item);
   };
 
   const togglePlay = (e: React.MouseEvent) => {
@@ -287,6 +304,7 @@ function GeneratedVideo({ item }: { item: BoardItem }) {
     if (!v) return;
     try { if (v.currentTime === 0) v.currentTime = 0.001; } catch { /* ignore */ }
     setLoaded(true);
+    correctVideoAspect(v, item);
   };
 
   const togglePlay = (e: React.MouseEvent) => {
@@ -942,7 +960,7 @@ export function BoardItemCard({
         )}
 
         {item.type === "video" && (
-          <UploadedVideoPreview src={item.outputUrl || item.src} height={item.height} />
+          <UploadedVideoPreview item={item} />
         )}
 
         {item.type === "audio" && (
