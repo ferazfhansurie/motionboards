@@ -184,6 +184,13 @@ function correctVideoAspect(v: HTMLVideoElement, item: BoardItem) {
   if (!v.videoWidth || !v.videoHeight) return;
   const w = item.width || v.videoWidth;
   const expectedH = Math.round(w * (v.videoHeight / v.videoWidth));
+  // TEMP DEBUG — remove after diagnosing paste-distortion
+  console.log("[MB videoAspect]", {
+    id: item.id, type: item.type, outputType: item.outputType,
+    itemW: item.width, itemH: item.height,
+    videoW: v.videoWidth, videoH: v.videoHeight,
+    expectedH, willUpdate: Math.abs((item.height || 0) - expectedH) > 2,
+  });
   if (Math.abs((item.height || 0) - expectedH) > 2) {
     useAppStore.getState().updateItem(item.id, { height: expectedH });
   }

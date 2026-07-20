@@ -1,0 +1,4 @@
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/hyperwrapz-ad1-c1-15s.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/hyperwrapz-ad1-c2-15s-locked.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/hyperwrapz-ad1-c3-15s-locked.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/hyperwrapz-ad1-c4-15s-locked.mp4'

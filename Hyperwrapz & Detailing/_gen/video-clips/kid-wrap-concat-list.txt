@@ -1,0 +1,6 @@
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/omni-kid-wrap-c1.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/omni-kid-wrap-c2.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/omni-kid-wrap-c3.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/omni-kid-wrap-c4.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/omni-kid-wrap-c5.mp4'
+file '/Users/faeez/motionboards/Hyperwrapz & Detailing/_gen/video-clips/omni-kid-wrap-c6.mp4'

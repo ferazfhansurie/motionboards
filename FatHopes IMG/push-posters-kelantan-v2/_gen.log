@@ -1,0 +1,18 @@
+crop A_portrait <- PUX01965.JPG (2300, 0, 4199, 3376) -> (1350, 2400)
+crop B_driver <- PUX08092.JPG (2650, 0, 4549, 3376) -> (1350, 2400)
+crop C_volvo <- PUX09211.JPG (3650, 0, 5549, 3376) -> (1350, 2400)
+crop D_fleet <- PUX09184.JPG (2350, 0, 4249, 3376) -> (1350, 2400)
+crop E_crew <- PUX08206.JPG (1675, 0, 3574, 3376) -> (1350, 2400)
+crop F_group <- PUX09161.JPG (1950, 0, 3849, 3376) -> (1350, 2400)
+OK  01_tauke.png (A_portrait)
+OK  02_pandu.png (B_driver)
+OK  03_periuk.png (C_volvo)
+OK  04_90lori.png (D_fleet)
+OK  05_halal.png (E_crew)
+OK  06_ramai.png (F_group)
+OK  07_niat.png (A_portrait)
+OK  08_trip.png (B_driver)
+OK  09_steren.png (C_volvo)
+OK  10_naik.png (F_group)
+
+DONE ok=10 fail=[] -> /Users/faeez/motionboards/FatHopes IMG/push-posters-kelantan-v2

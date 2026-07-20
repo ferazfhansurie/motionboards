@@ -1,0 +1,299 @@
+<title>MicroMentor — Title Slide</title>
+<style>
+  :root{
+    --paper:#ECEEF7;      /* cool periwinkle paper, biased toward the indigo accent */
+    --paper-2:#E3E6F3;
+    --ink:#15182B;        /* deep indigo-black */
+    --ink-soft:#4A4F6B;
+    --line:#D3D7E8;
+    --coral:#FF5A47;      /* the one energetic accent */
+    --coral-deep:#E8452F;
+    --hi:#FFD23F;         /* highlighter yellow — used literally, once */
+    --indigo:#4B4FA6;     /* UI support inside the phone */
+    --indigo-soft:#E9EAFB;
+    --white:#FFFFFF;
+    --shadow:24px 40px 90px rgba(21,24,43,.28);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  body{
+    min-height:100vh;
+    display:grid;place-items:center;
+    background:
+      radial-gradient(120% 90% at 85% 10%, #F4F5FC 0%, #DFE2F1 60%, #D2D6EA 100%);
+    padding:24px;
+    font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-color-scheme:dark){ body{background:radial-gradient(120% 90% at 85% 10%,#20233b,#12142a);} }
+  :root[data-theme="light"] body{background:radial-gradient(120% 90% at 85% 10%,#F4F5FC,#D2D6EA);}
+  :root[data-theme="dark"] body{background:radial-gradient(120% 90% at 85% 10%,#20233b,#12142a);}
+
+  /* ------- the slide is a committed, self-contained visual object ------- */
+  .slide{
+    position:relative;
+    width:min(96vw, calc(94vh * 16/9));
+    aspect-ratio:16/9;
+    background:var(--paper);
+    border-radius:22px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+    container-type:size;
+    color:var(--ink);
+  }
+
+  /* faint dotted study-grid texture */
+  .slide::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(75,79,166,.16) 1.3px, transparent 1.3px);
+    background-size:26px 26px;
+    -webkit-mask-image:linear-gradient(105deg, #000 0%, transparent 62%);
+            mask-image:linear-gradient(105deg, #000 0%, transparent 62%);
+    opacity:.7;
+  }
+  /* ambient glow behind the phone */
+  .slide::after{
+    content:"";position:absolute;right:-6cqw;top:8cqh;
+    width:52cqw;height:52cqw;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,90,71,.20),transparent 68%);
+    filter:blur(4px);
+  }
+
+  .frame{position:absolute;inset:0;display:flex;padding:6.2cqw 6.5cqw}
+
+  /* ---------------- LEFT: the pitch ---------------- */
+  .left{
+    position:relative;z-index:3;
+    flex:1.15;display:flex;flex-direction:column;gap:2.4cqh;
+    padding-right:3cqw;
+  }
+
+  .eyebrow{display:flex;align-items:center;gap:1.4cqw;flex-wrap:wrap}
+  .course{
+    font-size:1.7cqw;font-weight:800;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--ink);
+  }
+  .course b{color:var(--coral-deep)}
+  .tag{
+    font-size:1.35cqw;font-weight:700;letter-spacing:.04em;
+    color:var(--indigo);
+    background:var(--indigo-soft);
+    padding:.55cqw 1.3cqw;border-radius:999px;
+    border:1px solid #D6D8F3;
+  }
+
+  .wordmark{
+    font-size:9.4cqw;line-height:.92;font-weight:800;
+    letter-spacing:-.03em;color:var(--ink);
+    display:flex;align-items:baseline;gap:.06em;flex-wrap:wrap;
+  }
+  .wordmark .micro{color:var(--ink)}
+  .wordmark .mentor{position:relative;color:var(--coral-deep)}
+  /* literal highlighter swipe under the word */
+  .wordmark .mentor::after{
+    content:"";position:absolute;left:-.04em;right:-.04em;bottom:.08em;
+    height:.34em;background:var(--hi);z-index:-1;
+    border-radius:3px;transform:rotate(-1.2deg);
+    box-shadow:0 0 0 rgba(0,0,0,0);
+  }
+  .dot{color:var(--coral)}
+
+  .tagline{
+    font-size:2.5cqw;line-height:1.22;font-weight:600;
+    color:var(--ink);max-width:34ch;text-wrap:balance;
+  }
+  .tagline .mark{
+    background:linear-gradient(transparent 62%, rgba(255,210,63,.85) 0);
+    padding:0 .1em;
+  }
+  .sub{
+    font-size:1.5cqw;line-height:1.5;color:var(--ink-soft);
+    max-width:44ch;font-weight:500;
+  }
+
+  .presenters{margin-top:auto;display:flex;flex-direction:column;gap:1.1cqh}
+  .plabel{
+    font-size:1.2cqw;font-weight:800;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--indigo);
+  }
+  .names{display:flex;flex-direction:column;gap:.5cqh}
+  .name{
+    display:flex;align-items:baseline;gap:1cqw;
+    font-size:1.85cqw;font-weight:700;color:var(--ink);
+  }
+  .name .mat{
+    font-size:1.35cqw;font-weight:600;color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  }
+  .name .bull{color:var(--coral);font-size:1.4cqw;transform:translateY(-.1em)}
+  .name.ghost{color:#A9AEC7}
+  .name.ghost .bull{color:#C7CADD}
+
+  .meta{
+    position:absolute;left:6.5cqw;bottom:4.6cqh;z-index:3;
+    display:flex;gap:3.4cqw;
+    font-size:1.25cqw;color:var(--ink-soft);
+  }
+  .meta .k{font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);font-size:1.05cqw}
+  .meta .v{font-weight:600}
+  .meta .col{display:flex;flex-direction:column;gap:.4cqh}
+
+  /* ---------------- RIGHT: the phone UI mockup ---------------- */
+  .right{position:relative;z-index:2;flex:.85;display:flex;align-items:center;justify-content:center}
+
+  .phone{
+    position:relative;width:26cqw;aspect-ratio:9/19.2;
+    background:#0E1022;border-radius:4cqw;
+    padding:1cqw;
+    box-shadow:
+      0 2cqw 5cqw rgba(21,24,43,.34),
+      inset 0 0 0 .35cqw #2A2E52;
+    transform:rotate(3deg);
+  }
+  .notch{
+    position:absolute;top:1.7cqw;left:50%;transform:translateX(-50%);
+    width:7cqw;height:1.1cqw;background:#0E1022;border-radius:999px;z-index:5;
+  }
+  .screen{
+    width:100%;height:100%;background:#FBFBFE;border-radius:3.1cqw;
+    overflow:hidden;display:flex;flex-direction:column;
+    font-size:1.05cqw;
+  }
+
+  .app-top{
+    padding:3cqw 2cqw 1.4cqw;display:flex;align-items:flex-end;
+    justify-content:space-between;
+  }
+  .greet .hi{font-size:1.05cqw;color:#8A8FB0;font-weight:600;letter-spacing:.02em}
+  .greet .day{font-size:1.9cqw;font-weight:800;color:var(--ink);line-height:1.05}
+  .streak{
+    display:flex;align-items:center;gap:.5cqw;
+    background:#FFF1CF;color:#B57F00;font-weight:800;
+    padding:.5cqw 1cqw;border-radius:999px;font-size:1.15cqw;
+  }
+  .streak .fl{width:1.1cqw;height:1.1cqw;border-radius:50% 50% 50% 0;background:var(--coral);transform:rotate(45deg)}
+
+  .app-body{flex:1;padding:.6cqw 2cqw 2cqw;display:flex;flex-direction:column;gap:1.3cqw}
+
+  .card{
+    background:var(--white);border:1px solid #ECEDF6;
+    border-radius:2.2cqw;padding:2cqw;
+    box-shadow:0 1.2cqw 2.6cqw rgba(21,24,43,.07);
+    display:flex;flex-direction:column;gap:1.3cqw;
+  }
+  .goal{
+    align-self:flex-start;display:inline-flex;align-items:center;gap:.5cqw;
+    background:var(--indigo-soft);color:var(--indigo);
+    font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    font-size:.85cqw;padding:.45cqw 1cqw;border-radius:999px;
+  }
+  .goal .d{width:.7cqw;height:.7cqw;border-radius:50%;background:var(--indigo)}
+  .q{font-size:1.55cqw;font-weight:800;color:var(--ink);line-height:1.2}
+  .visual{
+    height:6.5cqw;border-radius:1.6cqw;
+    background:linear-gradient(120deg,#FF7A6B,#FF5A47);
+    position:relative;overflow:hidden;
+  }
+  .visual .play{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:3.4cqw;height:3.4cqw;border-radius:50%;
+    background:rgba(255,255,255,.92);
+    display:grid;place-items:center;
+  }
+  .visual .play::after{content:"";border-left:1cqw solid var(--coral-deep);border-top:.6cqw solid transparent;border-bottom:.6cqw solid transparent;margin-left:.25cqw}
+  .visual .len{position:absolute;right:1cqw;bottom:1cqw;color:#fff;font-weight:800;font-size:1cqw;background:rgba(0,0,0,.22);padding:.2cqw .7cqw;border-radius:999px}
+
+  .opts{display:flex;flex-direction:column;gap:.9cqw}
+  .opt{
+    display:flex;align-items:center;gap:1cqw;
+    padding:1.1cqw 1.3cqw;border-radius:1.4cqw;
+    border:1.5px solid #E7E8F2;font-weight:700;color:var(--ink-soft);
+    font-size:1.15cqw;
+  }
+  .opt .k{width:1.9cqw;height:1.9cqw;border-radius:.7cqw;background:#F1F2FA;color:#9A9FBE;
+    display:grid;place-items:center;font-weight:800;font-size:1cqw}
+  .opt.correct{border-color:var(--coral);background:#FFF2F0;color:var(--ink)}
+  .opt.correct .k{background:var(--coral);color:#fff}
+  .opt.correct .check{margin-left:auto;color:var(--coral);font-weight:900}
+
+  .review{
+    display:flex;align-items:center;justify-content:space-between;
+    font-size:1cqw;color:#8A8FB0;font-weight:600;padding:0 .4cqw;
+  }
+  .review b{color:var(--indigo)}
+  .bar{height:.8cqw;background:#EDEEF6;border-radius:999px;overflow:hidden}
+  .bar i{display:block;height:100%;width:64%;background:linear-gradient(90deg,var(--coral),#FF8B7D);border-radius:999px}
+
+  /* corner arrow like the reference decks */
+  .arrow{
+    position:absolute;right:5.2cqw;bottom:4.6cqh;z-index:4;
+    width:4cqw;height:4cqw;border-radius:50%;
+    border:2px solid var(--ink);display:grid;place-items:center;color:var(--ink);
+    font-size:1.8cqw;
+  }
+</style>
+
+<div class="slide" role="img" aria-label="Title slide: MicroMentor, a micro-learning app for students, GFP 0009 Digital Creativity">
+  <div class="frame">
+    <div class="left">
+      <div class="eyebrow">
+        <span class="course">GFP&nbsp;0009 · Digital&nbsp;<b>Creativity</b></span>
+        <span class="tag">Micro-learning · EdTech</span>
+      </div>
+
+      <h1 class="wordmark"><span class="micro">Micro</span><span class="mentor">Mentor</span><span class="dot">.</span></h1>
+
+      <p class="tagline">Turn a whole lecture into <span class="mark">3-minute lessons</span> you'll actually remember.</p>
+      <p class="sub">A student micro-learning app that beats cramming and the forgetting curve — built on the <strong>AMPLIFY</strong> model.</p>
+
+      <div class="presenters">
+        <div class="plabel">Presented by</div>
+        <div class="names">
+          <div class="name"><span class="bull">●</span>Aisyatun Nabiha binti Mohamed Husain <span class="mat">25004128</span></div>
+          <div class="name ghost"><span class="bull">●</span>[ Group member 2 ] <span class="mat">[ matric ]</span></div>
+          <div class="name ghost"><span class="bull">●</span>[ Group member 3 ] <span class="mat">[ matric ]</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="app-top">
+            <div class="greet">
+              <div class="hi">Good evening, Aisyatun</div>
+              <div class="day">Today's lessons</div>
+            </div>
+            <div class="streak"><span class="fl"></span>12</div>
+          </div>
+
+          <div class="app-body">
+            <div class="card">
+              <span class="goal"><span class="d"></span>Goal · Explain the light reaction</span>
+              <div class="visual"><span class="play"></span><span class="len">2:48</span></div>
+              <div class="q">Where does photosynthesis capture light energy?</div>
+              <div class="opts">
+                <div class="opt"><span class="k">A</span>Mitochondria</div>
+                <div class="opt correct"><span class="k">B</span>Chloroplast<span class="check">✓</span></div>
+                <div class="opt"><span class="k">C</span>Ribosome</div>
+              </div>
+            </div>
+
+            <div class="review"><span>Next review · <b>tomorrow 9am</b></span><span>3 of 5</span></div>
+            <div class="bar"><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div class="col"><span class="k">Course</span><span class="v">GFP 0009 — Digital Creativity</span></div>
+    <div class="col"><span class="k">Lecturer</span><span class="v">Dr. Rafiza binti Abdul Razak</span></div>
+    <div class="col"><span class="k">Faculty</span><span class="v">Universiti Malaya</span></div>
+  </div>
+
+  <div class="arrow" aria-hidden="true">→</div>
+</div>

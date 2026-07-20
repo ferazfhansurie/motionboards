@@ -1,0 +1,48 @@
+FATHOPES ENERGY SINGAPORE — SEEDANCE 2.0 I2V (15s infographic ad)
+=================================================================
+
+RECOMMENDED SEED / FIRST FRAME (feed as the I2V input image):
+  public/Fathopes-singapore/c08b2c24-a2d4-45dd-bdc0-62609882548a.jpg
+  (green FatHopes SG lorry loaded with IBC totes of used cooking oil, depot bay 03/04)
+
+REFERENCE FRAMES for the multi-shot cuts (attach as additional refs / use as the
+first frame of each clip if you generate shot-by-shot):
+  Shot 2 team    -> 391494d3-94b7-4b13-bf60-a91b6f1fd3fc.jpg  (6-person crew, arms crossed)
+  Shot 3 volume  -> WhatsApp Image 2026-06-09 at 9.24.31 AM.jpeg  (staff + stacked IBC totes)
+  Shot 4 process -> WhatsApp Image 2026-06-09 at 9.24.30 AM.jpeg  (tanker "CONTENTS: USED COOKING OIL")
+
+SETTINGS: 9:16 vertical · 2K · 15s · 24fps · real-photo look (no CGI faces)
+
+-----------------------------------------------------------------
+PROMPT (paste into Seedance 2.0 I2V):
+-----------------------------------------------------------------
+Treat the attached photograph as a real, finished shot — a green FatHopes Energy
+Singapore lorry loaded with IBC totes of used cooking oil inside a depot. Keep every
+person, face, vehicle and printed sign exactly as in the photo; do not redraw or
+restyle them. Realistic cinematic motion only, natural daylight, subtle handheld life.
+
+Animate as a clean 15-second kinetic-infographic advert with crisp on-screen text in
+SF Pro / Helvetica Neue, flat white with a single FatHopes green (#6FBE44) accent,
+generous negative space, no clutter. Singapore English only.
+
+00.0-03.0s | Slow dolly-in on the loaded lorry, shallow focus racking onto the oil
+totes. Text fades up: "Your used cooking oil is worth money."
+03.0-06.0s | Cut to the FatHopes crew standing confident by the truck; gentle push-in.
+Text: "We collect from restaurants, hawkers and homes."
+06.0-09.0s | Cut to stacked totes filling the warehouse; slow vertical tilt up
+revealing the scale. Animated line draws an arrow: "Used cooking oil" -> a small jet
+icon -> "Sustainable Aviation Fuel."
+09.0-12.0s | Cut to the "CONTENTS: USED COOKING OIL" tanker; light glide. Three quick
+kinetic chips pop in one by one: "Get paid." "Cut waste." "Fuel cleaner flights."
+12.0-15.0s | End card: soft white gradient over the depot, FatHopes Energy logo
+centered, then address and phone snap in clean and legible:
+"FatHopes Energy Singapore" / "33 Penjuru Lane, Block C, #03 & #04" / "8263 2208 ·
+fathopesenergy.com" and a green pill button "Sell Your UCO Today."
+
+Smooth eased transitions, one idea on screen at a time, each line appears once, no
+duplicated or garbled text, no watermark, no fake logos, no distorted faces or truck
+lettering. Confident, premium, sustainability-forward tone.
+-----------------------------------------------------------------
+NOTE: Seedance I2V animates one seed image best. For the cleanest 15s, generate 4 short
+clips (each ~3-4s) using the reference frame listed per shot as that clip's first frame,
+then stitch. Or run the full prompt on the seed lorry image for a single continuous take.
