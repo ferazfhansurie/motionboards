@@ -73,61 +73,69 @@ async function validateInputTypes(
 ): Promise<string | null> {
   for (const inp of modelInputs) {
     if (inp.type !== "image" && inp.type !== "video" && inp.type !== "audio") continue;
-    const url = input[inp.name];
-    if (typeof url !== "string" || !url) continue;
+    // Multi-reference inputs (such as Seedance Omni's reference_images and
+    // reference_videos) are arrays. Check every entry, not just singular
+    // inputs, so a stale client cannot send an MP4 as a reference image and
+    // get Ark's opaque "image format is not supported" response.
+    const value = input[inp.name];
+    const urls = Array.isArray(value) ? value : [value];
 
-    // Reject browser-only URLs immediately. The client's resolveUrl waits +
-    // retries upload, but if it gives up we'd otherwise forward a blob:/data:
-    // URL to the provider (Replicate, Vertex) which then fails with a
-    // confusing "couldn't fetch input" error.
-    if (url.startsWith("blob:") || url.startsWith("data:")) {
-      return `Input "${inp.description}" hasn't finished uploading yet. Wait a moment, then try generate again — or drag the file again if it's been more than a few seconds.`;
-    }
-    if (!/^https?:\/\//i.test(url)) {
-      return `Input "${inp.description}" has an invalid URL. Re-upload or re-tag the file on the canvas.`;
-    }
+    for (const url of urls) {
+      if (typeof url !== "string" || !url) continue;
 
-    let mime: string | null = null;
-    const ownId = extractOwnFileId(url, origin);
-    if (ownId) {
-      const file = await getFile(ownId);
-      if (!file) {
-        return `Input "${inp.description}" points to a file that no longer exists. Re-upload it.`;
+      // Reject browser-only URLs immediately. The client's resolveUrl waits +
+      // retries upload, but if it gives up we'd otherwise forward a blob:/data:
+      // URL to the provider (Replicate, Vertex) which then fails with a
+      // confusing "couldn't fetch input" error.
+      if (url.startsWith("blob:") || url.startsWith("data:")) {
+        return `Input "${inp.description}" hasn't finished uploading yet. Wait a moment, then try generate again — or drag the file again if it's been more than a few seconds.`;
       }
-      mime = file.mimeType;
-    } else {
-      // External URL — confirm Replicate/Vertex/etc. can actually fetch it.
-      // We HEAD from the server (server-to-server, ignores CORS). A 404 or
-      // network error here means the provider would also fail, so we'd
-      // rather surface a clear message now than have it bounce back as a
-      // generic "input fetch failed" 5 minutes later.
-      try {
-        const headRes = await fetch(url, { method: "HEAD" });
-        if (!headRes.ok) {
-          // Some CDNs (Vercel Blob, certain S3 configs) return 405 on HEAD
-          // even though GET works. Don't reject on 405 — only on 4xx that
-          // imply the resource itself is gone.
-          if (headRes.status === 404 || headRes.status === 410) {
-            return `Input "${inp.description}" returned ${headRes.status} — the file isn't reachable. Re-upload or re-tag.`;
-          }
-          // Other non-OK statuses: continue (might still be fetchable by GET).
-        } else {
-          mime = headRes.headers.get("content-type");
+      if (!/^https?:\/\//i.test(url)) {
+        return `Input "${inp.description}" has an invalid URL. Re-upload or re-tag the file on the canvas.`;
+      }
+
+      let mime: string | null = null;
+      const ownId = extractOwnFileId(url, origin);
+      if (ownId) {
+        const file = await getFile(ownId);
+        if (!file) {
+          return `Input "${inp.description}" points to a file that no longer exists. Re-upload it.`;
         }
-      } catch {
-        // Network error — let the downstream provider try; it'll surface a
-        // clearer error if the URL really is dead.
+        mime = file.mimeType;
+      } else {
+        // External URL — confirm Replicate/Vertex/etc. can actually fetch it.
+        // We HEAD from the server (server-to-server, ignores CORS). A 404 or
+        // network error here means the provider would also fail, so we'd
+        // rather surface a clear message now than have it bounce back as a
+        // generic "input fetch failed" 5 minutes later.
+        try {
+          const headRes = await fetch(url, { method: "HEAD" });
+          if (!headRes.ok) {
+            // Some CDNs (Vercel Blob, certain S3 configs) return 405 on HEAD
+            // even though GET works. Don't reject on 405 — only on 4xx that
+            // imply the resource itself is gone.
+            if (headRes.status === 404 || headRes.status === 410) {
+              return `Input "${inp.description}" returned ${headRes.status} — the file isn't reachable. Re-upload or re-tag.`;
+            }
+            // Other non-OK statuses: continue (might still be fetchable by GET).
+          } else {
+            mime = headRes.headers.get("content-type");
+          }
+        } catch {
+          // Network error — let the downstream provider try; it'll surface a
+          // clearer error if the URL really is dead.
+        }
       }
-    }
 
-    let actual = mimeKind(mime);
-    // If Content-Type is missing or generic (octet-stream), fall back to
-    // the URL extension. Without this, an image stored in R2 with no
-    // explicit Content-Type sails through validation as "other" → skipped
-    // → forwarded to the provider, where it fails with an opaque error.
-    if (actual === "other") actual = kindFromUrlExtension(url);
-    if (actual !== "other" && actual !== inp.type) {
-      return `Input "${inp.description}" needs ${inp.type === "audio" ? "an audio file" : `a ${inp.type}`}, but you tagged a ${mime || actual} file. Drag a ${inp.type} onto the canvas and tag it as the ${inp.description.toLowerCase()}.`;
+      let actual = mimeKind(mime);
+      // If Content-Type is missing or generic (octet-stream), fall back to
+      // the URL extension. Without this, an image stored in R2 with no
+      // explicit Content-Type sails through validation as "other" → skipped
+      // → forwarded to the provider, where it fails with an opaque error.
+      if (actual === "other") actual = kindFromUrlExtension(url);
+      if (actual !== "other" && actual !== inp.type) {
+        return `Input "${inp.description}" needs ${inp.type === "audio" ? "an audio file" : `a ${inp.type}`}, but you tagged a ${mime || actual} file. Drag a ${inp.type} onto the canvas and tag it as the ${inp.description.toLowerCase()}.`;
+      }
     }
   }
 

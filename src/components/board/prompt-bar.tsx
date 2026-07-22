@@ -952,7 +952,12 @@ export function PromptBar() {
       // For v2v models like Wan Animate we need BOTH a character image and a
       // reference video. Pick the first image-ish ref for `inputImage` and the
       // first video ref for `inputVideo`.
-      const firstImageRef = refItems.find((r) => r && (r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image"))) || refItems[0];
+      // Only ever treat an actual image as the image input. The old
+      // `|| refItems[0]` fallback grabbed whatever was attached — so a
+      // video-only reference got shoved into the image_url / reference_images
+      // slot and Ark rejected it ("image format not supported" / "input image
+      // exceeds 30 MiB"). Videos must flow through firstVideoRef → reference_videos.
+      const firstImageRef = refItems.find((r) => r && (r.type === "image" || r.type === "psd-layer" || (r.type === "generation" && r.outputType === "image")));
       const firstVideoRef = refItems.find((r) => r && (r.type === "video" || (r.type === "generation" && r.outputType === "video")));
       const inputImage = (await resolveUrl(firstImageRef)) || (await resolveUrl(startItem));
       const inputVideo = await resolveUrl(firstVideoRef);
