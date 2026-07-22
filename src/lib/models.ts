@@ -472,7 +472,7 @@ export const models: AIModel[] = [
     cost: "~RM0.67/s (720p)", creditCost: 335, speed: "~3m", stable: true, maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs as @Image1, @Video1, @Audio1... e.g. 'Use @Image1 as her face, @Audio1 as the background music — match the cuts to its beats.'" },
-      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for faces, wardrobe, props, or locations. Use with video/audio refs as needed; tag images as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
       { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50, maxCount: 3 },
       { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15, maxCount: 3 },
     ],
@@ -561,7 +561,7 @@ export const models: AIModel[] = [
     maxPromptChars: 2000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs as @Image1, @Video1, @Audio1... e.g. 'Use @Image1 as her face, @Audio1 as the background music.'" },
-      { name: "reference_images", type: "image", required: true, description: "1-9 reference images: faces, wardrobe, props, locations. Tag them in the prompt as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: up to 9 reference images for faces, wardrobe, props, or locations. Use with video/audio refs as needed; tag images as @Image1, @Image2...", maxMB: 10, maxCount: 9 },
       { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference video clips (for motion/style transfer). Tag as @Video1, @Video2, @Video3.", maxMB: 50, maxCount: 3 },
       { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs (mp3/wav, 15s combined max). Drives beat-matched cuts and lip-sync. Tag as @Audio1, @Audio2, @Audio3.", maxMB: 15, maxCount: 3 },
     ],
