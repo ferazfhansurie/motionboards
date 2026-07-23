@@ -130,11 +130,15 @@ export async function GET(req: NextRequest) {
           const omniAi = veoApiKey ? new GoogleGenAI({ apiKey: veoApiKey }) : ai;
           const interaction = await omniAi.interactions.get(requestId) as unknown as {
             status: string;
+            output_video?: { type: string; data?: string; uri?: string; mime_type?: string };
             outputs?: Array<{ type: string; data?: string; uri?: string; mime_type?: string }>;
           };
 
           if (interaction.status === "completed") {
-            const vid = (interaction.outputs || []).find((o) => o.type === "video");
+            // Current Interactions responses place generated media in
+            // output_video. Keep the old outputs-array fallback for jobs
+            // created by the previous SDK shape.
+            const vid = interaction.output_video || (interaction.outputs || []).find((o) => o.type === "video");
             if (vid && (vid.data || vid.uri)) {
               let outputUrl: string;
               try {

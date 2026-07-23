@@ -761,7 +761,9 @@ export async function POST(req: NextRequest) {
               input: omniInput,
               background: true,
               store: true,
-              response_format: { type: "video", aspect_ratio: aspect && aspect !== "auto" ? aspect : undefined, duration_seconds: durSecs, delivery: "uri" },
+              // Interactions expects a string duration (for example "10s"),
+              // not the removed duration_seconds field.
+              response_format: { type: "video", aspect_ratio: aspect && aspect !== "auto" ? aspect : undefined, duration: `${durSecs}s`, delivery: "uri" },
             } as any) as unknown as { id: string };
 
             return NextResponse.json({
