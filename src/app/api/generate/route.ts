@@ -755,22 +755,51 @@ export async function POST(req: NextRequest) {
             omniInput.push({ type: "text", text: prompt?.trim() || "Generate a video" });
 
             const omniModelId = modelId.replace(/\/(i2v|s2e)$/, "");
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // Google Omni Flash video currently returns interaction IDs that
+            // cannot reliably be fetched afterwards on the Gemini API preview
+            // surface. Keep this request synchronous instead: Vercel permits
+            // this route to run for five minutes, and the completed video is
+            // returned directly for us to persist in MotionBoards history.
             const interaction = await omniAi.interactions.create({
               model: omniModelId,
               input: omniInput,
-              background: true,
-              store: true,
+              background: false,
+              store: false,
               // Interactions expects a string duration (for example "10s"),
               // not the removed duration_seconds field.
               response_format: { type: "video", aspect_ratio: aspect && aspect !== "auto" ? aspect : undefined, duration: `${durSecs}s`, delivery: "uri" },
-            } as any) as unknown as { id: string };
+            } as Parameters<typeof omniAi.interactions.create>[0]) as unknown as {
+              id: string;
+              output_video?: { data?: string; uri?: string; mime_type?: string };
+            };
+
+            const video = interaction.output_video;
+            if (!video || (!video.data && !video.uri)) {
+              await finalizeGeneration(generation.id, { status: "failed", error: "Google Omni returned no video. Try again with a shorter motion prompt." });
+              return NextResponse.json({ error: "Google Omni returned no video. Try again with a shorter motion prompt." }, { status: 502 });
+            }
+
+            let outputUrl = video.uri || "";
+            try {
+              if (video.data) {
+                outputUrl = await storeOutput(req.nextUrl.origin, Buffer.from(video.data, "base64"), video.mime_type || "video/mp4", user.id);
+              } else if (video.uri) {
+                const videoRes = await fetch(video.uri);
+                if (!videoRes.ok) throw new Error(`Google Omni video download returned ${videoRes.status}`);
+                outputUrl = await storeOutput(req.nextUrl.origin, Buffer.from(await videoRes.arrayBuffer()), videoRes.headers.get("content-type") || "video/mp4", user.id);
+              }
+            } catch (storeErr) {
+              console.error("Failed to store Google Omni video:", storeErr);
+            }
+
+            await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
+            await finalizeGeneration(generation.id, { status: "completed", outputUrl });
 
             return NextResponse.json({
               generationId: generation.id,
-              requestId: interaction.id,
               modelId,
-              status: "processing",
+              status: "completed",
+              outputUrl,
               geminiVideo: true,
             });
           }
