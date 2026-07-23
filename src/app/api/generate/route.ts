@@ -764,7 +764,9 @@ export async function POST(req: NextRequest) {
               model: omniModelId,
               input: omniInput,
               background: false,
-              store: false,
+              // URI video delivery requires a stored interaction even when
+              // we await the completed response synchronously.
+              store: true,
               // Interactions expects a string duration (for example "10s"),
               // not the removed duration_seconds field.
               response_format: { type: "video", aspect_ratio: aspect && aspect !== "auto" ? aspect : undefined, duration: `${durSecs}s`, delivery: "uri" },
