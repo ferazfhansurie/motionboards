@@ -83,6 +83,19 @@ async function validateInputTypes(
     for (const url of urls) {
       if (typeof url !== "string" || !url) continue;
 
+      // Seedance 2.0 real-person / digital-character references are trusted
+      // ModelArk assets, not fetchable HTTP files.  The upstream API expects
+      // their URI verbatim (`asset://asset-…`) in image_url.url, so bypass the
+      // URL and MIME checks intended for uploaded canvas files.  Rejecting
+      // these here made a verified character impossible to use through
+      // MotionBoards despite Ark supporting it natively.
+      if (url.startsWith("asset://")) {
+        if (!/^asset:\/\/asset-[A-Za-z0-9_-]+$/.test(url)) {
+          return `Input "${inp.description}" has an invalid Seedance asset URI. Select an active asset from My Assets, then try again.`;
+        }
+        continue;
+      }
+
       // Reject browser-only URLs immediately. The client's resolveUrl waits +
       // retries upload, but if it gives up we'd otherwise forward a blob:/data:
       // URL to the provider (Replicate, Vertex) which then fails with a
