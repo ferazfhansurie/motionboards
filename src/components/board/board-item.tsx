@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star, RotateCcw } from "lucide-react";
+import { Play, Loader2, Music, X, AlertCircle, Pencil, Layers, Download, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, ZoomIn, ImageIcon, VideoIcon, SparklesIcon, LayersIcon, Copy, Check, ClipboardPaste, Flag, Target, Share2, FolderPlus, Star, RotateCcw, EyeOff } from "lucide-react";
+import { blurFacesInImage, blurFacesInVideo, FaceBlurError } from "@/lib/face-blur";
 import { useAppStore } from "@/lib/store";
 import type { BoardItem } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
@@ -184,13 +185,6 @@ function correctVideoAspect(v: HTMLVideoElement, item: BoardItem) {
   if (!v.videoWidth || !v.videoHeight) return;
   const w = item.width || v.videoWidth;
   const expectedH = Math.round(w * (v.videoHeight / v.videoWidth));
-  // TEMP DEBUG — remove after diagnosing paste-distortion
-  console.log("[MB videoAspect]", {
-    id: item.id, type: item.type, outputType: item.outputType,
-    itemW: item.width, itemH: item.height,
-    videoW: v.videoWidth, videoH: v.videoHeight,
-    expectedH, willUpdate: Math.abs((item.height || 0) - expectedH) > 2,
-  });
   if (Math.abs((item.height || 0) - expectedH) > 2) {
     useAppStore.getState().updateItem(item.id, { height: expectedH });
   }
@@ -586,6 +580,53 @@ export function BoardItemCard({
     (item.type === "video" || (item.type === "generation" && item.outputType === "video")) &&
     !!(item.outputUrl || item.src);
   const isResizable = item.type === "image" || item.type === "video" || item.type === "generation" || item.type === "psd-layer" || item.type === "text" || item.type === "drawing";
+  const isBlurableImage = item.type === "image" || item.type === "psd-layer" || (item.type === "generation" && item.outputType === "image");
+  const isBlurableVideo = isVideoItem;
+
+  // Face-blur (client-side mosaic). Detects faces on-device, pixelates them,
+  // uploads the result, and drops a new item on the canvas beside the source.
+  const handleBlurFaces = async () => {
+    const url = item.outputUrl || item.src;
+    if (!url) return;
+    const isVideo = isBlurableVideo;
+    const toastId = showToast(isVideo ? "Blurring faces (re-encoding video)…" : "Blurring faces…", { kind: "loading", durationMs: 600000 });
+    try {
+      let blob: Blob;
+      let mime: string;
+      if (isVideo) {
+        const out = await blurFacesInVideo(url, (f) => updateToast(toastId, { kind: "loading", message: `Blurring faces… ${Math.round(f * 100)}%` }));
+        blob = out.blob;
+        mime = out.mime;
+      } else {
+        blob = await blurFacesInImage(url);
+        mime = "image/png";
+      }
+      updateToast(toastId, { kind: "loading", message: "Uploading…" });
+      const ext = mime.includes("mp4") ? "mp4" : mime.includes("webm") ? "webm" : "png";
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "content-type": mime, "x-filename": `blurred-${Date.now()}.${ext}` },
+        body: blob,
+      }).then((r) => r.json());
+      if (!res?.url) throw new FaceBlurError("record-failed", res?.error || "Upload failed.");
+      useAppStore.getState().addItem({
+        id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: isVideo ? "video" : "image",
+        x: item.x + (item.width || 200) + 32,
+        y: item.y,
+        width: item.width || 200,
+        height: item.height || 200,
+        src: res.url,
+        fileName: `blurred-faces.${ext}`,
+        sizeBytes: blob.size,
+        createdAt: new Date().toISOString(),
+      });
+      updateToast(toastId, { kind: "success", message: "Faces blurred — new copy added." });
+    } catch (err) {
+      const msg = err instanceof FaceBlurError ? err.message : (err instanceof Error ? err.message : "Face blur failed.");
+      updateToast(toastId, { kind: "error", message: msg });
+    }
+  };
 
   // Right-click / long-press context menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -1459,6 +1500,21 @@ export function BoardItemCard({
               <Star className={`h-3.5 w-3.5 ${item.starred ? "text-amber-400" : "text-gray-400"}`} fill={item.starred ? "currentColor" : "none"} />
               {item.starred ? "Unstar" : "Star"}
             </button>
+
+            {/* Blur faces (client-side mosaic) — images & videos */}
+            {(isBlurableImage || isBlurableVideo) && (
+              <>
+                <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />
+                <button
+                  type="button"
+                  className={`flex items-center gap-2.5 w-full px-3 py-2 text-[11px] font-medium transition-colors ${isDark ? "text-white hover:bg-white/10" : "text-[#0d1117] hover:bg-gray-50"}`}
+                  onClick={() => { closeContextMenu(); void handleBlurFaces(); }}
+                >
+                  <EyeOff className="h-3.5 w-3.5 text-gray-400" />
+                  Blur faces
+                </button>
+              </>
+            )}
 
             {/* Copy / Paste */}
             <div className={`h-px my-0.5 ${isDark ? "bg-gray-700" : "bg-gray-100"}`} />
