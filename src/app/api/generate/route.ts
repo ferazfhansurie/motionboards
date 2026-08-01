@@ -547,31 +547,40 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Prompt is required." }, { status: 400 });
         }
 
-        const refImageUrl = input.image_url as string | undefined;
+        // gpt-image-2 accepts MULTIPLE reference images. Read the plural
+        // `image_urls` slot (falling back to a legacy single `image_url`).
+        const refImageUrls: string[] = Array.isArray(input.image_urls)
+          ? (input.image_urls as string[])
+          : (input.image_url ? [input.image_url as string] : []);
         let b64: string | undefined;
-        if (refImageUrl) {
-          // Edit mode: fetch the reference image and upload it as form data.
-          // Pull from Neon directly for same-origin /api/files/:id URLs so we
-          // don't round-trip through the public origin.
-          const ownId = extractOwnFileId(refImageUrl, req.nextUrl.origin);
-          let imgBytes: Buffer;
-          let imgMime = "image/png";
-          if (ownId) {
-            const file = await getFile(ownId);
-            if (!file) throw new Error("Reference image not found");
-            imgBytes = Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength);
-            imgMime = file.mimeType || "image/png";
-          } else {
-            const imgRes = await fetch(refImageUrl);
-            if (!imgRes.ok) throw new Error(`Couldn't fetch reference image (${imgRes.status})`);
-            imgBytes = Buffer.from(await imgRes.arrayBuffer());
-            imgMime = imgRes.headers.get("content-type") || "image/png";
+        if (refImageUrls.length > 0) {
+          // Edit mode: fetch each reference image and upload as form data. Pull
+          // from Neon directly for same-origin /api/files/:id URLs so we don't
+          // round-trip through the public origin.
+          const imgFiles: File[] = [];
+          for (const refUrl of refImageUrls) {
+            const ownId = extractOwnFileId(refUrl, req.nextUrl.origin);
+            let imgBytes: Buffer;
+            let imgMime = "image/png";
+            if (ownId) {
+              const file = await getFile(ownId);
+              if (!file) throw new Error("Reference image not found");
+              imgBytes = Buffer.from(file.data.buffer, file.data.byteOffset, file.data.byteLength);
+              imgMime = file.mimeType || "image/png";
+            } else {
+              const imgRes = await fetch(refUrl);
+              if (!imgRes.ok) throw new Error(`Couldn't fetch reference image (${imgRes.status})`);
+              imgBytes = Buffer.from(await imgRes.arrayBuffer());
+              imgMime = imgRes.headers.get("content-type") || "image/png";
+            }
+            const ext = imgMime.includes("jpeg") ? "jpg" : imgMime.includes("webp") ? "webp" : "png";
+            imgFiles.push(new File([new Uint8Array(imgBytes)], `ref${imgFiles.length}.${ext}`, { type: imgMime }));
           }
-          const ext = imgMime.includes("jpeg") ? "jpg" : imgMime.includes("webp") ? "webp" : "png";
-          const imgFile = new File([new Uint8Array(imgBytes)], `ref.${ext}`, { type: imgMime });
           const edit = await openai.images.edit({
             model: modelId,
-            image: imgFile,
+            // The SDK accepts a single Uploadable or an array; send one when
+            // there's only one so older SDK typings stay happy.
+            image: imgFiles.length === 1 ? imgFiles[0] : imgFiles,
             prompt: p,
             size,
             n: 1,

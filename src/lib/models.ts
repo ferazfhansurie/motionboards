@@ -198,7 +198,7 @@ export const models: AIModel[] = [
     cost: "~RM0.25", creditCost: 25, speed: "~25s", stable: true, maxPromptChars: 32000,
     inputs: [
       { name: "prompt", type: "text", required: true, description: "Image description" },
-      { name: "image_url", type: "image", required: false, description: "Reference image to edit (optional)", maxMB: 20 },
+      { name: "image_urls", type: "image", required: false, description: "Reference images to edit / blend from (optional, up to 10). gpt-image-2 composes using all of them — describe how to combine them in the prompt.", maxMB: 20, maxCount: 10 },
     ],
     options: {
       aspect_ratio: { values: ["auto", "1024x1024", "1024x1536", "1536x1024"], default: "auto", label: "Size" },
