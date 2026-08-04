@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <rect width="1080" height="1350" fill="#f7f6f1"/>
+  <rect width="1080" height="28" fill="#a8ce38"/>
+  <rect y="1210" width="1080" height="140" fill="#123d79"/>
+  <image x="76" y="76" width="296" height="89" xlink:href="file:///Users/faeez/motionboards/FatHopes%20IMG/fathopes%20logo.png" preserveAspectRatio="xMidYMid meet"/>
+  <text x="78" y="255" font-family="Avenir Next, Arial, sans-serif" font-size="28" font-weight="700" fill="#6e9933" letter-spacing="4">COMMUNITY ACTIVATION</text>
+  <text x="76" y="343" font-family="Avenir Next Condensed, Impact, sans-serif" font-size="95" font-weight="900" fill="#123d79" letter-spacing="-2">SIME DARBY</text>
+  <text x="76" y="427" font-family="Avenir Next Condensed, Impact, sans-serif" font-size="82" font-weight="900" fill="#123d79" letter-spacing="-2">ARA DAMANSARA</text>
+  <rect x="76" y="475" width="928" height="625" rx="7" fill="#123d79"/>
+  <image x="88" y="487" width="904" height="601" xlink:href="file:///Users/faeez/Downloads/ddssss.jpeg" preserveAspectRatio="xMidYMid slice"/>
+  <rect x="76" y="1135" width="198" height="44" rx="22" fill="#a8ce38"/>
+  <text x="104" y="1166" font-family="Avenir Next, Arial, sans-serif" font-size="24" font-weight="800" fill="#123d79">EVENT RECAP</text>
+  <text x="76" y="1268" font-family="Avenir Next, Arial, sans-serif" font-size="47" font-weight="800" fill="white">POWERING CHANGE, TOGETHER.</text>
+  <line x1="78" y1="1306" x2="480" y2="1306" stroke="#a8ce38" stroke-width="3"/>
+  <text x="78" y="1330" font-family="Avenir Next, Arial, sans-serif" font-size="18" font-weight="600" fill="white" letter-spacing="2">DATE: ____________________</text>
+</svg>

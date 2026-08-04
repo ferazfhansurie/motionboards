@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1228" height="1535" viewBox="0 0 1228 1535">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="45%" r="72%">
+      <stop offset="0%" stop-color="#e9f7ff"/>
+      <stop offset="58%" stop-color="#c9e8fa"/>
+      <stop offset="100%" stop-color="#98cfe9"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="614" cy="685" rx="535" ry="615" fill="url(#sky)"/>
+  <g text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800">
+    <text x="614" y="585" font-size="132" fill="#092331" letter-spacing="-5">DICARI</text>
+    <text x="614" y="705" font-size="114" fill="#6f9d14" letter-spacing="-5">PUSH AGENT</text>
+    <rect x="291" y="738" width="646" height="5" fill="#092331" opacity="0.32"/>
+    <text x="614" y="790" font-size="45" fill="#092331" letter-spacing="-1">INCOME HIJAU, KALIS-AI.</text>
+  </g>
+</svg>

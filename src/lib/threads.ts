@@ -296,12 +296,16 @@ export async function postToThreads(
   token: string,
   text: string,
   topicTag?: string,
+  replyToId?: string,
 ): Promise<PublishResult> {
   // Step 1 — create container.
   const createUrl = `${THREADS_API}/${userId}/threads`;
   const createParams: Record<string, string> = { media_type: "TEXT", text, access_token: token };
   // One topic tag per post helps discovery (Threads' own topic feeds).
   if (topicTag) createParams.topic_tag = topicTag;
+  // Discovery replies are outbound-only. Supplying this value creates a reply
+  // under a public target post; normal scheduled posts leave it undefined.
+  if (replyToId) createParams.reply_to_id = replyToId;
   const createRes = await fetch(createUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

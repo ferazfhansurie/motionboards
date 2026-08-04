@@ -1,0 +1,21 @@
+FATHOPES ENERGY SINGAPORE — SEEDANCE 2.0 FAST OMNI
+
+MODEL: dreamina-seedance-2-0-fast-260128/omni
+SETTINGS: 9:16 · 720p · 15s · Native Audio ON
+
+REFERENCES
+@Image1 = 01-shirt-brand-lock.jpg — primary shirt-branding lock; full real FatHopes back print is clearly readable.
+@Image2 = 02-used-oil-pumping.jpg — real used-oil drum and collection pumping process.
+@Image3 = 03-singapore-oil-storage.jpg — real IBC storage tank and pickup collection environment.
+@Image4 = fathopes logo.png — exact official FatHopes Energy logo.
+
+PROMPT
+Use @Image1–@Image3 as locked real Singapore FatHopes collection references. @Image1 is the primary staff-shirt branding lock. Premium vertical documentary motion-graphics infographic; crisp daylight, editorial framing, restrained lime/aqua route lines, no stock footage. Follow the audio beats with calm pauses.
+
+Start on @Image1 with a slow push toward the real collection setup. A lime route line and oil-drop icon appear, no words. At the question, transition to @Image2: hose and used-oil drum prove the process. At “problem for the future,” the route line briefly turns amber at an abstract drain icon, then green. At “we’ll collect it,” move to @Image3: collection nodes travel from IBC tank to pickup. Resolve into the exact @Image4 logo on a clean dark-green end card with a subtle energy glow.
+
+AUDIO: warm natural Singaporean English narrator, conversational and unhurried: “Singaporeans love eating fried food. But where does all that used cooking oil go? Poured down the drain, it becomes a problem for the future. Store it—we’ll collect it. FatHopes Energy collects across Singapore. Turn waste into wealth.” Light modern pulse and real collection ambience; music rises in pauses and ducks under speech.
+
+LOCKED BRANDING: preserve @Image1’s full shirt print exactly: official FatHopes Energy logo, “Waste to Wealth Conversion Experts”, and website line. Preserve all truck lettering, logos, IBC tank details and vehicle geometry in @Image1–@Image3 as photographed. Never redraw, retype, warp, blur, replace or invent lettering. Gentle push-ins and 2.5D parallax only; crop branded text out if it cannot stay stable.
+
+DO NOT generate new text, captions, letters, numbers, QR codes or watermarks; add typography later in MotionBoards. No new people/faces, fake vehicles, altered logo, morphing truck, orbiting camera, shake, flicker, rapid cuts or robotic voice.

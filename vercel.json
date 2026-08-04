@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/threads-autopost",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/threads-autopost",
-      "schedule": "0 12 * * *"
+      "path": "/api/threads-discovery-reply",
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/sparron",

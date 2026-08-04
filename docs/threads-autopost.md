@@ -233,3 +233,48 @@ needs a small Neon table plus a page in the app. It is a clean next step; ask wh
 - **Pause everything:** remove the crons from `vercel.json` (or unset `CRON_SECRET` to hard-disable
   the endpoint), then redeploy.
 - **Fire a post right now:** hit the endpoint with the secret (section 3).
+
+---
+
+## 11. One daily relevant-post discovery reply
+
+`/api/threads-discovery-reply` is the only scheduled Threads workflow for
+`@farzmusa`. It searches recent public Threads posts around Singapore food,
+hawkers, restaurants, used cooking oil, food waste, and sustainability; scores
+them for relevance; and makes at most **one** contextual reply each calendar day
+at **13:00 Malaysia time**. It never reads or responds to replies received by
+`@farzmusa`.
+
+Safety rules are built in: no bulk replies, no links, no hashtags, no invented
+personal stories, no engagement-bait, and a FatHopes mention is only permitted
+when directly relevant and clearly disclosed (for example, “we at FatHopes”).
+
+### Required env and permission
+
+The token must be freshly authorized with all three Threads scopes:
+
+```text
+threads_basic, threads_content_publish, threads_keyword_search
+```
+
+Then set these in Vercel Production (and `.env.local` when testing locally):
+
+```text
+THREADS_DISCOVERY_ENABLED=true
+THREADS_USER_ID=<farzmusa Threads user ID>
+THREADS_ACCESS_TOKEN=<fresh token with keyword search permission>
+DATABASE_URL=<existing Neon database URL>
+ANTHROPIC_API_KEY=<existing key>
+CRON_SECRET=<existing secret>
+```
+
+Keep `THREADS_DISCOVERY_ENABLED` unset or `false` to pause publishing. A dry run
+is still safe and can be used to check the permission and draft quality:
+
+```bash
+npm run dev
+node scripts/threads-discovery-reply.mjs --dry
+```
+
+After that is approved, the same script without `--dry` sends the single reply
+for the day. The daily cron uses exactly the same route.

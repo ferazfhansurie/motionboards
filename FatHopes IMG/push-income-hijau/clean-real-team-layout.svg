@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1228" height="1535" viewBox="0 0 1228 1535">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d8f1ff"/>
+      <stop offset="100%" stop-color="#a9d9f2"/>
+    </linearGradient>
+  </defs>
+  <rect x="102" y="55" width="1024" height="1248" rx="82" fill="url(#sky)"/>
+  <g text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800">
+    <text x="614" y="560" font-size="92" fill="#092331" letter-spacing="-4">DICARI</text>
+    <text x="614" y="655" font-size="80" fill="#76a615" letter-spacing="-4">PUSH AGENT</text>
+    <rect x="381" y="690" width="466" height="4" fill="#092331" opacity="0.35"/>
+    <text x="614" y="747" font-size="34" fill="#092331" letter-spacing="-1">INCOME HIJAU, KALIS-AI.</text>
+  </g>
+</svg>

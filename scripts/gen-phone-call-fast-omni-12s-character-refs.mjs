@@ -1,0 +1,36 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import sharp from "sharp";
+
+const ROOT = "/Users/faeez/motionboards";
+const MODEL = "dreamina-seedance-2-0-fast-260128/omni";
+const OUT = path.join(ROOT, "aios/outputs/fathopes-heroes-ep1-seedance-clips/ep1-phone-call-fast-omni-12s-exact-lab-layout.mp4");
+const REFS = [
+  path.join(ROOT, "FatHopes IMG/sg-video/refs/WhatsApp Image 2026-07-23 at 12.15.10 PM.jpeg"),
+  path.join(ROOT, "FatHopes IMG/drive-download-20260627T093124Z-3-001/Kit-Action.png"),
+  path.join(ROOT, "FatHopes IMG/drive-download-20260627T093124Z-3-001/Sparron-Action.png"),
+  path.join(ROOT, "public/Fathopes_heroes_animated/superheroes-group.png"),
+  path.join(ROOT, "FatHopes IMG/sg-video/refs/WhatsApp Image 2026-07-23 at 2.32.57 PM.jpeg"),
+  path.join(ROOT, "aios/outputs/fathopes-heroes-ep1-seedance-clips/worm-reference-from-previous-clip.jpg"),
+];
+const PROMPT = `FORMAT: Vertical 9:16, 12-second animated cinematic continuation. Generate directly from the character and environment references. Do not use or recreate any storyboard.
+
+REFERENCES: @Image1 is the exact Kit face and facial style. Preserve his round chubby face, thick angled eyebrows, small brown eyes, short black hair, wide-brim black hat, teal workwear and black gloves. @Image2 locks Kit's full character design. @Image3 locks Sparron's design and outfit. @Image4 locks the third hero and exact three-hero lineup. @Image5 is the exact HQ lab layout and must be followed precisely. @Image6 locks the oily worm monster inside its transparent tube.
+
+ENVIRONMENT LOCK: Match @Image5 exactly in every lab shot: vertical camera perspective, centered cylindrical glass tube in the middle, worm centered inside it, Kit standing on the left side of the tube, blonde masked hero and male scientist standing on the right, silver lab table spanning the foreground, blue-white ceiling panels, bright rectangular ceiling lights, pale blue wall panels, laboratory equipment at the sides, reflective floor and the same spacing and scale. Do not redesign, relocate, mirror or substitute the lab, tube, table or character positions. Keep the tube as the dominant central anchor.
+
+ACTION: Start inside the HQ lab with a phone suddenly vibrating and ringing on the metal table. The worm stays inside the tube in the background. Cut to a macro close-up of the vibrating phone. Cut to Kit, Sparron and the third hero turning toward it, confused. Kit picks up the phone and says naturally, “Hello?” Cut to an over-the-shoulder shot of Kit listening. Then make a dramatic split-screen: Kit in the bright lab on the left, and an unknown black figure standing in darkness on the right. Show only the figure's wide-brim hat silhouette, shoulders and one gloved hand. Never reveal the face, identity or name. Cut back to the three heroes looking at one another and the phone, confused and uneasy. Hold the final confused reaction longer for a suspenseful, slightly funny ending.
+
+CAMERA: Smooth establishing wide shot, macro phone insert, medium reaction shot, Kit close-up, over-the-shoulder angle, dramatic split-screen, low-angle silhouette shot and final medium-wide group shot. Use clean cuts on strong music beats. One clear action per shot. Keep Kit's face consistent with @Image1 in every shot.
+
+AUDIO: Low-volume suspense music with a subtle pulse, fluorescent lab hum, phone vibration and ringtone, button tap, quiet room ambience and a restrained impact on the split-screen reveal. Lower the music during Kit's dialogue. Kit speaks in a calm young-adult Klang Valley/Kuala Lumpur conversational voice: “Hello?” The unknown caller uses a low, controlled, mysterious voice. Keep all dialogue clear and naturally paced.
+
+STYLE: Consistent premium 2D cel-shaded FatHopes Heroes animation matching @Image5, clean bold outlines, expressive faces, cinematic lighting, teal-and-blue HQ palette, smooth animation, realistic phone and glass reflections. Preserve the exact @Image5 composition whenever the lab is visible, while using close-ups only when specified.
+
+DO NOT: Use a storyboard reference. Do not show the aunty, kitchen, sink, faucet or drain. Do not add extra characters. Do not change faces, outfits, proportions or colours. No villain face reveal, Glinciro name reveal, captions, subtitles, speech bubbles, readable text, morphing, duplicate limbs, warped hands, flicker or watermark.`;
+
+async function loadEnv() { for (const file of ["env.local", ".env.local"]) { try { const raw = await fs.readFile(path.join(ROOT, file), "utf8"); for (const line of raw.split("\n")) { const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, ""); } } catch {} } }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function upload(base, key, file, index) { const b = await sharp(file).resize({ width: 900, height: 1200, fit: "inside" }).jpeg({ quality: 78, mozjpeg: true }).toBuffer(); const r = await fetch(`${base}/api/upload`, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "image/jpeg", "x-filename": `phone-call-12s-character-ref-${index}.jpg` }, body: b }); const j = await r.json().catch(() => ({})); if (!r.ok || !j.url) throw new Error(`upload failed HTTP ${r.status}: ${JSON.stringify(j)}`); return j.url; }
+async function main() { await loadEnv(); const key = process.env.MB_API_KEY || process.env.MB_KEY; const base = (process.env.MB_BASE || "https://motionboards.vercel.app").replace(/\/$/, ""); if (!key) throw new Error("Missing Motionboards API key"); const refs = []; for (let i = 0; i < REFS.length; i++) refs.push(await upload(base, key, REFS[i], i + 1)); const submit = await fetch(`${base}/api/generate`, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: MODEL, prompt: PROMPT, inputImages: refs, generationOptions: { aspect_ratio: "9:16", resolution: "720p", duration: "12s", generate_audio: true } }) }); const j = await submit.json().catch(() => ({})); if (!submit.ok || !j.requestId || !j.generationId) throw new Error(`submit failed HTTP ${submit.status}: ${JSON.stringify(j)}`); console.log(`submitted: ${j.requestId}`); const q = new URLSearchParams({ requestId: j.requestId, modelId: MODEL, generationId: j.generationId, byteplusVideo: "true", durationSec: "12", resolution: "720p" }); let outputUrl; for (let n = 0; n < 180; n++) { await sleep(5000); const r = await fetch(`${base}/api/generate/status?${q}`, { headers: { Authorization: `Bearer ${key}` } }); const s = await r.json().catch(() => ({})); if (s.status === "completed" && s.outputUrl) { outputUrl = s.outputUrl; break; } if (s.status === "failed") throw new Error(`generation failed: ${s.error || "unknown"}`); if (n % 6 === 0) console.log(`${n * 5}s ${s.status || "processing"}`); } if (!outputUrl) throw new Error("generation timed out"); const video = await fetch(outputUrl, { headers: { Authorization: `Bearer ${key}` } }); await fs.mkdir(path.dirname(OUT), { recursive: true }); await fs.writeFile(OUT, Buffer.from(await video.arrayBuffer())); console.log(`saved ${OUT}`); }
+main().catch(e => { console.error(e.stack || e.message); process.exitCode = 1; });

@@ -1,0 +1,7 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { GoogleGenAI } from "@google/genai";
+const ROOT="/Users/faeez/motionboards";
+const OUT=path.join(ROOT,"FatHopes IMG","push-carousel-identify-collector-casefile-v4","final","black-polo-chroma.png");
+async function main(){const raw=await fs.readFile(path.join(ROOT,"env.local"),"utf8");for(const line of raw.split(/\r?\n/)){const m=line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);if(m&&!(m[1] in process.env))process.env[m[1]]=m[2].replace(/^["']|["']$/g,"");}const ai=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});const r=await ai.models.generateContent({model:"gemini-3.1-flash-image-preview",contents:[{text:`Create only ONE folded, front-facing matte black short-sleeve polo shirt for a premium Flat Lay. It must have a crisp conventional collar and a short button placket. No person, no hanger, no lanyard, no pocket, no logo, no text, no badge, no extra objects. Put the shirt entirely inside the canvas with clear padding, isolated on a perfectly flat solid #ff00ff magenta chroma-key background. The background must have no shadow, texture, gradient, reflection or variation. The polo must be a single clean product cutout.`}],config:{responseModalities:["IMAGE"],imageConfig:{aspectRatio:"1:1",imageSize:"2K"}}});const d=r.candidates?.[0]?.content?.parts?.find(x=>x.inlineData)?.inlineData?.data;if(!d)throw Error("No image.");await fs.writeFile(OUT,Buffer.from(d,"base64"));}
+main().catch(e=>{console.error(`FATAL: ${e.message}`);process.exitCode=1;});

@@ -1,0 +1,23 @@
+FATHOPES ENERGY SINGAPORE — SEEDANCE 2.0 FAST OMNI V2
+
+MODEL: dreamina-seedance-2-0-fast-260128/omni
+SETTINGS: 9:16 · 720p · 15s · Native Audio ON
+
+REFERENCES
+@Image1 = 01-shirt-brand-lock.jpg — primary shirt-branding lock; full real FatHopes back print is readable.
+@Image2 = 02-used-oil-pumping.jpg — real used-oil drum and collection pumping process.
+@Image3 = 03-singapore-oil-storage.jpg — real IBC storage tank and pickup environment.
+@Image4 = fathopes logo.png — exact official FatHopes Energy logo.
+
+PROMPT
+Use @Image1–@Image3 as locked real Singapore FatHopes references; @Image1 is the shirt-branding lock. Premium vertical documentary infographic, clean lime/aqua graphics, no stock footage or generated words.
+
+ALL REFERENCES MOVE: @Image1 worker moves naturally with a slow forward drift; shirt print remains fixed. @Image2 has moving hose, subtle real oil flow and a close push. @Image3 has pickup/IBC depth parallax, light equipment motion and side glide. Never use a static frame.
+
+BEATS: “fried food” = warm-gold oil droplet and frying ripples beside @Image1. “where does it go?” = droplet follows lime route and pauses at a shape-only question icon. “down the drain” = cut to @Image2; route enters abstract drain grid, turns amber, warning pulse. “store it” = line turns green and makes a sealed-container icon around the drum. “we’ll collect it” = @Image3; green nodes travel IBC tank to pickup. “across Singapore” = route blooms into an abstract island-grid network. “Turn waste into wealth” = route becomes green energy droplet, then exact @Image4 logo on a dark-green end card.
+
+AUDIO: warm natural Singaporean English, calm: “Singaporeans love eating fried food. But where does all that used cooking oil go? Poured down the drain, it becomes a problem for the future. Store it—we’ll collect it. FatHopes Energy collects across Singapore. Turn waste into wealth.” Modern pulse and real collection ambience rise only in pauses.
+
+LOCKED: preserve @Image1’s FatHopes Energy logo, “Waste to Wealth Conversion Experts”, website, all truck lettering, tank details and vehicle geometry exactly. Never redraw, retype, warp, blur or alter text. Gentle push-ins/2.5D only; crop unstable lettering out.
+
+NO captions, letters, numbers, QR codes, watermarks, new people/faces, fake vehicles, altered logo, morphing truck, orbit, shake, flicker, rapid cuts or robotic voice.
