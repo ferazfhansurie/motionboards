@@ -64,6 +64,7 @@ export default function ShopAutomationPage() {
           </Link>
           <div className="flex items-center gap-3">
             <button onClick={() => setShowNotice(true)} className="hidden items-center gap-2 text-sm font-semibold text-[#56605c] hover:text-[#17201d] sm:flex"><CircleHelp className="h-4 w-4" /> Help</button>
+            <Link href="/tickloop/finance" className="rounded-xl border border-[#dce4de] bg-white px-3.5 py-2.5 text-sm font-bold transition hover:border-[#2b7843]">Finance</Link>
             <button className="rounded-xl bg-[#17201d] px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-[#2b7843]">My automations</button>
           </div>
         </div>

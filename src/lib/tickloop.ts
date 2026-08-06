@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { neon } from "@neondatabase/serverless";
+import { getAuthorizedShops, normalizeOrder, refreshAccessToken, toE164, type TikTokOrder, type TikTokTokens } from "./tiktok-shop";
 
 type Row = Record<string, unknown>;
 type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Row[]>;
@@ -17,6 +18,8 @@ export async function ensureTickLoopSchema() {
   await sql`CREATE TABLE IF NOT EXISTS tl_automations (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, name TEXT NOT NULL, enabled BOOLEAN NOT NULL DEFAULT FALSE, trigger TEXT NOT NULL, template_name TEXT, config JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
   await sql`CREATE TABLE IF NOT EXISTS tl_events (id BIGSERIAL PRIMARY KEY, workspace_id TEXT, provider TEXT NOT NULL, event_type TEXT NOT NULL, external_id TEXT, payload JSONB NOT NULL, received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(provider, external_id))`;
   await sql`CREATE TABLE IF NOT EXISTS tl_consents (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, phone_hash TEXT NOT NULL, status TEXT NOT NULL, source TEXT NOT NULL, captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(workspace_id, phone_hash))`;
+  await sql`CREATE TABLE IF NOT EXISTS tl_orders (workspace_id TEXT NOT NULL, order_id TEXT NOT NULL, shop_id TEXT, status TEXT NOT NULL, recipient_name TEXT, phone TEXT, phone_e164 TEXT, phone_masked BOOLEAN NOT NULL DEFAULT TRUE, buyer_email TEXT, address TEXT, postal_code TEXT, region_code TEXT, currency TEXT, total_amount TEXT, item_count INTEGER NOT NULL DEFAULT 0, tracking_number TEXT, create_time TIMESTAMPTZ, paid_time TIMESTAMPTZ, update_time TIMESTAMPTZ, raw JSONB NOT NULL DEFAULT '{}'::jsonb, synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (workspace_id, order_id))`;
+  await sql`CREATE INDEX IF NOT EXISTS tl_orders_status_idx ON tl_orders(workspace_id, status, create_time DESC)`;
   schemaReady = true;
 }
 
@@ -63,4 +66,74 @@ export async function sendTemplate(workspaceId: string, to: string, name: string
   return { ok: true, result: await response.json() };
 }
 export async function logEvent(provider: Integration, eventType: string, payload: unknown, externalId?: string, workspaceId?: string) { await ensureTickLoopSchema(); await sql`INSERT INTO tl_events (workspace_id, provider, event_type, external_id, payload) VALUES (${workspaceId || null}, ${provider}, ${eventType}, ${externalId || null}, ${JSON.stringify(payload)}::jsonb) ON CONFLICT (provider, external_id) DO NOTHING`; }
+/* ------------------------------------------------------- TikTok Shop access */
+
+/**
+ * Returns a live access token + shop cipher for the workspace, refreshing the
+ * token and back-filling the shop cipher on demand. Every order call goes
+ * through here so a 7-day token expiry never surfaces as a 401 to the caller.
+ */
+export async function tiktokShopAccess(workspaceId: string) {
+  const connection = await connectionForWorkspace(workspaceId, "tiktok_shop");
+  if (!connection?.credentials) return { ok: false as const, reason: "tiktok_not_connected" as const };
+
+  let tokens = decrypt<TikTokTokens>(connection.credentials as string);
+  const metadata = (connection.metadata || {}) as { shopCipher?: string; shopId?: string; shopName?: string; region?: string };
+  let changed = false;
+
+  const expiresAt = Number(tokens.access_token_expire_in || 0);
+  if (expiresAt && expiresAt * 1000 - Date.now() < 5 * 60_000) {
+    if (!tokens.refresh_token) return { ok: false as const, reason: "tiktok_token_expired" as const };
+    tokens = await refreshAccessToken(tokens.refresh_token);
+    changed = true;
+  }
+
+  let shopCipher = metadata.shopCipher;
+  if (!shopCipher) {
+    const shops = await getAuthorizedShops(tokens.access_token);
+    const shop = shops[0];
+    if (!shop?.cipher) return { ok: false as const, reason: "no_authorized_shop" as const };
+    Object.assign(metadata, { shopCipher: shop.cipher, shopId: shop.id, shopName: shop.name, region: shop.region });
+    shopCipher = shop.cipher;
+    changed = true;
+  }
+
+  if (changed) await upsertConnection(workspaceId, "tiktok_shop", (connection.external_id as string) || metadata.shopId || "authorized-shop", tokens, metadata);
+  return { ok: true as const, accessToken: tokens.access_token, shopCipher, shopId: metadata.shopId, shopName: metadata.shopName, region: metadata.region };
+}
+
+/* -------------------------------------------------------------- tl_orders */
+
+export async function saveOrders(workspaceId: string, shopId: string | undefined, orders: TikTokOrder[]) {
+  await ensureTickLoopSchema();
+  const normalized = orders.map(normalizeOrder);
+  for (const order of normalized) {
+    await sql`INSERT INTO tl_orders (workspace_id, order_id, shop_id, status, recipient_name, phone, phone_e164, phone_masked, buyer_email, address, postal_code, region_code, currency, total_amount, item_count, tracking_number, create_time, paid_time, update_time, raw, synced_at)
+      VALUES (${workspaceId}, ${order.orderId}, ${shopId || null}, ${order.status}, ${order.recipientName}, ${order.phone}, ${toE164(order.phone)}, ${order.phoneIsMasked}, ${order.buyerEmail}, ${order.address}, ${order.postalCode}, ${order.regionCode}, ${order.currency}, ${order.totalAmount}, ${order.itemCount}, ${order.trackingNumber}, ${order.createTime}, ${order.paidTime}, ${order.updateTime}, ${JSON.stringify(order.raw)}::jsonb, NOW())
+      ON CONFLICT (workspace_id, order_id) DO UPDATE SET status = EXCLUDED.status, recipient_name = EXCLUDED.recipient_name, phone = EXCLUDED.phone, phone_e164 = EXCLUDED.phone_e164, phone_masked = EXCLUDED.phone_masked, buyer_email = EXCLUDED.buyer_email, address = EXCLUDED.address, postal_code = EXCLUDED.postal_code, region_code = EXCLUDED.region_code, currency = EXCLUDED.currency, total_amount = EXCLUDED.total_amount, item_count = EXCLUDED.item_count, tracking_number = EXCLUDED.tracking_number, paid_time = EXCLUDED.paid_time, update_time = EXCLUDED.update_time, raw = EXCLUDED.raw, synced_at = NOW()`;
+  }
+  return normalized;
+}
+
+export async function listOrders(workspaceId: string, options: { status?: string; withPhoneOnly?: boolean; limit?: number } = {}) {
+  await ensureTickLoopSchema();
+  const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+  if (options.status && options.withPhoneOnly) return sql`SELECT * FROM tl_orders WHERE workspace_id = ${workspaceId} AND status = ${options.status} AND phone_e164 IS NOT NULL ORDER BY create_time DESC NULLS LAST LIMIT ${limit}`;
+  if (options.status) return sql`SELECT * FROM tl_orders WHERE workspace_id = ${workspaceId} AND status = ${options.status} ORDER BY create_time DESC NULLS LAST LIMIT ${limit}`;
+  if (options.withPhoneOnly) return sql`SELECT * FROM tl_orders WHERE workspace_id = ${workspaceId} AND phone_e164 IS NOT NULL ORDER BY create_time DESC NULLS LAST LIMIT ${limit}`;
+  return sql`SELECT * FROM tl_orders WHERE workspace_id = ${workspaceId} ORDER BY create_time DESC NULLS LAST LIMIT ${limit}`;
+}
+
+export async function orderById(workspaceId: string, orderId: string) {
+  await ensureTickLoopSchema();
+  const rows = await sql`SELECT * FROM tl_orders WHERE workspace_id = ${workspaceId} AND order_id = ${orderId} LIMIT 1`;
+  return rows[0];
+}
+
+export async function workspaceForTikTokShop(shopId: string) {
+  await ensureTickLoopSchema();
+  const rows = await sql`SELECT workspace_id FROM tl_connections WHERE provider = 'tiktok_shop' AND (external_id = ${shopId} OR metadata->>'shopId' = ${shopId}) LIMIT 1`;
+  return rows[0]?.workspace_id as string | undefined;
+}
+
 export function validMetaSignature(raw: string, signature: string | null) { const secret = process.env.META_APP_SECRET; if (!secret || !signature?.startsWith("sha256=")) return false; const hmac = createHmac("sha256", secret).update(raw).digest("hex"); return timingSafeEqual(Buffer.from(hmac), Buffer.from(signature.slice(7))); }

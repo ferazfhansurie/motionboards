@@ -2,6 +2,16 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Sibling projects share this folder but are not part of this app. Tailwind's
+   automatic source detection otherwise scans them and generates invalid CSS from
+   class-name examples written in their prose docs, which fails the whole build. */
+@source not "../../aios";
+@source not "../../aios-superapp";
+@source not "../../ai-memory-faeez";
+@source not "../../claude-whatsapp-mcp";
+@source not "../../adletic-inbox";
+@source not "../../adleticagency";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
