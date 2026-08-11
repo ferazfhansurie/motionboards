@@ -1088,7 +1088,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "ByteDance Ark API key not configured." }, { status: 500 });
       }
       try {
-        const arkModel = modelId.replace(/\/(i2v|s2e|omni)$/, "");
+        // Seedance 2.5 adds /edit (video editing) to the existing mode suffixes;
+        // all of them collapse to the same Ark model id.
+        const arkModel = modelId.replace(/\/(i2v|s2e|omni|edit)$/, "");
 
         // ModelArk's /contents/generations/tasks takes a `content` array of
         // role-tagged parts: a text prompt, plus image_url / video_url /

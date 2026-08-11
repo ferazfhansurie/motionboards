@@ -574,6 +574,134 @@ export const models: AIModel[] = [
   },
 
   // ────────────────────────────────────────────────────────────────────
+  // Seedance 2.5 — ByteDance's flagship (Dreamina direct, ByteDance Ark).
+  // The headline change over 2.0 is length and reference breadth: native
+  // single-shot clips up to 30s, and up to 50 multimodal references
+  // (images + video + audio) in one task, tagged @Image1 / @Video1 / @Audio1.
+  //
+  // Two real differences from 2.0 that matter here:
+  //   - the API tops out at 720p (2.0 exposes 1080p). ByteDance's 4K/1080p
+  //     announcements refer to separate upscale endpoints, not this model.
+  //   - durations are any integer 4-30s, not a short fixed ladder.
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: "dreamina-seedance-2-5-260628",
+    name: "Seedance 2.5 Pro",
+    provider: "byteplus", type: "t2v", category: "Video",
+    description: "ByteDance's flagship. Native single-shot video up to 30s with native audio. Attach up to 50 references (images, clips, audio) and tag them in the prompt as @Image1, @Video1, @Audio1... Caps at 720p.",
+    cost: "~RM0.75/s (720p)", creditCost: 375, speed: "~4m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene description with camera moves, lighting, mood" },
+      { name: "reference_images", type: "image", required: false, description: "Optional: reference images for character lock or scene composition. Tag in prompt as @Image1, @Image2...", maxMB: 10, maxCount: 20 },
+      { name: "reference_videos", type: "video", required: false, description: "Optional: reference clips for motion / style transfer. Tag as @Video1, @Video2...", maxMB: 50, maxCount: 3 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: audio refs for beat-matched cuts or dialogue. Tag as @Audio1...", maxMB: 15, maxCount: 3 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "8s", "10s", "12s", "15s", "20s", "25s", "30s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
+    guide: `**Seedance 2.5 — long single takes, many references.**
+
+**What it is best at:** one continuous shot that actually holds together for 15-30s. 2.0 drifts past ~10s; 2.5 was trained for length, so use it when you want a whole beat in one take rather than stitched cuts.
+
+**Duration is the main lever.** Any length 4-30s. Longer costs proportionally more, so block the shot at 5s, lock the prompt, then re-run at the full length.
+
+**References:** tag every ref explicitly — "@Image1 is her face, @Video1 is the camera move, cut on the beats of @Audio1". Untagged refs get used loosely and the result wanders.
+
+**Resolution:** 720p is the ceiling on this API (there is no 1080p here — use Seedance 2.0 Pro if you need it). 480p is for blocking.
+
+**Prompt like a shot list:** subject, action, camera, lens, lighting, palette, pace. Keep it under 2000 characters.`,
+  },
+
+  {
+    id: "dreamina-seedance-2-5-260628/i2v",
+    name: "Seedance 2.5 Pro I2V",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Seedance 2.5 image-to-video. Animate a still into a single take up to 30s with native audio. Attach extra refs to switch into multi-reference mode.",
+    cost: "~RM0.75/s (720p)", creditCost: 375, speed: "~4m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "How the image should animate — describe motion, not the scene" },
+      { name: "image_url", type: "image", required: true, description: "Image to animate (first frame when no extra refs are attached)", maxMB: 10 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: extra refs switch into multi-reference mode. Tag as @Image1, @Image2...", maxMB: 10, maxCount: 20 },
+      { name: "reference_videos", type: "video", required: false, description: "Optional: reference clips for motion / style. Tag as @Video1...", maxMB: 50, maxCount: 3 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: drive lip-sync / timing. Tag as @Audio1...", maxMB: 15, maxCount: 3 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "8s", "10s", "12s", "15s", "20s", "25s", "30s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "dreamina-seedance-2-5-260628/s2e",
+    name: "Seedance 2.5 Pro S2E",
+    provider: "byteplus", type: "s2e", category: "Video",
+    description: "Seedance 2.5 start-to-end. Give a first and last frame; Ark animates the transition between them with native audio.",
+    cost: "~RM0.75/s (720p)", creditCost: 375, speed: "~4m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Describe the transition between the two frames" },
+      { name: "first_frame_url", type: "image", required: true, description: "Start frame image", maxMB: 10 },
+      { name: "last_frame_url", type: "image", required: true, description: "End frame image", maxMB: 10 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: drive the transition timing from audio. Tag as @Audio1...", maxMB: 15, maxCount: 3 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "8s", "10s", "12s", "15s", "20s", "25s", "30s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "dreamina-seedance-2-5-260628/omni",
+    name: "Seedance 2.5 Omni",
+    provider: "byteplus", type: "i2v", category: "Video",
+    description: "Seedance 2.5 multi-reference mode. Lock faces, wardrobe, props, locations, motion and music together — up to 50 refs across images, clips and audio — and direct the whole arc in one prompt. Tag each as @Image1, @Video1, @Audio1...",
+    cost: "~RM0.75/s (720p)", creditCost: 375, speed: "~4m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "Scene direction. Tag refs explicitly, e.g. 'Use @Image1 as her face, @Video1 for the camera move, cut to @Audio1.'" },
+      { name: "reference_images", type: "image", required: true, description: "1-20 reference images: faces, wardrobe, props, locations. Tag as @Image1, @Image2...", maxMB: 10, maxCount: 20 },
+      { name: "reference_videos", type: "video", required: false, description: "Optional: up to 3 reference clips for motion / style transfer. Tag as @Video1...", maxMB: 50, maxCount: 3 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: up to 3 audio refs for beat-matched cuts and lip-sync. Tag as @Audio1...", maxMB: 15, maxCount: 3 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], default: "16:9", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "8s", "10s", "12s", "15s", "20s", "25s", "30s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  {
+    id: "dreamina-seedance-2-5-260628/edit",
+    name: "Seedance 2.5 Video Edit",
+    provider: "byteplus", type: "v2v", category: "Video",
+    description: "Seedance 2.5 video editing. Feed an existing clip and describe the change — swap a subject, restyle a scene, extend the action — and it re-renders the shot. Attach images to define what to put in.",
+    cost: "~RM0.75/s (720p)", creditCost: 375, speed: "~4m", stable: true, maxPromptChars: 2000,
+    inputs: [
+      { name: "prompt", type: "text", required: true, description: "What to change, e.g. 'replace the drink with @Image1, keep the camera move'" },
+      { name: "reference_videos", type: "video", required: true, description: "The clip to edit. Tag it in the prompt as @Video1.", maxMB: 50, maxCount: 3 },
+      { name: "reference_images", type: "image", required: false, description: "Optional: images defining what to insert or restyle to. Tag as @Image1...", maxMB: 10, maxCount: 20 },
+      { name: "reference_audios", type: "audio", required: false, description: "Optional: audio refs. Tag as @Audio1...", maxMB: 15, maxCount: 3 },
+    ],
+    options: {
+      aspect_ratio: { values: ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"], default: "adaptive", label: "Aspect Ratio" },
+      resolution: { values: ["480p", "720p"], default: "720p", label: "Resolution" },
+      duration: { values: ["4s", "5s", "6s", "8s", "10s", "12s", "15s", "20s", "25s", "30s"], default: "5s", label: "Duration" },
+      generate_audio: { default: true, label: "Native audio" },
+    },
+    perSecond: { noAudio720p: 0.75, withAudio720p: 0.75, noAudio4k: 0, withAudio4k: 0 },
+  },
+
+  // ────────────────────────────────────────────────────────────────────
   // Kling 3.0 family - Kuaishou's flagship video model on Replicate.
   // Premium tier known for strong physics, natural human motion, and tight
   // character consistency.
