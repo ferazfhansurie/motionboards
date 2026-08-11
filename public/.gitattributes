@@ -1,0 +1,27 @@
+# Everything under public/ is served by the app and read during `next build`,
+# so it must be a real file in a plain `git clone` — Vercel does not fetch LFS
+# objects, and an LFS pointer here builds as a 131-byte text file instead of an
+# image, which fails the build.
+#
+# The root .gitattributes LFS-tracks media repo-wide (correct for the campaign
+# and asset folders); this overrides it for the one directory the build depends on.
+*.png -filter -diff -merge text=auto
+*.PNG -filter -diff -merge text=auto
+*.jpg -filter -diff -merge text=auto
+*.JPG -filter -diff -merge text=auto
+*.jpeg -filter -diff -merge text=auto
+*.JPEG -filter -diff -merge text=auto
+*.webp -filter -diff -merge text=auto
+*.WEBP -filter -diff -merge text=auto
+*.mp4 -filter -diff -merge text=auto
+*.MP4 -filter -diff -merge text=auto
+*.mov -filter -diff -merge text=auto
+*.MOV -filter -diff -merge text=auto
+*.pdf -filter -diff -merge text=auto
+*.PDF -filter -diff -merge text=auto
+*.ttf -filter -diff -merge text=auto
+*.TTF -filter -diff -merge text=auto
+*.aiff -filter -diff -merge text=auto
+*.AIFF -filter -diff -merge text=auto
+*.heic -filter -diff -merge text=auto
+*.HEIC -filter -diff -merge text=auto

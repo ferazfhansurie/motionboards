@@ -64,3 +64,22 @@ src/components/board/.next/
 # separate nested git repos (not part of MotionBoards)
 /adleticagency/
 /adletic-inbox/
+
+# --- Repo hygiene: generated media does not belong in git -------------------
+# 113 tracked videos (757 MB) and ~250 MB of unused public/ imagery made every
+# push take many minutes and, once LFS-tracked, broke the Vercel build (Vercel
+# does not fetch LFS objects, so each file checked out as a 131-byte pointer).
+# These stay on disk locally; they are just no longer version-controlled.
+*.mp4
+*.MP4
+*.mov
+*.MOV
+
+# Campaign / generated asset folders under public that the app never serves.
+# public/hero and public/tutorials ARE served and remain tracked.
+public/ESP/
+public/Fathopes_heroes_animated/
+public/Fathopes-singapore/
+public/threads-refs/
+public/Poster Templates References/
+public/Ai photos and videos to put in system/
