@@ -1,0 +1,20 @@
+# Anything under src/ is read during `next build` — including the app-router
+# metadata icons (src/app/icon.png, src/app/apple-icon.png), which Turbopack
+# decodes at build time. Vercel does not fetch LFS objects, so an LFS pointer
+# here reaches the build as 130 bytes of text and fails with
+# "Invalid PNG signature".
+#
+# The root .gitattributes LFS-tracks media repo-wide, which is right for the
+# campaign folders; this overrides it for the source tree.
+*.png -filter -diff -merge text=auto
+*.PNG -filter -diff -merge text=auto
+*.jpg -filter -diff -merge text=auto
+*.JPG -filter -diff -merge text=auto
+*.jpeg -filter -diff -merge text=auto
+*.JPEG -filter -diff -merge text=auto
+*.webp -filter -diff -merge text=auto
+*.WEBP -filter -diff -merge text=auto
+*.ttf -filter -diff -merge text=auto
+*.TTF -filter -diff -merge text=auto
+*.pdf -filter -diff -merge text=auto
+*.PDF -filter -diff -merge text=auto
