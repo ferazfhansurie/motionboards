@@ -54,10 +54,19 @@ type MessagePart =
   // user-side: result of a tool call we executed. Goes back to the AI to
   // continue the loop. Not rendered to the user — the assistant tool_use
   // card carries the visible status.
+  //
+  // content is usually plain text, but timeline_probe_clip returns native
+  // Anthropic content blocks (text + image) so Claude actually sees the
+  // captured frame instead of just getting a URL string it can't view.
+  // These blocks are sent through to the API as-is (see toAnthropicContent
+  // server-side) — they are NOT the client's OpenAI-style image_url shape.
   | {
       type: "tool_result";
       tool_use_id: string;
-      content: string;
+      content: string | Array<
+        | { type: "text"; text: string }
+        | { type: "image"; source: { type: "url"; url: string } }
+      >;
       is_error?: boolean;
     };
 type MessageContent = string | MessagePart[];
@@ -1182,7 +1191,12 @@ export function AIPromptPanel({ variant = "board" }: AIPromptPanelProps = {}) {
         return {
           type: "tool_result",
           tool_use_id: toolUse.id,
-          content: result.message,
+          content: result.imageUrl
+            ? [
+                { type: "text", text: result.message },
+                { type: "image", source: { type: "url", url: result.imageUrl } },
+              ]
+            : result.message,
           is_error: !result.ok,
         };
       }
@@ -1972,7 +1986,7 @@ export function AIPromptPanel({ variant = "board" }: AIPromptPanelProps = {}) {
                         ))}
                       </div>
                     )}
-                    {!isUser && text && !isOnlyToolUse && (
+                    {!isUser && text && !isOnlyToolUse && !isEditor && (
                       <div className={`flex items-center gap-2 mt-2.5 pt-2 border-t ${isDark ? "border-gray-700" : "border-gray-200/70"}`}>
                         <button
                           type="button"

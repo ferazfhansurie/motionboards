@@ -15,6 +15,10 @@ export interface TimelineToolResult {
   ok: boolean;
   message: string;
   clipId?: string;
+  // Set by runTimelineProbeClip so the caller can attach the frame as an
+  // actual viewable image in the tool_result, not just a URL in text —
+  // Claude cannot see pixels from a string, only from an image content block.
+  imageUrl?: string;
 }
 
 function probeVideoDuration(url: string): Promise<number> {
@@ -178,7 +182,8 @@ export async function runTimelineProbeClip(args: { item_id: string; at_seconds?:
 
     return {
       ok: true,
-      message: `Frame captured from item ${item.id} at ${(args.at_seconds ?? 0).toFixed(1)}s: ${hostedUrl}. Attach this URL as a reference image in your next message if you need to look at it directly.`,
+      imageUrl: hostedUrl,
+      message: `Frame captured from item ${item.id} at ${(args.at_seconds ?? 0).toFixed(1)}s.`,
     };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Probe failed" };

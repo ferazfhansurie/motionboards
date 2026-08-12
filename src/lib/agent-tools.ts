@@ -169,7 +169,9 @@ Appends to the end of the timeline by default. Pass trim_in/trim_out only if the
   {
     name: "timeline_probe_clip",
     kind: "client_action",
-    description: `Grab a single frame from a video (as an image you can then see) so you can judge what's actually happening at a moment in the footage before deciding where to cut or what to say about it. Use this before trimming/splitting a clip you haven't looked at yet, or when the user asks "what's at the start/end of this clip" or similar.
+    description: `Grab a single frame from a video and return it as an actual image in the tool result — you will see it directly, not just get a URL. Use this before trimming/splitting a clip you haven't looked at yet, when the user asks "what's at the start/end of this clip," or to read on-screen text/captions burned into the video.
+
+One call only captures one instant. If captions or on-screen text change over the clip's duration, call this multiple times at different at_seconds to read all of them — don't assume one frame shows everything.
 
 Works on any video canvas item — doesn't require the clip to already be on the timeline.`,
     input_schema: {
