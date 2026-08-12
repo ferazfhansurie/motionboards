@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Scissors, Plus, Play, Pause, Trash2, Download, Upload, MessageSquare } from "lucide-react";
+import { ArrowLeft, Scissors, Plus, Play, Pause, Trash2, Download, Upload, MessageSquare, Sun, Moon } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useTimelinePlayer } from "@/lib/timeline-player";
 import { TimelineExportDialog } from "@/components/board/timeline-export-dialog";
@@ -30,6 +30,9 @@ export function EditorWorkspace() {
   const redoTimeline = useAppStore((s) => s.redoTimeline);
   const isAIPromptOpen = useAppStore((s) => s.isAIPromptOpen);
   const setAIPromptOpen = useAppStore((s) => s.setAIPromptOpen);
+  const theme = useAppStore((s) => s.theme);
+  const setTheme = useAppStore((s) => s.setTheme);
+  const dark = theme === "dark";
 
   // The chat panel is `fixed right-0` and dispatches its width on resize —
   // mirrors the same listener canvas.tsx uses so this page's content isn't
@@ -184,31 +187,54 @@ export function EditorWorkspace() {
 
   const clips = timeline?.clips ? [...timeline.clips].sort((a, b) => a.order - b.order) : [];
 
+  const pageBg = dark ? "bg-[#0a0c10]" : "bg-gray-50";
+  const pageText = dark ? "text-white" : "text-[#0d1117]";
+  const borderCol = dark ? "border-white/10" : "border-gray-200";
+  const barBg = dark ? "bg-[#0d1117]" : "bg-white";
+  const subText = dark ? "text-gray-400" : "text-gray-500";
+  const hoverBg = dark ? "hover:bg-white/10" : "hover:bg-black/5";
+  const btnText = dark ? "text-gray-300" : "text-gray-600";
+  const trackBg = dark ? "bg-[#0a0c10]" : "bg-gray-100";
+  const clipBg = dark ? "bg-[#1c2128]" : "bg-white";
+  const clipBorder = dark ? "border-white/20" : "border-gray-300";
+  const menuBg = dark ? "bg-[#161b22]" : "bg-white";
+  const dividerBg = dark ? "bg-white/10" : "bg-gray-200";
+
   return (
     <div
-      className="flex h-[100dvh] flex-col bg-[#0a0c10] text-white"
+      className={`flex h-[100dvh] flex-col ${pageBg} ${pageText}`}
       style={{ width: isAIPromptOpen ? `calc(100dvw - ${aiPanelWidth}px)` : "100dvw" }}
     >
       {/* Header — deliberately not the MotionBoards board chrome: no logo, no
           board switcher, no dotted canvas. This is a dedicated editor. */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
-        <div className="flex items-center gap-3">
-          <Link href="/generate" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors">
+      <header className={`flex h-12 shrink-0 items-center justify-between border-b ${borderCol} px-2 sm:px-4`}>
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Link href="/generate" className={`flex items-center gap-1.5 text-xs ${subText} ${dark ? "hover:text-white" : "hover:text-[#0d1117]"} transition-colors shrink-0`}>
             <ArrowLeft className="h-3.5 w-3.5" />
-            Boards
+            <span className="hidden sm:inline">Boards</span>
           </Link>
-          <div className="h-4 w-px bg-white/10" />
-          <span className="text-xs font-semibold tracking-wide text-white">AI Video Editor</span>
+          <div className={`h-4 w-px ${dividerBg} shrink-0`} />
+          <span className="hidden sm:inline text-xs font-semibold tracking-wide truncate">AI Video Editor</span>
         </div>
-        {!isAIPromptOpen && (
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setAIPromptOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-[#f26522] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#d9541a] transition-colors"
+            onClick={() => setTheme(dark ? "light" : "dark")}
+            className={`rounded-md p-1.5 ${hoverBg} transition-colors`}
+            title={dark ? "Switch to light mode" : "Switch to dark mode"}
           >
-            <MessageSquare className="h-3 w-3" /> Open chat
+            {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
-        )}
+          {!isAIPromptOpen && (
+            <button
+              type="button"
+              onClick={() => setAIPromptOpen(true)}
+              className="flex items-center gap-1.5 rounded-md bg-[#f26522] px-2 sm:px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#d9541a] transition-colors"
+            >
+              <MessageSquare className="h-3 w-3" /> <span className="hidden xs:inline">Open chat</span>
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -219,7 +245,7 @@ export function EditorWorkspace() {
               <video ref={videoElA} className={`absolute inset-0 h-full w-full object-contain ${player.activeSlot === 0 ? "opacity-100" : "opacity-0"}`} playsInline />
               <video ref={videoElB} className={`absolute inset-0 h-full w-full object-contain ${player.activeSlot === 1 ? "opacity-100" : "opacity-0"}`} playsInline />
               {clips.length === 0 && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-500">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-500 px-4 text-center">
                   <p className="text-sm">No clips yet</p>
                   <button
                     type="button"
@@ -234,31 +260,31 @@ export function EditorWorkspace() {
           </div>
 
           {/* Transport bar */}
-          <div className="flex h-10 shrink-0 items-center justify-center gap-3 border-t border-white/10 bg-[#0d1117]">
+          <div className={`flex h-10 shrink-0 items-center justify-center gap-3 border-t ${borderCol} ${barBg}`}>
             <button
               type="button"
               onClick={() => (player.isPlaying ? player.pause() : player.play())}
               disabled={clips.length === 0}
-              className="rounded-full bg-white/10 p-1.5 hover:bg-white/20 disabled:opacity-40 transition-colors"
+              className={`rounded-full ${dark ? "bg-white/10 hover:bg-white/20" : "bg-black/5 hover:bg-black/10"} p-1.5 disabled:opacity-40 transition-colors`}
             >
-              {player.isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" fill="white" />}
+              {player.isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className={`h-3.5 w-3.5 ${dark ? "text-white" : "text-[#0d1117]"}`} fill="currentColor" />}
             </button>
-            <span className="font-mono text-[11px] text-gray-400">
+            <span className={`font-mono text-[11px] ${subText}`}>
               {fmt(player.currentTime)} / {fmt(player.totalDuration)}
             </span>
           </div>
 
-          {/* Toolbar row */}
-          <div className="flex h-11 shrink-0 items-center justify-between border-t border-white/10 bg-[#0d1117] px-3">
-            <div className="flex items-center gap-1.5">
-              <button type="button" onClick={undoTimeline} className="rounded-md px-2 py-1 text-[10px] text-gray-300 hover:bg-white/10">
+          {/* Toolbar row — horizontally scrollable so it never wraps/overflows on narrow screens */}
+          <div className={`flex h-11 shrink-0 items-center justify-between gap-2 overflow-x-auto border-t ${borderCol} ${barBg} px-2 sm:px-3`}>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button type="button" onClick={undoTimeline} className={`rounded-md px-2 py-1 text-[10px] ${btnText} ${hoverBg}`}>
                 Undo
               </button>
-              <button type="button" onClick={redoTimeline} className="rounded-md px-2 py-1 text-[10px] text-gray-300 hover:bg-white/10">
+              <button type="button" onClick={redoTimeline} className={`rounded-md px-2 py-1 text-[10px] ${btnText} ${hoverBg}`}>
                 Redo
               </button>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -274,7 +300,7 @@ export function EditorWorkspace() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-gray-300 hover:bg-white/10 disabled:opacity-50"
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold ${btnText} ${hoverBg} disabled:opacity-50`}
               >
                 <Upload className="h-3 w-3" /> {uploading ? "Uploading…" : "Upload"}
               </button>
@@ -282,21 +308,21 @@ export function EditorWorkspace() {
                 <button
                   type="button"
                   onClick={() => setAddMenuOpen((v) => !v)}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-gray-300 hover:bg-white/10"
+                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold ${btnText} ${hoverBg}`}
                 >
                   <Plus className="h-3 w-3" /> Add clip
                 </button>
                 {addMenuOpen && (
-                  <div className="absolute bottom-full right-0 mb-1 w-56 max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-[#161b22] shadow-lg">
+                  <div className={`absolute bottom-full right-0 mb-1 w-56 max-w-[calc(100vw-2rem)] max-h-64 overflow-y-auto rounded-lg border ${borderCol} ${menuBg} shadow-lg`}>
                     {eligibleVideos.length === 0 && (
-                      <div className="px-3 py-2 text-[11px] text-gray-400">No video clips yet — upload one.</div>
+                      <div className={`px-3 py-2 text-[11px] ${subText}`}>No video clips yet — upload one.</div>
                     )}
                     {eligibleVideos.map((item) => (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => addClipFromItem(item.id)}
-                        className="block w-full truncate px-3 py-1.5 text-left text-[11px] text-gray-200 hover:bg-white/10"
+                        className={`block w-full truncate px-3 py-1.5 text-left text-[11px] ${pageText} ${hoverBg}`}
                       >
                         {item.fileName || item.prompt?.slice(0, 40) || item.id}
                       </button>
@@ -321,12 +347,12 @@ export function EditorWorkspace() {
             onPointerMove={onTrackPointerMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
-            className="relative h-28 shrink-0 overflow-x-auto border-t border-white/10 bg-[#0a0c10] px-3 py-3 select-none"
+            className={`relative h-24 sm:h-28 shrink-0 overflow-x-auto border-t ${borderCol} ${trackBg} px-3 py-3 select-none`}
             style={{ touchAction: "none" }}
           >
             <div className="relative h-full" style={{ width: Math.max(300, player.totalDuration * PIXELS_PER_SECOND) }}>
               {clips.length === 0 && (
-                <div className="flex h-full items-center justify-center text-[11px] text-gray-500">
+                <div className={`flex h-full items-center justify-center text-[11px] ${subText} text-center px-4`}>
                   Empty timeline. Upload or add a clip to sequence a video.
                 </div>
               )}
@@ -346,23 +372,23 @@ export function EditorWorkspace() {
                       key={clip.id}
                       onPointerDown={onPointerDownClip(clip.id)}
                       className={`absolute top-0 bottom-0 rounded-md border-2 cursor-grab active:cursor-grabbing overflow-hidden ${
-                        isSelected ? "border-[#f26522]" : "border-white/20"
-                      } bg-[#1c2128]`}
+                        isSelected ? "border-[#f26522]" : clipBorder
+                      } ${clipBg}`}
                       style={{ left, width }}
                       title={item?.fileName || item?.prompt || clip.itemId}
                     >
-                      <div className="truncate px-1.5 py-1 text-[10px] text-white/80">
+                      <div className={`truncate px-1.5 py-1 text-[10px] ${dark ? "text-white/80" : "text-gray-700"}`}>
                         {item?.fileName || item?.prompt?.slice(0, 24) || "clip"}
                       </div>
                       <div
                         data-handle="start"
                         onPointerDown={beginTrimDrag(clip.id, "start")}
-                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize bg-[#f26522]/70 hover:bg-[#f26522]"
+                        className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize bg-[#f26522]/70 hover:bg-[#f26522] touch-none"
                       />
                       <div
                         data-handle="end"
                         onPointerDown={beginTrimDrag(clip.id, "end")}
-                        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize bg-[#f26522]/70 hover:bg-[#f26522]"
+                        className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize bg-[#f26522]/70 hover:bg-[#f26522] touch-none"
                       />
                       {isSelected && (
                         <div className="absolute right-1 top-1 flex gap-1 z-10">

@@ -10,13 +10,16 @@ import { useAppStore, startTabHeartbeat, stopTabHeartbeat } from "@/lib/store";
 
 // Dedicated AI video editor page — same account/board data as /generate,
 // but a purpose-built editor layout (preview + timeline + chat) instead of
-// the freeform moodboard canvas. Chat is docked open by default since this
-// page's whole point is directing edits through Claude.
+// the freeform moodboard canvas. Chat is docked open by default on desktop
+// since this page's whole point is directing edits through Claude; on
+// mobile the chat is a full-screen overlay (see AIPromptPanel's isMobile
+// behavior), so it starts closed there so the editor is visible first.
 export default function EditPage() {
   const [ready, setReady] = useState(false);
   const [authedUserId, setAuthedUserId] = useState<string | null>(null);
   const setCanvasMounted = useAppStore((s) => s.setCanvasMounted);
   const setAIPromptOpen = useAppStore((s) => s.setAIPromptOpen);
+  const theme = useAppStore((s) => s.theme);
 
   useEffect(() => {
     track("editor_opened");
@@ -35,7 +38,9 @@ export default function EditPage() {
   }, []);
 
   useEffect(() => {
-    setAIPromptOpen(true);
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setAIPromptOpen(true);
+    }
   }, [setAIPromptOpen]);
 
   useEffect(() => {
@@ -50,7 +55,7 @@ export default function EditPage() {
 
   if (!ready) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0a0c10]">
+      <div className={`flex h-screen items-center justify-center ${theme === "dark" ? "bg-[#0a0c10]" : "bg-gray-50"}`}>
         <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
       </div>
     );
