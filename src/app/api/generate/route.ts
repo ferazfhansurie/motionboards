@@ -1003,6 +1003,60 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (modelInfo.provider === "elevenlabs") {
+      if (!settings.elevenlabsApiKey) {
+        return NextResponse.json({ error: "ElevenLabs API key not configured." }, { status: 500 });
+      }
+      try {
+        // aspect_ratio option is reused to carry the voice name (same UI
+        // hack as the OpenAI TTS branch above) — map the display name to
+        // ElevenLabs' stable public premade voice_ids.
+        const VOICE_IDS: Record<string, string> = {
+          Rachel: "21m00Tcm4TlvDq8ikWAM",
+          Adam: "pNInz6obpgDQGcFmaJgB",
+          Antoni: "ErXwobaYiN019PkySvjV",
+          Bella: "EXAVITQu4vr4xnSDxMaL",
+          Domi: "AZnzlk1XvdvUeBnXmlld",
+          Elli: "MF3mGyEYCl7XYWbV9V6O",
+          Josh: "TxGEqnHWrfWFTfGW9XjX",
+          Arnold: "VR6AewLTigWG4xSOukaG",
+          Sam: "yoZ06aMxZJJ28mfd3POQ",
+        };
+        const voiceName = (input.aspect_ratio as string) || "Rachel";
+        const voiceId = VOICE_IDS[voiceName] || VOICE_IDS.Rachel;
+        const text = (input.text as string) || prompt || "";
+        if (!text.trim()) {
+          return NextResponse.json({ error: "Text is required for TTS." }, { status: 400 });
+        }
+
+        const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: "POST",
+          headers: {
+            "xi-api-key": settings.elevenlabsApiKey,
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+          },
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_multilingual_v2",
+          }),
+        });
+        if (!ttsRes.ok) {
+          const err = await ttsRes.text().catch(() => "");
+          throw new Error(`ElevenLabs TTS failed (${ttsRes.status}): ${err.slice(0, 200)}`);
+        }
+        const buffer = Buffer.from(await ttsRes.arrayBuffer());
+        const outputUrl = await storeOutput(req.nextUrl.origin, buffer, "audio/mpeg", user.id);
+        await chargeForGeneration({ userId: user.id, generationId: generation.id, modelId });
+        await finalizeGeneration(generation.id, { status: "completed", outputUrl });
+        return NextResponse.json({ generationId: generation.id, status: "completed", outputUrl });
+      } catch (ttsErr) {
+        const msg = ttsErr instanceof Error ? ttsErr.message : "ElevenLabs TTS error";
+        await finalizeGeneration(generation.id, { status: "failed", error: msg });
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
+    }
+
     // Fish Audio: voice clone + TTS in one synchronous flow
     if (modelInfo.provider === "fish") {
       if (!settings.fishApiKey) {

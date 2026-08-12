@@ -60,7 +60,7 @@ export interface PerSecondRate {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "openai" | "replicate" | "segmind" | "gemini" | "fish" | "byteplus" | "comfy";
+  provider: "openai" | "replicate" | "segmind" | "gemini" | "fish" | "byteplus" | "comfy" | "elevenlabs";
   type: ModelType;
   category: ModelCategory;
   description: string;
@@ -1107,6 +1107,20 @@ export const models: AIModel[] = [
     ],
     options: {
       aspect_ratio: { values: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], default: "alloy", label: "Voice" },
+    },
+  },
+
+  {
+    id: "elevenlabs-tts",
+    name: "ElevenLabs TTS",
+    provider: "elevenlabs", type: "audio", category: "Voice",
+    description: "ElevenLabs text-to-speech (eleven_multilingual_v2). More natural prosody than tts-1, supports 29 languages — good for voiceover narration.",
+    cost: "~RM0.05", creditCost: 5, speed: "~5s", stable: true,
+    inputs: [
+      { name: "text", type: "text", required: true, description: "Text to read aloud" },
+    ],
+    options: {
+      aspect_ratio: { values: ["Rachel", "Adam", "Antoni", "Bella", "Domi", "Elli", "Josh", "Arnold", "Sam"], default: "Rachel", label: "Voice" },
     },
   },
 

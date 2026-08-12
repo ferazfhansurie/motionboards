@@ -26,10 +26,13 @@ export interface Settings {
   // ARK_API_KEY on Vercel; no settings.json fallback needed for this one but
   // we keep the shape consistent with the others.
   arkApiKey: string;
+  // ElevenLabs TTS. Token lives in ELEVENLABS_API_KEY on Vercel / .env.local
+  // — env-only like arkApiKey, no settings.json UI wiring.
+  elevenlabsApiKey: string;
 }
 
 export function getSettings(): Settings {
-  let settings: Settings = { openaiApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "", arkApiKey: "" };
+  let settings: Settings = { openaiApiKey: "", replicateApiKey: "", segmindApiKey: "", geminiApiKey: "", fishApiKey: "", arkApiKey: "", elevenlabsApiKey: "" };
   if (existsSync(SETTINGS_FILE)) {
     try {
       settings = { ...settings, ...JSON.parse(readFileSync(SETTINGS_FILE, "utf-8")) };
@@ -42,6 +45,7 @@ export function getSettings(): Settings {
   if (!settings.geminiApiKey) settings.geminiApiKey = process.env.GEMINI_API_KEY || "";
   if (!settings.fishApiKey) settings.fishApiKey = process.env.FISH_API_KEY || "";
   if (!settings.arkApiKey) settings.arkApiKey = process.env.ARK_API_KEY || "";
+  if (!settings.elevenlabsApiKey) settings.elevenlabsApiKey = process.env.ELEVENLABS_API_KEY || "";
   return settings;
 }
 
