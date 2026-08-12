@@ -95,6 +95,106 @@ Pick model_id from the catalog in your system prompt. Don't invent ids.`,
       required: ["model_id", "prompt"],
     },
   },
+  {
+    name: "timeline_add_clip",
+    kind: "client_action",
+    description: `Add an existing video already on the canvas to the single-track timeline, as a new sequenced clip. The clip references the canvas item — the source media is never duplicated.
+
+Use this when the user wants to build an edited sequence from clips they already generated or uploaded. If the video isn't on the canvas yet, generate or upload it first.
+
+Appends to the end of the timeline by default. Pass trim_in/trim_out only if the user wants a specific portion — otherwise the full source is used.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        item_id: { type: "string", description: "The canvas item id of the video to add (from CURRENT TIMELINE / canvas context)." },
+        trim_in: { type: "number", description: "Optional start offset in seconds into the source. Defaults to 0." },
+        trim_out: { type: "number", description: "Optional end offset in seconds into the source. Defaults to the full source duration." },
+        order: { type: "number", description: "Optional position in the sequence (0-based). Defaults to appended at the end." },
+      },
+      required: ["item_id"],
+    },
+  },
+  {
+    name: "timeline_trim_clip",
+    kind: "client_action",
+    description: "Change the in/out points of a clip already on the timeline — use to tighten or extend a cut. Does not affect the underlying canvas item, only where this clip starts/ends within its own sequenced range.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clip_id: { type: "string", description: "The timeline clip id (not the canvas item id) — from the CURRENT TIMELINE context." },
+        trim_in: { type: "number", description: "New start offset in seconds into the source." },
+        trim_out: { type: "number", description: "New end offset in seconds into the source." },
+      },
+      required: ["clip_id"],
+    },
+  },
+  {
+    name: "timeline_reorder_clip",
+    kind: "client_action",
+    description: "Move a clip to a new position in the timeline sequence.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clip_id: { type: "string", description: "The timeline clip id to move." },
+        order: { type: "number", description: "Target position (0-based; use the order values shown in CURRENT TIMELINE as a guide, non-integers are fine)." },
+      },
+      required: ["clip_id", "order"],
+    },
+  },
+  {
+    name: "timeline_split_clip",
+    kind: "client_action",
+    description: "Split one timeline clip into two at a given offset, so each half can be trimmed, reordered, or removed independently. Use this before removing or replacing just part of a clip.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clip_id: { type: "string", description: "The timeline clip id to split." },
+        at_seconds: { type: "number", description: "Offset in seconds from the start of this clip's OWN trimmed range (not the source media) where the cut happens." },
+      },
+      required: ["clip_id", "at_seconds"],
+    },
+  },
+  {
+    name: "timeline_remove_clip",
+    kind: "client_action",
+    description: "Remove a clip from the timeline sequence. Does not delete the underlying canvas item — it stays on the board and can be re-added.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clip_id: { type: "string", description: "The timeline clip id to remove." },
+      },
+      required: ["clip_id"],
+    },
+  },
+  {
+    name: "timeline_probe_clip",
+    kind: "client_action",
+    description: `Grab a single frame from a video (as an image you can then see) so you can judge what's actually happening at a moment in the footage before deciding where to cut or what to say about it. Use this before trimming/splitting a clip you haven't looked at yet, or when the user asks "what's at the start/end of this clip" or similar.
+
+Works on any video canvas item — doesn't require the clip to already be on the timeline.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        item_id: { type: "string", description: "The canvas item id of the video to probe." },
+        at_seconds: { type: "number", description: "Timestamp in seconds to grab the frame at. Defaults to the middle of the video if omitted." },
+      },
+      required: ["item_id"],
+    },
+  },
+  {
+    name: "timeline_transcribe_clip",
+    kind: "client_action",
+    description: `Get a timestamped transcript of a video's audio, so you can find "the part where they say X" or judge pacing/dialogue without the user describing it to you. Use before trimming to a specific spoken moment, or when asked to cut around dialogue/narration.
+
+Returns an empty/near-empty transcript for clips with no speech (music-only, silent, etc.) — that's a valid result, not an error.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        item_id: { type: "string", description: "The canvas item id of the video to transcribe." },
+      },
+      required: ["item_id"],
+    },
+  },
 ];
 
 // Convert the registry into the shape Claude expects in its `tools` array.

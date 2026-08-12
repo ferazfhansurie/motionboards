@@ -58,7 +58,7 @@ const initialLoadedItemCount: number = (initialLoadedState?.boards || []).reduce
 function getCurrentBoards(state: AppState): Board[] {
   return state.boards.map((b) =>
     b.id === state.activeBoardId
-      ? { ...b, items: state.items, connections: state.connections, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName }
+      ? { ...b, items: state.items, connections: state.connections, panX: state.panX, panY: state.panY, zoom: state.zoom, name: state.boardName, timeline: state.timeline || undefined }
       : b
   );
 }
@@ -282,12 +282,29 @@ export interface Board {
   panY: number;
   zoom: number;
   connections: Connection[];
+  timeline?: Timeline;
 }
 
 export interface Connection {
   id: string;
   fromId: string;
   toId: string;
+}
+
+export interface TimelineClip {
+  id: string;
+  itemId: string; // references an existing BoardItem — media is never duplicated
+  trimIn: number; // seconds into the source media
+  trimOut: number; // seconds into the source media
+  order: number; // position in the single track; floats allowed for cheap reordering
+  sourceDurationSec?: number; // cached full-source duration, probed once on add
+}
+
+export interface Timeline {
+  id: string;
+  clips: TimelineClip[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AppState {
@@ -353,6 +370,8 @@ export interface AppState {
   drawingColor: string;
   drawingStrokeWidth: number;
   connections: Connection[];
+  timeline: Timeline | null;
+  isTimelineOpen: boolean;
   theme: "light" | "dark";
   connectingFromId: string | null;
   // When true, every new generation automatically draws connection lines from
@@ -387,6 +406,8 @@ export interface AppState {
   // Undo/Redo
   undoStack: BoardItem[][];
   redoStack: BoardItem[][];
+  timelineUndoStack: TimelineClip[][];
+  timelineRedoStack: TimelineClip[][];
 
   // Actions
   addItem: (item: BoardItem) => void;
@@ -463,6 +484,14 @@ export interface AppState {
   setConnectingFromId: (id: string | null) => void;
   setFoldersOpen: (open: boolean) => void;
   setAssetsOpen: (open: boolean) => void;
+  setTimelineOpen: (open: boolean) => void;
+  addTimelineClip: (itemId: string, opts?: { trimIn?: number; trimOut?: number; order?: number; sourceDurationSec?: number }) => string;
+  updateTimelineClip: (clipId: string, patch: Partial<Pick<TimelineClip, "trimIn" | "trimOut" | "order">>) => void;
+  removeTimelineClip: (clipId: string) => void;
+  reorderTimelineClip: (clipId: string, order: number) => void;
+  splitTimelineClip: (clipId: string, atSeconds: number) => string | null;
+  undoTimeline: () => void;
+  redoTimeline: () => void;
   setMultiTabLockout: (info: AppState["multiTabLockout"]) => void;
   setTakeoverInProgress: (v: boolean) => void;
   setCanvasMounted: (v: boolean) => void;
@@ -501,6 +530,8 @@ export const useAppStore = create<AppState>((set) => {
   panY: startBoard.panY || 0,
   zoom: startBoard.zoom || 1,
   boardName: startBoard.name || "Board 1",
+  timeline: startBoard.timeline || null,
+  isTimelineOpen: false,
   selectedModelId: saved?.selectedModelId || "gemini-3.1-flash-image-preview",
   isModelPanelOpen: false,
   isTemplatesOpen: false,
@@ -556,6 +587,8 @@ export const useAppStore = create<AppState>((set) => {
   canvasMounted: false,
   undoStack: [],
   redoStack: [],
+  timelineUndoStack: [],
+  timelineRedoStack: [],
 
   pushUndo: () => set((s) => ({
     undoStack: [...s.undoStack.slice(-49), s.items],
@@ -616,6 +649,7 @@ export const useAppStore = create<AppState>((set) => {
         panY: active.panY || 0,
         zoom: active.zoom || 1,
         boardName: active.name || "Board 1",
+        timeline: active.timeline || null,
         selectedModelId: snap.selectedModelId ?? null,
         selectedItemId: null,
         selectedItemIds: [],
@@ -625,11 +659,14 @@ export const useAppStore = create<AppState>((set) => {
         audioInputId: null,
         undoStack: [],
         redoStack: [],
+        timelineUndoStack: [],
+        timelineRedoStack: [],
       };
     }),
   setConnectingFromId: (connectingFromId) => set({ connectingFromId }),
   setFoldersOpen: (isFoldersOpen) => set({ isFoldersOpen }),
   setAssetsOpen: (isAssetsOpen) => set({ isAssetsOpen }),
+  setTimelineOpen: (isTimelineOpen) => set({ isTimelineOpen }),
   setMultiTabLockout: (multiTabLockout) => set({ multiTabLockout }),
   setTakeoverInProgress: (takeoverInProgress) => set({ takeoverInProgress }),
   setCanvasMounted: (canvasMounted) => set({ canvasMounted }),
@@ -994,7 +1031,7 @@ export const useAppStore = create<AppState>((set) => {
       // Save current board state
       const updatedBoards = s.boards.map((b) =>
         b.id === s.activeBoardId
-          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom }
+          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom, timeline: s.timeline || undefined }
           : b
       );
       const newId = `board_${Date.now()}`;
@@ -1012,6 +1049,7 @@ export const useAppStore = create<AppState>((set) => {
         activeBoardId: newId,
         items: [],
         connections: [],
+        timeline: null,
         selectedItemId: null,
         panX: 0,
         panY: 0,
@@ -1021,6 +1059,8 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: null,
         inputRefs: [],
         audioInputId: null,
+        timelineUndoStack: [],
+        timelineRedoStack: [],
       };
     }),
   insertImportedBoard: (board) =>
@@ -1030,7 +1070,7 @@ export const useAppStore = create<AppState>((set) => {
       // (minted by importBoardFromFile) so no collision with existing boards.
       const updatedBoards = s.boards.map((b) =>
         b.id === s.activeBoardId
-          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom }
+          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom, timeline: s.timeline || undefined }
           : b
       );
       return {
@@ -1038,6 +1078,7 @@ export const useAppStore = create<AppState>((set) => {
         activeBoardId: board.id,
         items: board.items,
         connections: board.connections || [],
+        timeline: board.timeline || null,
         selectedItemId: null,
         selectedItemIds: [],
         panX: board.panX || 0,
@@ -1050,6 +1091,8 @@ export const useAppStore = create<AppState>((set) => {
         audioInputId: null,
         undoStack: [],
         redoStack: [],
+        timelineUndoStack: [],
+        timelineRedoStack: [],
       };
     }),
   switchBoard: (boardId) =>
@@ -1057,7 +1100,7 @@ export const useAppStore = create<AppState>((set) => {
       if (boardId === s.activeBoardId) return s;
       const updatedBoards = s.boards.map((b) =>
         b.id === s.activeBoardId
-          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom }
+          ? { ...b, items: s.items, connections: s.connections, panX: s.panX, panY: s.panY, zoom: s.zoom, timeline: s.timeline || undefined }
           : b
       );
       const target = updatedBoards.find((b) => b.id === boardId);
@@ -1067,6 +1110,7 @@ export const useAppStore = create<AppState>((set) => {
         activeBoardId: boardId,
         items: target.items,
         connections: target.connections || [],
+        timeline: target.timeline || null,
         selectedItemId: null,
         panX: target.panX,
         panY: target.panY,
@@ -1076,6 +1120,8 @@ export const useAppStore = create<AppState>((set) => {
         endFrameId: null,
         inputRefs: [],
         audioInputId: null,
+        timelineUndoStack: [],
+        timelineRedoStack: [],
       };
     }),
   deleteBoard: (boardId) =>
@@ -1089,6 +1135,7 @@ export const useAppStore = create<AppState>((set) => {
           activeBoardId: target.id,
           items: target.items,
           connections: target.connections || [],
+          timeline: target.timeline || null,
           selectedItemId: null,
           panX: target.panX,
           panY: target.panY,
@@ -1098,6 +1145,8 @@ export const useAppStore = create<AppState>((set) => {
           endFrameId: null,
           inputRefs: [],
           audioInputId: null,
+          timelineUndoStack: [],
+          timelineRedoStack: [],
         };
       }
       return { boards: remaining };
@@ -1107,6 +1156,121 @@ export const useAppStore = create<AppState>((set) => {
       boards: s.boards.map((b) => (b.id === boardId ? { ...b, name } : b)),
       boardName: s.activeBoardId === boardId ? name : s.boardName,
     })),
+
+  addTimelineClip: (itemId, opts) => {
+    const clipId = `tclip_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    set((s) => {
+      const clips = s.timeline?.clips || [];
+      const maxOrder = clips.reduce((m, c) => Math.max(m, c.order), -1);
+      const trimIn = opts?.trimIn ?? 0;
+      const trimOut = opts?.trimOut ?? opts?.sourceDurationSec ?? trimIn + 5;
+      const newClip: TimelineClip = {
+        id: clipId,
+        itemId,
+        trimIn,
+        trimOut,
+        order: opts?.order ?? maxOrder + 1,
+        sourceDurationSec: opts?.sourceDurationSec,
+      };
+      const now = new Date().toISOString();
+      const timeline: Timeline = s.timeline
+        ? { ...s.timeline, clips: [...clips, newClip], updatedAt: now }
+        : { id: `tl_${Date.now()}`, clips: [newClip], createdAt: now, updatedAt: now };
+      return {
+        timelineUndoStack: [...s.timelineUndoStack.slice(-49), clips],
+        timelineRedoStack: [],
+        timeline,
+      };
+    });
+    return clipId;
+  },
+  updateTimelineClip: (clipId, patch) =>
+    set((s) => {
+      if (!s.timeline) return s;
+      const clips = s.timeline.clips;
+      return {
+        timelineUndoStack: [...s.timelineUndoStack.slice(-49), clips],
+        timelineRedoStack: [],
+        timeline: {
+          ...s.timeline,
+          clips: clips.map((c) => (c.id === clipId ? { ...c, ...patch } : c)),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  removeTimelineClip: (clipId) =>
+    set((s) => {
+      if (!s.timeline) return s;
+      const clips = s.timeline.clips;
+      return {
+        timelineUndoStack: [...s.timelineUndoStack.slice(-49), clips],
+        timelineRedoStack: [],
+        timeline: {
+          ...s.timeline,
+          clips: clips.filter((c) => c.id !== clipId),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  reorderTimelineClip: (clipId, order) =>
+    set((s) => {
+      if (!s.timeline) return s;
+      const clips = s.timeline.clips;
+      return {
+        timelineUndoStack: [...s.timelineUndoStack.slice(-49), clips],
+        timelineRedoStack: [],
+        timeline: {
+          ...s.timeline,
+          clips: clips.map((c) => (c.id === clipId ? { ...c, order } : c)),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  splitTimelineClip: (clipId, atSeconds) => {
+    let newClipId: string | null = null;
+    set((s) => {
+      if (!s.timeline) return s;
+      const clips = s.timeline.clips;
+      const clip = clips.find((c) => c.id === clipId);
+      if (!clip) return s;
+      // atSeconds is relative to the clip's own trimmed range, not the source.
+      const splitPoint = clip.trimIn + atSeconds;
+      if (splitPoint <= clip.trimIn || splitPoint >= clip.trimOut) return s;
+      newClipId = `tclip_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const first: TimelineClip = { ...clip, trimOut: splitPoint };
+      const second: TimelineClip = { ...clip, id: newClipId, trimIn: splitPoint, order: clip.order + 0.5 };
+      return {
+        timelineUndoStack: [...s.timelineUndoStack.slice(-49), clips],
+        timelineRedoStack: [],
+        timeline: {
+          ...s.timeline,
+          clips: clips.map((c) => (c.id === clipId ? first : c)).concat(second),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+    return newClipId;
+  },
+  undoTimeline: () =>
+    set((s) => {
+      if (s.timelineUndoStack.length === 0 || !s.timeline) return s;
+      const prev = s.timelineUndoStack[s.timelineUndoStack.length - 1];
+      return {
+        timelineUndoStack: s.timelineUndoStack.slice(0, -1),
+        timelineRedoStack: [...s.timelineRedoStack, s.timeline.clips],
+        timeline: { ...s.timeline, clips: prev },
+      };
+    }),
+  redoTimeline: () =>
+    set((s) => {
+      if (s.timelineRedoStack.length === 0 || !s.timeline) return s;
+      const next = s.timelineRedoStack[s.timelineRedoStack.length - 1];
+      return {
+        timelineRedoStack: s.timelineRedoStack.slice(0, -1),
+        timelineUndoStack: [...s.timelineUndoStack, s.timeline.clips],
+        timeline: { ...s.timeline, clips: next },
+      };
+    }),
 });
 });
 

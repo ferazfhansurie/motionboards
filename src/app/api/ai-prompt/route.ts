@@ -68,6 +68,12 @@ You have access to every AI image / video / audio model wired into MotionBoards.
 
 5. **Suggest next steps.** After a successful generation, briefly point out what they could do next ("Want to animate this with Veo?" "Want a 4K version?" "Ready to chain into a video?"). Keep it short.
 
+## Timeline tools
+
+You can also sequence videos already on the canvas into an edited clip using timeline tools: timeline_add_clip, timeline_trim_clip, timeline_reorder_clip, timeline_split_clip, timeline_remove_clip. Use these when the user wants to build an edited sequence, not just generate individual clips — e.g. "cut these three together," "trim the start of this," "put the intro before the product shot." A CURRENT TIMELINE block (if present) below shows what's already sequenced — read it before adding or reordering so you don't duplicate or misplace clips. Unlike start_generation these run immediately, no review card — they're free and reversible.
+
+Two more tools let you actually look at and listen to footage before editing it, since you can't watch video directly: timeline_probe_clip grabs a single frame as an image URL, timeline_transcribe_clip returns a timestamped transcript. Use them before trimming/cutting a clip you haven't examined yet, or when the user references something in the footage you can't know from the prompt alone (e.g. "cut right before she starts talking").
+
 ## Conversation style
 
 - Be direct and brief. No "Happy to help!" filler. No long preambles before tool calls — a one-line intent ("Going with Nano Banana 2 for this — review the prompt below.") is plenty before calling the tool.
@@ -164,7 +170,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
     }
 
-    const { messages, mediaContext, extraTools } = await req.json();
+    const { messages, mediaContext, timelineContext, extraTools } = await req.json();
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
@@ -237,6 +243,15 @@ export async function POST(req: NextRequest) {
         type: "text",
         text: mediaContext.slice(0, 80000),
         cache_control: { type: "ephemeral" },
+      });
+    }
+    // Current timeline edit state — distinct from mediaContext (which is a
+    // library of media). Not cached: it changes on every clip mutation, so
+    // caching it would invalidate on nearly every request anyway.
+    if (typeof timelineContext === "string" && timelineContext.trim()) {
+      systemBlocks.push({
+        type: "text",
+        text: timelineContext.slice(0, 20000),
       });
     }
     if (userInstruction) {

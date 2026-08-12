@@ -9,6 +9,16 @@ import remarkBreaks from "remark-breaks";
 import { useAppStore } from "@/lib/store";
 import { CHAT_MODELS, DEFAULT_CHAT_MODEL } from "@/lib/chat-models";
 import { runAgentGeneration } from "@/lib/agent-generation";
+import {
+  runTimelineAddClip,
+  runTimelineTrimClip,
+  runTimelineReorderClip,
+  runTimelineSplitClip,
+  runTimelineRemoveClip,
+  runTimelineProbeClip,
+  runTimelineTranscribeClip,
+  type TimelineToolResult,
+} from "@/lib/agent-timeline";
 
 // Message content is either a plain string (simple turns) or an array of
 // parts. The server route translates these to Anthropic's content-block
@@ -972,13 +982,28 @@ export function AIPromptPanel() {
   // and updates the assistant bubble in place. Returns the final assistant
   // message + Claude's stop_reason so the outer loop knows whether to
   // continue with tool execution.
+  // Serializes the current timeline into a compact block Claude reads before
+  // calling timeline_* tools, so it knows what's already sequenced instead
+  // of guessing clip ids/positions.
+  const buildTimelineContext = (): string | undefined => {
+    const { timeline, items } = useAppStore.getState();
+    if (!timeline || timeline.clips.length === 0) return undefined;
+    const sorted = [...timeline.clips].sort((a, b) => a.order - b.order);
+    const lines = sorted.map((c) => {
+      const item = items.find((i) => i.id === c.itemId);
+      const label = item?.fileName || item?.prompt?.slice(0, 40) || c.itemId;
+      return `- clip ${c.id} (order ${c.order}): item ${c.itemId} "${label}", trim ${c.trimIn.toFixed(1)}s–${c.trimOut.toFixed(1)}s (${(c.trimOut - c.trimIn).toFixed(1)}s)`;
+    });
+    return `## CURRENT TIMELINE\n${lines.join("\n")}`;
+  };
+
   const streamOneTurn = async (
     history: Message[],
   ): Promise<{ assistant: Message; stopReason: string | null; error?: string }> => {
     const res = await fetch("/api/ai-prompt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history }),
+      body: JSON.stringify({ messages: history, timelineContext: buildTimelineContext() }),
     });
 
     if (!res.ok || !res.body) {
@@ -1117,6 +1142,42 @@ export function AIPromptPanel() {
           is_error: isError,
         };
       }
+
+      const timelineHandlers: Record<string, (input: Record<string, unknown>) => Promise<TimelineToolResult> | TimelineToolResult> = {
+        timeline_add_clip: (input) =>
+          runTimelineAddClip({
+            item_id: input.item_id as string,
+            trim_in: input.trim_in as number | undefined,
+            trim_out: input.trim_out as number | undefined,
+            order: input.order as number | undefined,
+          }),
+        timeline_trim_clip: (input) =>
+          runTimelineTrimClip({
+            clip_id: input.clip_id as string,
+            trim_in: input.trim_in as number | undefined,
+            trim_out: input.trim_out as number | undefined,
+          }),
+        timeline_reorder_clip: (input) =>
+          runTimelineReorderClip({ clip_id: input.clip_id as string, order: input.order as number }),
+        timeline_split_clip: (input) =>
+          runTimelineSplitClip({ clip_id: input.clip_id as string, at_seconds: input.at_seconds as number }),
+        timeline_remove_clip: (input) => runTimelineRemoveClip({ clip_id: input.clip_id as string }),
+        timeline_probe_clip: (input) =>
+          runTimelineProbeClip({ item_id: input.item_id as string, at_seconds: input.at_seconds as number | undefined }),
+        timeline_transcribe_clip: (input) => runTimelineTranscribeClip({ item_id: input.item_id as string }),
+      };
+
+      const handler = timelineHandlers[toolUse.name];
+      if (handler) {
+        const result = await handler(toolUse.input);
+        return {
+          type: "tool_result",
+          tool_use_id: toolUse.id,
+          content: result.message,
+          is_error: !result.ok,
+        };
+      }
+
       return {
         type: "tool_result",
         tool_use_id: toolUse.id,

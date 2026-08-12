@@ -14,6 +14,7 @@ import { ProfilePanel, HistoryPanel } from "./dashboard-modal";
 import { AIPromptPanel } from "./ai-prompt-panel";
 import { FoldersPanel } from "./folders-panel";
 import { AssetsPanel, AssetReadyNotifier } from "./assets-panel";
+import { TimelinePanel } from "./timeline-panel";
 import { Minimap } from "./minimap";
 import { UILayer } from "@/components/ui/ui-layer";
 import { parsePsdBuffer } from "@/lib/psd";
@@ -1161,6 +1162,7 @@ export function Canvas() {
       <AIPromptPanel />
       <FoldersPanel />
       <AssetsPanel />
+      <TimelinePanel />
       <AssetReadyNotifier />
       <Minimap />
       <UILayer />
