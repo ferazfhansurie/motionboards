@@ -185,9 +185,18 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-export function AIPromptPanel() {
-  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, pendingChatSeed, setPendingChatSeed, theme, items: canvasItems, boards, activeBoardId } = useAppStore();
+interface AIPromptPanelProps {
+  // "editor" swaps the greeting, suggested prompts, and header status for
+  // copy that reflects this is a video-editing agent aware of the current
+  // timeline (used by /edit) instead of the generic generation assistant
+  // shown on the board canvas.
+  variant?: "board" | "editor";
+}
+
+export function AIPromptPanel({ variant = "board" }: AIPromptPanelProps = {}) {
+  const { isAIPromptOpen, setAIPromptOpen, setPendingPrompt, pendingChatSeed, setPendingChatSeed, theme, items: canvasItems, boards, activeBoardId, timeline } = useAppStore();
   const isDark = theme === "dark";
+  const isEditor = variant === "editor";
 
   // Resizable width — persisted to localStorage
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
@@ -1403,11 +1412,15 @@ export function AIPromptPanel() {
           </div>
           <div className="min-w-0">
             <h3 className={`text-sm font-bold tracking-tight truncate ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-              {currentChat?.title || "ADletic AI"}
+              {currentChat?.title || (isEditor ? "Edit Assistant" : "ADletic AI")}
             </h3>
             <p className="text-[10px] text-green-500 font-medium flex items-center gap-1">
               <span className="inline-block w-1 h-1 rounded-full bg-green-500 animate-pulse" />
-              Online — ready to create
+              {isEditor
+                ? timeline && timeline.clips.length > 0
+                  ? `Sees ${timeline.clips.length} clip${timeline.clips.length === 1 ? "" : "s"} on your timeline`
+                  : "Online — timeline is empty"
+                : "Online — ready to create"}
             </p>
           </div>
         </div>
@@ -1857,21 +1870,31 @@ export function AIPromptPanel() {
                   </div>
                 </div>
                 <h2 className={`text-xl font-bold tracking-tight mb-1.5 ${isDark ? "text-white" : "text-[#0d1117]"}`}>
-                  Hey, I&rsquo;m ADletic
+                  {isEditor ? "Hi, I'm your edit assistant" : "Hey, I’m ADletic"}
                 </h2>
                 <p className={`text-[12.5px] mb-6 max-w-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                  Tell me what you want to create — a video, a poster, a storyboard. I&rsquo;ll craft the prompt and walk you through it.
+                  {isEditor
+                    ? "Tell me how to cut this together — trim, split, reorder, or find a moment in your footage. I can look at frames and read transcripts before I cut."
+                    : "Tell me what you want to create — a video, a poster, a storyboard. I’ll craft the prompt and walk you through it."}
                 </p>
                 <div className="w-full max-w-sm space-y-2">
                   <p className={`text-[10px] uppercase tracking-wider font-bold mb-2.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                     Try one of these
                   </p>
-                  {[
-                    { emoji: "🎬", text: "Cinematic drone shot of a city at golden hour" },
-                    { emoji: "📸", text: "12-panel storyboard for a coffee ad" },
-                    { emoji: "🎨", text: "Neon-noir comic book illustration of a courier" },
-                    { emoji: "💡", text: "What makes a good Veo prompt?" },
-                  ].map((s) => (
+                  {(isEditor
+                    ? [
+                        { emoji: "✂️", text: "Trim the start of this clip" },
+                        { emoji: "🎬", text: "Cut these clips together in order" },
+                        { emoji: "📝", text: "What's said in this clip?" },
+                        { emoji: "🔍", text: "Show me what's happening at the start of this clip" },
+                      ]
+                    : [
+                        { emoji: "🎬", text: "Cinematic drone shot of a city at golden hour" },
+                        { emoji: "📸", text: "12-panel storyboard for a coffee ad" },
+                        { emoji: "🎨", text: "Neon-noir comic book illustration of a courier" },
+                        { emoji: "💡", text: "What makes a good Veo prompt?" },
+                      ]
+                  ).map((s) => (
                     <button
                       key={s.text}
                       type="button"

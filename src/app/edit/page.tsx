@@ -59,7 +59,7 @@ export default function EditPage() {
   return (
     <>
       <EditorWorkspace />
-      <AIPromptPanel />
+      <AIPromptPanel variant="editor" />
       <MultiTabLockout />
     </>
   );
