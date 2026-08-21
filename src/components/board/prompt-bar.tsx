@@ -1008,24 +1008,100 @@ export function PromptBar() {
       // accept ones created after this click.
       const generateStartedAt = new Date().toISOString();
 
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          model: selectedModel.id,
-          mode: selectedModel.type,
-          inputImage,
-          inputImages: inputImagesList,
-          inputVideo,
-          inputVideos: inputVideosList,
-          startFrame: startFrameUrl,
-          endFrame: endFrameUrl,
-          inputAudio: inputAudioUrl,
-          inputAudios: inputAudiosList,
-          generationOptions: Object.keys(generationOptions).length > 0 ? generationOptions : undefined,
-        }),
-      });
+      // Recovery: synchronous providers (Nano Banana 2 4K is the worst
+      // offender — 60–120s GPU runs) routinely complete server-side but lose
+      // the response on the way back — either a Vercel gateway error (res.ok
+      // is false) or the fetch() call itself throwing "TypeError: Failed to
+      // fetch" (mobile Safari backgrounding the tab, a network blip, no
+      // Response object ever exists). Hoisted above the fetch call so BOTH
+      // failure shapes can reach it — previously only the res.ok branch did,
+      // so a raw network throw skipped straight to the generic catch below
+      // and reported "failed" even when the generation had already completed
+      // and charged server-side.
+      const recoverFromHistory = async (): Promise<boolean> => {
+        // Up to ~60s of polling: the upstream may still be finishing.
+        const deadline = Date.now() + 60_000;
+        while (Date.now() < deadline) {
+          try {
+            const url = `/api/generations/recent?model=${encodeURIComponent(selectedModel.id)}&since=${encodeURIComponent(generateStartedAt)}&limit=5`;
+            const histRes = await fetch(url, { cache: "no-store" });
+            if (histRes.ok) {
+              const histJson = await histRes.json().catch(() => ({}));
+              const candidates = (histJson.generations as Array<{ status: string; outputUrl?: string | null; prompt?: string | null }> | undefined) || [];
+              const match = candidates.find(
+                (g) => g.status === "completed" && g.outputUrl && (g.prompt || "") === (prompt || ""),
+              );
+              if (match && match.outputUrl) {
+                useAppStore.getState().updateItem(genItem.id, {
+                  status: "completed",
+                  outputUrl: match.outputUrl,
+                  cost: getEstimatedCost(selectedModel, generationOptions),
+                  progressText: undefined,
+                  error: undefined,
+                });
+                if (outputType === "image") {
+                  const img = new window.Image();
+                  img.onload = () => {
+                    const maxW = 250;
+                    const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+                    useAppStore.getState().updateItem(genItem.id, {
+                      width: Math.round(img.naturalWidth * scale),
+                      height: Math.round(img.naturalHeight * scale),
+                    });
+                  };
+                  img.src = match.outputUrl;
+                }
+                return true;
+              }
+            }
+          } catch {
+            // ignore and retry
+          }
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        return false;
+      };
+
+      let res: Response;
+      try {
+        res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            model: selectedModel.id,
+            mode: selectedModel.type,
+            inputImage,
+            inputImages: inputImagesList,
+            inputVideo,
+            inputVideos: inputVideosList,
+            startFrame: startFrameUrl,
+            endFrame: endFrameUrl,
+            inputAudio: inputAudioUrl,
+            inputAudios: inputAudiosList,
+            generationOptions: Object.keys(generationOptions).length > 0 ? generationOptions : undefined,
+          }),
+        });
+      } catch (networkErr) {
+        // The request never reached a response — no res.ok to branch on.
+        // Same recovery path as an HTTP error below: the generation may well
+        // have completed and charged upstream despite the browser losing it.
+        const msg = networkErr instanceof Error ? networkErr.message : "Failed to fetch";
+        showToast(`${msg} — checking if it finished anyway...`, { kind: "error", durationMs: 6000 });
+        useAppStore.getState().updateItem(genItem.id, {
+          status: "processing",
+          progressText: "Recovering...",
+        });
+        const recovered = await recoverFromHistory();
+        if (!recovered) {
+          useAppStore.getState().updateItem(genItem.id, {
+            status: "failed",
+            error: msg,
+            progressText: undefined,
+          });
+        }
+        return;
+      }
 
       // Some failures (Vercel's 413, gateway errors) return HTML, not JSON.
       // Parse defensively so the user sees a clear message instead of
@@ -1060,61 +1136,10 @@ export function PromptBar() {
         const durationMs = res.status === 429 ? 8000 : 6000;
         showToast(msg, { kind: "error", durationMs });
 
-        // Recovery: synchronous providers (Nano Banana 2 4K is the worst
-        // offender — 60–120s GPU runs) routinely complete server-side but
-        // lose the response on the way back through Vercel's edge proxy or
-        // a flaky network. Before we declare failure, poll the user's recent
-        // generations for a completed match created after this click. If
-        // the work landed in the DB, attach its outputUrl to this canvas
-        // item so the user actually sees what they paid for.
         useAppStore.getState().updateItem(genItem.id, {
           status: "processing",
           progressText: "Recovering...",
         });
-
-        const recoverFromHistory = async (): Promise<boolean> => {
-          // Up to ~60s of polling: the upstream may still be finishing.
-          const deadline = Date.now() + 60_000;
-          while (Date.now() < deadline) {
-            try {
-              const url = `/api/generations/recent?model=${encodeURIComponent(selectedModel.id)}&since=${encodeURIComponent(generateStartedAt)}&limit=5`;
-              const histRes = await fetch(url, { cache: "no-store" });
-              if (histRes.ok) {
-                const histJson = await histRes.json().catch(() => ({}));
-                const candidates = (histJson.generations as Array<{ status: string; outputUrl?: string | null; prompt?: string | null }> | undefined) || [];
-                const match = candidates.find(
-                  (g) => g.status === "completed" && g.outputUrl && (g.prompt || "") === (prompt || ""),
-                );
-                if (match && match.outputUrl) {
-                  useAppStore.getState().updateItem(genItem.id, {
-                    status: "completed",
-                    outputUrl: match.outputUrl,
-                    cost: getEstimatedCost(selectedModel, generationOptions),
-                    progressText: undefined,
-                    error: undefined,
-                  });
-                  if (outputType === "image") {
-                    const img = new window.Image();
-                    img.onload = () => {
-                      const maxW = 250;
-                      const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
-                      useAppStore.getState().updateItem(genItem.id, {
-                        width: Math.round(img.naturalWidth * scale),
-                        height: Math.round(img.naturalHeight * scale),
-                      });
-                    };
-                    img.src = match.outputUrl;
-                  }
-                  return true;
-                }
-              }
-            } catch {
-              // ignore and retry
-            }
-            await new Promise((r) => setTimeout(r, 3000));
-          }
-          return false;
-        };
 
         const recovered = await recoverFromHistory();
         if (!recovered) {
