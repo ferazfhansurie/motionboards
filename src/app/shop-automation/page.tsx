@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   CircleHelp,
   ClipboardCheck,
   ExternalLink,
+  Loader2,
   LockKeyhole,
   MessageCircle,
   PackageCheck,
@@ -20,6 +21,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { launchWhatsAppEmbeddedSignup } from "@/lib/whatsapp-embedded-signup";
 
 type Step = "shop" | "whatsapp" | "consent" | "message";
 
@@ -42,6 +44,9 @@ export default function ShopAutomationPage() {
   const [template, setTemplate] = useState("Hi {{first_name}}, thanks for your TikTok Shop order {{order_id}}. We’ll keep you updated here. Reply STOP to opt out.");
   const [running, setRunning] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
+  const [waConnecting, setWaConnecting] = useState(false);
+  const [waError, setWaError] = useState<string | null>(null);
+  const [waStatus, setWaStatus] = useState<{ isCoexistence?: boolean; displayPhoneNumber?: string; verifiedName?: string } | null>(null);
 
   const activeIndex = setupSteps.findIndex((item) => item.id === step);
   const readyCount = Object.values(connected).filter(Boolean).length;
@@ -52,6 +57,45 @@ export default function ShopAutomationPage() {
     const next = setupSteps[activeIndex + 1];
     if (next) setStep(next.id);
   };
+
+  // Pick up an existing WhatsApp connection so reloading this page (or
+  // coming back after connecting elsewhere) doesn't ask to reconnect.
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch("/api/tickloop/workspace");
+        if (!response.ok) return;
+        const data = await response.json();
+        type Connection = { provider: string; metadata?: { isCoexistence?: boolean; displayPhoneNumber?: string; verifiedName?: string } };
+        const wa = (data.connections as Connection[] | undefined)?.find((c) => c.provider === "whatsapp");
+        if (wa) {
+          setConnected((current) => ({ ...current, whatsapp: true }));
+          setWaStatus({ isCoexistence: wa.metadata?.isCoexistence, displayPhoneNumber: wa.metadata?.displayPhoneNumber, verifiedName: wa.metadata?.verifiedName });
+        }
+      } catch {
+        /* not signed in yet — leave the step unconnected */
+      }
+    })();
+  }, []);
+
+  async function connectWhatsApp() {
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    const configId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID;
+    if (!appId || !configId) { setWaError("WhatsApp isn't configured yet — set NEXT_PUBLIC_META_APP_ID and NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID."); return; }
+    setWaConnecting(true); setWaError(null);
+    try {
+      const signup = await launchWhatsAppEmbeddedSignup({ appId, configId });
+      const response = await fetch("/api/tickloop/whatsapp/connect", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(signup) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Connection failed.");
+      setWaStatus(data);
+      finishStep();
+    } catch (error) {
+      setWaError((error as Error).message);
+    } finally {
+      setWaConnecting(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#f7f8f8] text-[#17201d]">
@@ -110,8 +154,22 @@ export default function ShopAutomationPage() {
             </SetupPanel>}
 
             {step === "whatsapp" && <SetupPanel eyebrow="Step 2 of 4" title="Connect WhatsApp Business" description="Use your verified WhatsApp Business account to send official customer updates. Your personal WhatsApp stays separate.">
-              <div className="grid gap-3 sm:grid-cols-2"><Feature title="Already use WhatsApp Business?" copy="Link your existing account through Meta’s secure Embedded Signup."/><Feature title="Need a business account?" copy="We’ll guide you through creating a business profile and verifying your number."/></div>
-              <button onClick={finishStep} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#2b7843] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#17201d]">Connect WhatsApp Business <ArrowRight className="h-4 w-4" /></button>
+              <div className="grid gap-3 sm:grid-cols-2"><Feature title="Already use WhatsApp Business?" copy="Link your existing account through Meta’s secure Embedded Signup — you keep using the WhatsApp app on your phone, nothing there changes."/><Feature title="Need a business account?" copy="We’ll guide you through creating a business profile and verifying your number."/></div>
+              {connected.whatsapp ? (
+                <div className="mt-6 rounded-2xl border border-[#cfe8d6] bg-[#f1faf3] p-5">
+                  <p className="text-sm font-bold text-[#2b7843]">Connected{waStatus?.displayPhoneNumber ? ` — ${waStatus.displayPhoneNumber}` : ""}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#41644b]">
+                    {waStatus?.verifiedName ? `${waStatus.verifiedName} · ` : ""}
+                    {waStatus?.isCoexistence ? "Coexistence — the WhatsApp app keeps working on this number, mirrored here." : "Connected as a Cloud API–only number."}
+                  </p>
+                  <Link href="/tickloop/whatsapp" className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[#2b7843] hover:underline">Open the inbox <ChevronRight className="h-3.5 w-3.5" /></Link>
+                </div>
+              ) : (
+                <button onClick={connectWhatsApp} disabled={waConnecting} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#2b7843] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#17201d] disabled:cursor-not-allowed disabled:opacity-60">
+                  {waConnecting && <Loader2 className="h-4 w-4 animate-spin" />} Connect WhatsApp Business <ArrowRight className="h-4 w-4" />
+                </button>
+              )}
+              {waError && <p className="mt-3 text-xs font-semibold text-[#a34a35]">{waError}</p>}
             </SetupPanel>}
 
             {step === "consent" && <SetupPanel eyebrow="Step 3 of 4" title="Choose how buyers opt in" description="An order’s delivery phone number is not automatically permission for marketing. Choose a clear way customers can agree to WhatsApp updates.">

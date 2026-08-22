@@ -6,6 +6,8 @@ type Row = Record<string, unknown>;
 type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Row[]>;
 const sql: Sql = (strings, ...values) => neon(process.env.DATABASE_URL!)(strings, ...values) as Promise<Row[]>;
 
+const GRAPH = "https://graph.facebook.com/v26.0";
+
 export type Integration = "tiktok_shop" | "whatsapp";
 
 let schemaReady = false;
@@ -20,6 +22,9 @@ export async function ensureTickLoopSchema() {
   await sql`CREATE TABLE IF NOT EXISTS tl_consents (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, phone_hash TEXT NOT NULL, status TEXT NOT NULL, source TEXT NOT NULL, captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(workspace_id, phone_hash))`;
   await sql`CREATE TABLE IF NOT EXISTS tl_orders (workspace_id TEXT NOT NULL, order_id TEXT NOT NULL, shop_id TEXT, status TEXT NOT NULL, recipient_name TEXT, phone TEXT, phone_e164 TEXT, phone_masked BOOLEAN NOT NULL DEFAULT TRUE, buyer_email TEXT, address TEXT, postal_code TEXT, region_code TEXT, currency TEXT, total_amount TEXT, item_count INTEGER NOT NULL DEFAULT 0, tracking_number TEXT, create_time TIMESTAMPTZ, paid_time TIMESTAMPTZ, update_time TIMESTAMPTZ, raw JSONB NOT NULL DEFAULT '{}'::jsonb, synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (workspace_id, order_id))`;
   await sql`CREATE INDEX IF NOT EXISTS tl_orders_status_idx ON tl_orders(workspace_id, status, create_time DESC)`;
+  await sql`CREATE TABLE IF NOT EXISTS tl_wa_contacts (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, phone_e164 TEXT NOT NULL, name TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(workspace_id, phone_e164))`;
+  await sql`CREATE TABLE IF NOT EXISTS tl_wa_messages (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, phone_e164 TEXT NOT NULL, direction TEXT NOT NULL, source TEXT NOT NULL, wa_message_id TEXT, message_type TEXT, body TEXT, sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), raw JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(workspace_id, wa_message_id))`;
+  await sql`CREATE INDEX IF NOT EXISTS tl_wa_messages_thread_idx ON tl_wa_messages(workspace_id, phone_e164, sent_at)`;
   schemaReady = true;
 }
 
@@ -61,9 +66,76 @@ export async function sendTemplate(workspaceId: string, to: string, name: string
   if (!await hasConsent(workspaceId, to)) return { ok: false, reason: "missing_consent" as const };
   const connection = await connectionForWorkspace(workspaceId, "whatsapp"); if (!connection?.credentials || !connection.external_id) return { ok: false, reason: "whatsapp_not_connected" as const };
   const credentials = decrypt<{ access_token?: string }>(connection.credentials as string); if (!credentials.access_token) return { ok: false, reason: "missing_access_token" as const };
-  const response = await fetch(`https://graph.facebook.com/v23.0/${connection.external_id}/messages`, { method: "POST", headers: { authorization: `Bearer ${credentials.access_token}`, "content-type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: to.replace(/\D/g, ""), type: "template", template: { name, language: { code: "en_US" }, components: body.length ? [{ type: "body", parameters: body.map((text) => ({ type: "text", text })) }] : [] } }) });
+  const response = await fetch(`${GRAPH}/${connection.external_id}/messages`, { method: "POST", headers: { authorization: `Bearer ${credentials.access_token}`, "content-type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: to.replace(/\D/g, ""), type: "template", template: { name, language: { code: "en_US" }, components: body.length ? [{ type: "body", parameters: body.map((text) => ({ type: "text", text })) }] : [] } }) });
   if (!response.ok) return { ok: false, reason: "provider_error" as const, detail: await response.text() };
   return { ok: true, result: await response.json() };
+}
+/**
+ * Free-form reply within Meta's 24h customer service window — not gated on
+ * marketing consent, since that gate exists for proactive/template sends,
+ * not for replying to a customer who just messaged in.
+ */
+export async function sendWaText(workspaceId: string, to: string, body: string) {
+  const connection = await connectionForWorkspace(workspaceId, "whatsapp"); if (!connection?.credentials || !connection.external_id) return { ok: false, reason: "whatsapp_not_connected" as const };
+  const credentials = decrypt<{ access_token?: string }>(connection.credentials as string); if (!credentials.access_token) return { ok: false, reason: "missing_access_token" as const };
+  const to164 = to.replace(/\D/g, "");
+  const response = await fetch(`${GRAPH}/${connection.external_id}/messages`, { method: "POST", headers: { authorization: `Bearer ${credentials.access_token}`, "content-type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: to164, type: "text", text: { body } }) });
+  if (!response.ok) return { ok: false, reason: "provider_error" as const, detail: await response.text() };
+  const result = await response.json();
+  await saveWaMessage(workspaceId, { phone: to164, direction: "outbound", source: "cloud_api", waMessageId: result?.messages?.[0]?.id, messageType: "text", body, raw: result });
+  return { ok: true, result };
+}
+/** Registers our app as the webhook receiver for this WABA — required once per WABA, safe to repeat. */
+export async function subscribeWabaWebhooks(wabaId: string, accessToken: string) {
+  const response = await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, { method: "POST", headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" } });
+  if (!response.ok) return { ok: false as const, detail: await response.text() };
+  return { ok: true as const };
+}
+/**
+ * Coexistence delivers extra data on webhook fields (history, smb_app_state_sync,
+ * smb_message_echoes) that a plain Cloud API app is not subscribed to by default.
+ * This is an app-level setting (not per-workspace), so it only needs to succeed
+ * once — safe to call again on every connect.
+ */
+export async function ensureAppWebhookFields() {
+  const appId = process.env.META_APP_ID; const appSecret = process.env.META_APP_SECRET; const baseUrl = process.env.TICKLOOP_APP_URL;
+  if (!appId || !appSecret || !baseUrl) return { ok: false as const, reason: "not_configured" as const };
+  const fields = "messages,message_template_status_update,history,smb_app_state_sync,smb_message_echoes,account_update";
+  const url = `${GRAPH}/${appId}/subscriptions?object=whatsapp_business_account&callback_url=${encodeURIComponent(`${baseUrl}/api/tickloop/webhooks/whatsapp`)}&verify_token=${encodeURIComponent(process.env.WEBHOOK_VERIFY_TOKEN || "")}&fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`;
+  const response = await fetch(url, { method: "POST" });
+  if (!response.ok) return { ok: false as const, reason: "provider_error" as const, detail: await response.text() };
+  return { ok: true as const };
+}
+export async function fetchPhoneNumberDetails(phoneNumberId: string, accessToken: string) {
+  const response = await fetch(`${GRAPH}/${phoneNumberId}?fields=is_on_biz_app,platform_type,display_phone_number,verified_name`, { headers: { authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) return null;
+  return response.json() as Promise<{ is_on_biz_app?: boolean; platform_type?: string; display_phone_number?: string; verified_name?: string }>;
+}
+export async function upsertWaContact(workspaceId: string, phone: string, name?: string | null) {
+  await ensureTickLoopSchema();
+  const phoneE164 = phone.replace(/\D/g, ""); if (!phoneE164) return;
+  const id = `wac_${randomBytes(10).toString("hex")}`;
+  await sql`INSERT INTO tl_wa_contacts (id, workspace_id, phone_e164, name) VALUES (${id}, ${workspaceId}, ${phoneE164}, ${name || null})
+    ON CONFLICT (workspace_id, phone_e164) DO UPDATE SET name = COALESCE(EXCLUDED.name, tl_wa_contacts.name), updated_at = NOW()`;
+}
+export async function saveWaMessage(workspaceId: string, message: { phone: string; direction: "inbound" | "outbound"; source: "cloud_api" | "business_app" | "history"; waMessageId?: string; messageType?: string; body?: string; sentAt?: Date; raw: unknown }) {
+  await ensureTickLoopSchema();
+  const phoneE164 = message.phone.replace(/\D/g, ""); if (!phoneE164) return;
+  const id = `wam_${randomBytes(10).toString("hex")}`;
+  await sql`INSERT INTO tl_wa_messages (id, workspace_id, phone_e164, direction, source, wa_message_id, message_type, body, sent_at, raw)
+    VALUES (${id}, ${workspaceId}, ${phoneE164}, ${message.direction}, ${message.source}, ${message.waMessageId || null}, ${message.messageType || null}, ${message.body || null}, ${message.sentAt?.toISOString() || new Date().toISOString()}, ${JSON.stringify(message.raw)}::jsonb)
+    ON CONFLICT (workspace_id, wa_message_id) DO NOTHING`;
+}
+export async function listWaContacts(workspaceId: string) {
+  await ensureTickLoopSchema();
+  return sql`SELECT c.*, (SELECT body FROM tl_wa_messages m WHERE m.workspace_id = c.workspace_id AND m.phone_e164 = c.phone_e164 ORDER BY m.sent_at DESC LIMIT 1) AS last_message,
+    (SELECT sent_at FROM tl_wa_messages m WHERE m.workspace_id = c.workspace_id AND m.phone_e164 = c.phone_e164 ORDER BY m.sent_at DESC LIMIT 1) AS last_message_at
+    FROM tl_wa_contacts c WHERE c.workspace_id = ${workspaceId} ORDER BY last_message_at DESC NULLS LAST`;
+}
+export async function listWaMessages(workspaceId: string, phone: string, limit = 200) {
+  await ensureTickLoopSchema();
+  const phoneE164 = phone.replace(/\D/g, "");
+  return sql`SELECT * FROM tl_wa_messages WHERE workspace_id = ${workspaceId} AND phone_e164 = ${phoneE164} ORDER BY sent_at ASC LIMIT ${limit}`;
 }
 export async function logEvent(provider: Integration, eventType: string, payload: unknown, externalId?: string, workspaceId?: string) { await ensureTickLoopSchema(); await sql`INSERT INTO tl_events (workspace_id, provider, event_type, external_id, payload) VALUES (${workspaceId || null}, ${provider}, ${eventType}, ${externalId || null}, ${JSON.stringify(payload)}::jsonb) ON CONFLICT (provider, external_id) DO NOTHING`; }
 /* ------------------------------------------------------- TikTok Shop access */
