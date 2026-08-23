@@ -128,7 +128,48 @@ type ChatMessage = {
     | (Anthropic.ContentBlockParam | ToolUseBlock | ToolResultBlock)[];
 };
 
-function toAnthropicContent(content: ChatMessage["content"]): string | Anthropic.ContentBlockParam[] {
+// Anthropic caps images at 8000px on the long edge for a single-image request,
+// but only 2000px once a request carries 2+ images — and canvas reference
+// photos routinely come in well above that (a phone camera shot, a full-res
+// screenshot). Sending them as a raw URL source skips our control entirely, so
+// a multi-image chat turn 400s with "image dimensions exceed max allowed size
+// for many-image requests: 2000 pixels" and the user just sees a dead request.
+// Fetch + downscale to fit under the multi-image ceiling unconditionally
+// (cheap, and correct regardless of how many other images end up in the same
+// turn) and hand Anthropic base64 bytes instead of a URL it has to fetch itself.
+const ANTHROPIC_MAX_IMAGE_EDGE = 2000;
+const anthropicMediaType = (fmt: string): "image/jpeg" | "image/png" | "image/gif" | "image/webp" => {
+  if (fmt === "png") return "image/png";
+  if (fmt === "gif") return "image/gif";
+  if (fmt === "webp") return "image/webp";
+  return "image/jpeg";
+};
+
+async function toAnthropicImageBlock(url: string): Promise<Anthropic.ContentBlockParam | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return { type: "image", source: { type: "url", url } };
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const sharp = (await import("sharp")).default;
+    const image = sharp(buffer, { failOn: "none" });
+    const meta = await image.metadata();
+    const longEdge = Math.max(meta.width || 0, meta.height || 0);
+    const needsResize = longEdge > ANTHROPIC_MAX_IMAGE_EDGE;
+    const output = needsResize
+      ? await image.resize({ width: ANTHROPIC_MAX_IMAGE_EDGE, height: ANTHROPIC_MAX_IMAGE_EDGE, fit: "inside", withoutEnlargement: true }).toBuffer()
+      : buffer;
+    const mediaType = anthropicMediaType(meta.format || "jpeg");
+    return { type: "image", source: { type: "base64", media_type: mediaType, data: output.toString("base64") } };
+  } catch (err) {
+    // Fall back to the URL source rather than dropping the image outright —
+    // Anthropic will still reject an oversized one, but a transient fetch
+    // failure (or a format sharp can't read) shouldn't silently vanish it.
+    console.warn("[ai-prompt] image resize failed, falling back to url source:", err instanceof Error ? err.message : err);
+    return { type: "image", source: { type: "url", url } };
+  }
+}
+
+async function toAnthropicContent(content: ChatMessage["content"]): Promise<string | Anthropic.ContentBlockParam[]> {
   if (typeof content === "string") return content;
   const out: Anthropic.ContentBlockParam[] = [];
   for (const part of content) {
@@ -138,7 +179,10 @@ function toAnthropicContent(content: ChatMessage["content"]): string | Anthropic
       out.push({ type: "text", text: p.text as string });
     } else if (t === "image_url" && p.image_url) {
       const url = (p.image_url as { url: string }).url;
-      if (url) out.push({ type: "image", source: { type: "url", url } });
+      if (url) {
+        const block = await toAnthropicImageBlock(url);
+        if (block) out.push(block);
+      }
     } else if (t === "tool_use") {
       out.push({
         type: "tool_use",
@@ -154,7 +198,17 @@ function toAnthropicContent(content: ChatMessage["content"]): string | Anthropic
         is_error: (p.is_error as boolean) || undefined,
       });
     } else if (t === "image" && p.source) {
-      out.push(part as Anthropic.ContentBlockParam);
+      // Same 2000px-in-a-multi-image-request ceiling applies here — a tool
+      // result that hands back a URL-sourced image (e.g. a generated preview)
+      // needs the same downscale. Base64 blocks are left as-is: whatever
+      // produced them already controls their size.
+      const source = p.source as { type: string; url?: string };
+      if (source.type === "url" && source.url) {
+        const block = await toAnthropicImageBlock(source.url);
+        if (block) out.push(block);
+      } else {
+        out.push(part as Anthropic.ContentBlockParam);
+      }
     }
   }
   return out;
@@ -263,10 +317,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const anthMessages: Anthropic.MessageParam[] = history.map((m) => ({
-      role: m.role,
-      content: toAnthropicContent(m.content),
-    }));
+    const anthMessages: Anthropic.MessageParam[] = await Promise.all(
+      history.map(async (m) => ({
+        role: m.role,
+        content: await toAnthropicContent(m.content),
+      }))
+    );
 
     // Build the stream args. mcp_servers is only included when the user
     // has at least one enabled connector — keeps requests for users who
