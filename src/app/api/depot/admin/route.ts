@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomInt } from "crypto";
+import { deleteR2Objects, r2Config } from "@/lib/r2";
 import { addMessage, currentAdmin, depotSql as sql, hashPass, newJobId, normPhone, publicJob } from "@/lib/depot";
 
 const POSTER = /\b(poster|posters|flyer|risalah|brosur|banner)\b/i;
@@ -22,13 +23,30 @@ export async function GET(req: NextRequest) {
     (SELECT m.text FROM depot_messages m WHERE m.user_id = u.id ORDER BY m.id DESC LIMIT 1) AS last_text
     FROM depot_users u ORDER BY last_msg DESC NULLS LAST, u.depot, u.name`;
   const admins = await sql`SELECT id, name, phone, last_seen FROM depot_admins ORDER BY id`;
-  return NextResponse.json({ jobs: jobs.map(publicJob), sites, users, admins });
+  const templates = await sql`SELECT id, name, note, file_url, filename, content_type, size, created_by, created_at FROM depot_templates ORDER BY id DESC`;
+  return NextResponse.json({ jobs: jobs.map(publicJob), sites, users, admins, templates });
 }
 
 export async function POST(req: NextRequest) {
   const admin = await currentAdmin(req);
   if (!admin) return NextResponse.json({ error: "Please log in again" }, { status: 401 });
   const b = await req.json().catch(() => ({}));
+  // poster templates: reference designs depot heads can browse and download
+  if (b.action === "template_add") {
+    const url = String(b.url || "");
+    const { publicBase } = r2Config();
+    if (!publicBase || !url.startsWith(`${publicBase}/depot-videos/templates/`)) return NextResponse.json({ error: "Upload the file first" }, { status: 400 });
+    const name = String(b.name || "").trim().slice(0, 120) || String(b.filename || "Template");
+    await sql`INSERT INTO depot_templates (name, note, file_url, filename, content_type, size, created_by)
+      VALUES (${name}, ${String(b.note || "").trim().slice(0, 500) || null}, ${url}, ${String(b.filename || "").slice(0, 200) || null},
+        ${String(b.contentType || "").slice(0, 100) || null}, ${Number(b.size) || null}, ${admin.name})`;
+    return NextResponse.json({ ok: true });
+  }
+  if (b.action === "template_del") {
+    const [t] = await sql`DELETE FROM depot_templates WHERE id = ${Number(b.id)} RETURNING file_url`;
+    if (t) { const { publicBase } = r2Config(); await deleteR2Objects([String(t.file_url).slice(publicBase.length)]); }
+    return NextResponse.json({ ok: true });
+  }
   // reply in someone's chat; with asEdit it also goes to their latest open video as a change
   if (b.action === "reply") {
     const [u] = await sql`SELECT id, depot, name FROM depot_users WHERE id = ${Number(b.userId)}`;

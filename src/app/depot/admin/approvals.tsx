@@ -9,6 +9,7 @@ type Job = { id: string; depot: string; manager: string | null; status: string; 
 type Site = { code: string; name: string; token: string; daily_limit: number };
 type User = { id: number; depot: string; name: string; phone: string; disabled: boolean; created_at: string; last_seen: string | null; videos: number;
   last_msg: string | null; last_text: string | null };
+type Template = { id: number; name: string; note: string | null; file_url: string; filename: string | null; content_type: string | null; size: number | null; created_by: string | null; created_at: string };
 type Admin = { id: number; name: string; phone: string; last_seen: string | null };
 type Msg = { id: number; role: "user" | "bot" | "admin"; author: string | null; text: string; media_url: string | null; created_at: string };
 const when = (s: string) => new Date(s).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kuala_Lumpur" });
@@ -22,13 +23,17 @@ export default function Approvals({ me }: { me: string }) {
   const [sites, setSites] = useState<Site[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [tpl, setTpl] = useState<{ name: string; note: string; file: File | null }>({ name: "", note: "", file: null });
+  const [tplState, setTplState] = useState("");
+  const tplRef = useRef<HTMLInputElement>(null);
   const [reply, setReply] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [sendState, setSendState] = useState("");
   const [newAdmin, setNewAdmin] = useState({ name: "", phone: "", password: "" });
   const fileRef = useRef<HTMLInputElement>(null);
   const threadEnd = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<"pending" | "all" | "chats" | "people" | "links">("pending");
+  const [tab, setTab] = useState<"pending" | "all" | "chats" | "people" | "templates" | "links">("pending");
   const [chatUser, setChatUser] = useState<number | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -36,7 +41,7 @@ export default function Approvals({ me }: { me: string }) {
   const load = useCallback(async () => {
     const r = await fetch("/api/depot/admin", { cache: "no-store" });
     if (r.status === 401) { location.replace("/depot/admin"); return; }
-    if (r.ok) { const j = await r.json(); setJobs(j.jobs); setSites(j.sites); setUsers(j.users ?? []); setAdmins(j.admins ?? []); }
+    if (r.ok) { const j = await r.json(); setJobs(j.jobs); setSites(j.sites); setUsers(j.users ?? []); setAdmins(j.admins ?? []); setTemplates(j.templates ?? []); }
   }, []);
   useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
 
@@ -87,6 +92,36 @@ export default function Approvals({ me }: { me: string }) {
     setSendState("");
   }
 
+  async function uploadTemplate() {
+    const f = tpl.file;
+    if (!f) return;
+    try {
+      setTplState("Uploading… 0%");
+      const type = f.type || "application/octet-stream";
+      const p = await fetch("/api/depot/admin/presign", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purpose: "template", filename: f.name, contentType: type, size: f.size }) });
+      const pj = await p.json();
+      if (!p.ok) throw new Error(pj.error || "Upload failed");
+      await new Promise<void>((res, rej) => {
+        const x = new XMLHttpRequest();
+        x.open("PUT", pj.uploadUrl);
+        x.setRequestHeader("Content-Type", type);
+        x.upload.onprogress = (e) => e.lengthComputable && setTplState(`Uploading… ${Math.round((e.loaded / e.total) * 100)}%`);
+        x.onload = () => (x.status < 300 ? res() : rej(new Error("Upload failed")));
+        x.onerror = () => rej(new Error("Upload failed"));
+        x.send(f);
+      });
+      await post({ action: "template_add", url: pj.publicUrl, name: tpl.name || f.name.replace(/\.[^.]+$/, ""), note: tpl.note, filename: f.name, contentType: type, size: f.size });
+      setTpl({ name: "", note: "", file: null }); if (tplRef.current) tplRef.current.value = "";
+      load();
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    setTplState("");
+  }
+  async function deleteTemplate(t: Template) {
+    if (!confirm(`Delete the template "${t.name}"? Depot heads won't see it any more.`)) return;
+    try { await post({ action: "template_del", id: t.id }); load(); } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  }
+
   async function addAdmin() {
     try { await post({ action: "admin_add", ...newAdmin }); setNewAdmin({ name: "", phone: "", password: "" }); load(); }
     catch (e) { alert(e instanceof Error ? e.message : String(e)); }
@@ -124,9 +159,9 @@ export default function Approvals({ me }: { me: string }) {
         <div className="mx-auto flex max-w-5xl items-center gap-3">
           <img src="/depot/fathopes-logo-white.png" alt="" className="h-7" />
           <div className="flex-1 font-bold">Depot video approvals</div>
-          {(["pending", "all", "chats", "people", "links"] as const).map((t) => (
+          {(["pending", "all", "chats", "people", "templates", "links"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`rounded-full px-3 py-1 text-sm font-semibold ${tab === t ? "bg-white text-[#0a7a3a]" : "bg-white/15"}`}>
-              {t === "pending" ? `To approve (${jobs.filter((j) => j.status === "pending").length})` : t === "all" ? "All videos" : t === "chats" ? "Chats" : t === "people" ? `People (${users.length})` : "Depot links"}
+              {t === "pending" ? `To approve (${jobs.filter((j) => j.status === "pending").length})` : t === "all" ? "All videos" : t === "chats" ? "Chats" : t === "people" ? `People (${users.length})` : t === "templates" ? `Templates (${templates.length})` : "Depot links"}
             </button>
           ))}
           <button onClick={logout} title={`Logged in as ${me}`} className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">Log out</button>
@@ -242,6 +277,39 @@ export default function Approvals({ me }: { me: string }) {
               </div>
             ))}
           </div>}
+          </div>
+        ) : tab === "templates" ? (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-white p-4 shadow-sm">
+              <div className="mb-1 font-bold">Add a poster template</div>
+              <div className="mb-3 text-sm text-[#5b6573]">Depot heads see these under Templates in their chat and can download them to use as a reference.</div>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <input ref={tplRef} type="file" accept="image/*,application/pdf,.psd,.ai,.zip,.pptx,.key" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0] ?? null; setTpl((t) => ({ ...t, file: f, name: t.name || (f ? f.name.replace(/\.[^.]+$/, "") : "") })); }} />
+                <button onClick={() => tplRef.current?.click()} className="rounded-lg border border-[#d9dce1] px-3 py-1.5 font-semibold">📎 {tpl.file ? tpl.file.name : "Choose file"}</button>
+                <input value={tpl.name} onChange={(e) => setTpl({ ...tpl, name: e.target.value })} placeholder="Name, e.g. Hari Kutipan (BM)" className="w-60 rounded-lg border border-[#d9dce1] px-2.5 py-1.5" />
+                <input value={tpl.note} onChange={(e) => setTpl({ ...tpl, note: e.target.value })} placeholder="Note (optional): when to use it" className="min-w-0 flex-1 rounded-lg border border-[#d9dce1] px-2.5 py-1.5" />
+                <button disabled={!tpl.file || !!tplState} onClick={uploadTemplate} className="rounded-lg bg-[#0a9b4a] px-4 py-1.5 font-bold text-white disabled:opacity-40">{tplState || "Upload"}</button>
+              </div>
+            </div>
+            {templates.length === 0 ? <div className="rounded-xl bg-white p-10 text-center text-[#5b6573] shadow-sm">No templates yet. Upload the first one above.</div> :
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {templates.map((t) => (
+                <div key={t.id} className="flex flex-col overflow-hidden rounded-xl bg-white shadow-sm">
+                  {t.content_type?.startsWith("image/") ? <a href={t.file_url} target="_blank" rel="noreferrer"><img src={t.file_url} alt={t.name} className="aspect-[4/5] w-full bg-[#eef0ee] object-cover" /></a>
+                    : <div className="flex aspect-[4/5] items-center justify-center bg-[#eef0ee] text-4xl">📄<span className="ml-2 text-sm font-bold text-[#5b6573]">{(t.filename?.match(/\.([a-z0-9]+)$/i)?.[1] ?? "file").toUpperCase()}</span></div>}
+                  <div className="flex flex-1 flex-col gap-1 p-3 text-sm">
+                    <div className="font-semibold">{t.name}</div>
+                    {t.note && <div className="text-[#5b6573]">{t.note}</div>}
+                    <div className="text-xs text-[#9aa3ae]">{t.created_by ?? "Admin"} · {when(t.created_at)}{t.size ? ` · ${(t.size / 1048576).toFixed(1)} MB` : ""}</div>
+                    <div className="mt-auto flex gap-2 pt-2">
+                      <a href={`/api/depot/templates/${t.id}`} className="flex-1 rounded-lg bg-[#0a9b4a] py-1.5 text-center font-bold text-white">⬇ Download</a>
+                      <button onClick={() => deleteTemplate(t)} className="rounded-lg border px-3 py-1.5 font-semibold text-[#c62828]">Delete</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>}
           </div>
         ) : tab === "links" ? (
           <div className="overflow-hidden rounded-xl bg-white shadow-sm">

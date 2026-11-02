@@ -26,7 +26,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/depot/[token
   const messages = await sql`SELECT id, job_id, role, author, text, media_url, created_at FROM depot_messages
     WHERE user_id = ${user.id} ORDER BY id DESC LIMIT 200`;
   const jobs = await sql`SELECT * FROM depot_jobs WHERE user_id = ${user.id} ORDER BY created_at DESC LIMIT 30`;
-  return NextResponse.json({ ...base, user: { name: user.name, phone: user.phone }, messages: messages.reverse(), jobs: jobs.map(publicJob) });
+  const templates = await sql`SELECT id, name, note, file_url, content_type FROM depot_templates ORDER BY id DESC`;
+  return NextResponse.json({ ...base, user: { name: user.name, phone: user.phone }, messages: messages.reverse(), jobs: jobs.map(publicJob), templates });
 }
 
 const OPEN = ["queued", "working", "preview", "pending", "rejected", "failed", "waiting"];
