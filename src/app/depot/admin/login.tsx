@@ -22,7 +22,7 @@ export default function AdminLogin({ setupKey }: { setupKey: string | null }) {
     <div className="flex min-h-[100dvh] items-center justify-center bg-[#f3f5f3] p-5 text-[#14181f]">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm">
         <div className="mb-1 text-xl font-bold">{setupKey ? "Create your admin account" : "Admin log in"}</div>
-        <div className="mb-5 text-sm text-[#5b6573]">{setupKey ? "This is the first admin. You can add more admins after." : "Depot video bot: approvals and all chats."}</div>
+        <div className="mb-5 text-sm text-[#5b6573]">{setupKey ? "Use your phone number (01121677672). You can add more admins after." : "Depot video bot: approvals and all chats."}</div>
         <div className="flex flex-col gap-3">
           {setupKey && <input className={input} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />}
           <input className={input} placeholder="Phone number" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />

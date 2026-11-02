@@ -177,10 +177,25 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({ status: "processing", log: "Generating video..." });
         }
 
-        // Poll using operation name stored in requestId
+        // Poll using operation name stored in requestId. Transient network
+        // blips ("fetch failed" from undici) happen occasionally on this
+        // call — retry once after a short wait before treating it as a real
+        // failure, since a single hiccup shouldn't kill an otherwise-healthy
+        // in-progress generation.
         const opStub = new GenerateVideosOperation();
         opStub.name = requestId;
-        const operation = await ai.operations.getVideosOperation({ operation: opStub });
+        let operation;
+        try {
+          operation = await ai.operations.getVideosOperation({ operation: opStub });
+        } catch (pollErr) {
+          const msg = pollErr instanceof Error ? pollErr.message : String(pollErr);
+          if (/fetch failed/i.test(msg)) {
+            await new Promise((r) => setTimeout(r, 2000));
+            operation = await ai.operations.getVideosOperation({ operation: opStub });
+          } else {
+            throw pollErr;
+          }
+        }
 
         if (operation.done) {
           // Check for operation-level error first (response may be undefined)
@@ -208,9 +223,15 @@ export async function GET(req: NextRequest) {
                 const { id } = await putFile(buffer, "video/mp4", user.id);
                 outputUrl = `${req.nextUrl.origin}/api/files/${id}`;
               } else {
-                // AI Studio: short-lived signed URL — download and re-host in Neon
+                // AI Studio: short-lived signed URL — download and re-host in Neon.
+                // Unlike GCS signed URLs, AI Studio's file-download endpoint isn't
+                // publicly fetchable on its own — it 401s ("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+                // without the API key reattached as a query param.
                 outputUrl = videoUri!;
-                const videoRes = await fetch(videoUri!);
+                const dlUrl = veoApiKey && !hasVertexAI
+                  ? `${videoUri}${videoUri!.includes("?") ? "&" : "?"}key=${veoApiKey}`
+                  : videoUri!;
+                const videoRes = await fetch(dlUrl);
                 if (videoRes.ok) {
                   const buffer = Buffer.from(await videoRes.arrayBuffer());
                   const mimeType = videoRes.headers.get("content-type") || "video/mp4";
@@ -252,7 +273,9 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({ status: "processing", log: "Generating video..." });
       } catch (gemErr) {
-        const msg = gemErr instanceof Error ? gemErr.message : "Gemini status check failed";
+        const raw = gemErr instanceof Error ? gemErr.message : "Gemini status check failed";
+        console.error("[Veo] Status check error:", raw);
+        const msg = humanizeVeoError(raw);
         await finalizeGeneration(generationId, { status: "failed", error: msg });
         return NextResponse.json({ status: "failed", error: msg });
       }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminCount, adminOk, checkPass, depotSql as sql, endAdminSession, hashPass, normPhone, startAdminSession } from "@/lib/depot";
 
+// The first admin account can only be Faeez (the key link was posted in a WhatsApp group).
+const OWNER_PHONE = "601121677672";
+
 // POST /api/depot/admin/auth
 //   { action: "login", phone, password }
 //   { action: "setup", k, name, phone, password }  first admin only, needs the admin key
@@ -18,6 +21,7 @@ export async function POST(req: NextRequest) {
 
   if (b.action === "setup") {
     if (!(await adminOk(b.k)) || (await adminCount()) > 0) return NextResponse.json({ error: "Setup is closed. Log in instead." }, { status: 403 });
+    if (phone !== OWNER_PHONE) return NextResponse.json({ error: "The first admin must be Faeez's number" }, { status: 403 });
     const name = String(b.name || "").trim().slice(0, 60);
     if (!name) return NextResponse.json({ error: "Enter your name" }, { status: 400 });
     if (password.length < 8) return NextResponse.json({ error: "Admin password needs at least 8 characters" }, { status: 400 });

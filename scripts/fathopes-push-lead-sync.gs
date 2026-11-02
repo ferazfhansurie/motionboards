@@ -3,26 +3,105 @@
 
 const DEST_SPREADSHEET_ID = '1KOA1mUjq_1YZK__ukPG4qvaOmPOs4Iu6onsbG46MPL4';
 const DEST_SHEET = 'Form Responses 1';
-const SOURCE_TABS = ['VIDEO', 'POSTER'];
+
+// Tabs that are always synced when present.
+const SOURCE_TABS = [
+  'VIDEO', 'POSTER', 'LEADFORM v2',
+  'Poster Form - PUSH v2 (Higher Intent)',
+  'Poster Form - PUSH v2 (Higher Intent) (v1)',
+  'Poster Form - PUSH v2 (Higher Intent) (v2)',
+  'LEADFORM v4',
+  'LEADFORM v7',
+  'Copy of LEADFORM v7',
+  'LEADFORM v8',
+  'LEADFORM v9',
+  'LEADFORM v10',
+  'LEADFORM v11',
+  'LEADFORM v10(1)',
+];
+
+// Any OTHER tab that looks like a Meta lead export (has a lead-id column AND a
+// created_time column) is picked up automatically, so swapping a lead form can
+// never silently break the sync again.
+// Tabs listed below are NEVER synced - add to this list if a new tab belongs to
+// a different programme.
+const EXCLUDE_TABS = [
+  'VENDOR',       // vendor programme, not PUSH driver recruitment
+  'TIKTOK PUSH',  // different source - remove this line if you want it synced
+  'Sheet7',
+  'Daily Report',
+];
+
+// Ranger (community UCO collector) leads are a different programme. Any tab
+// whose name contains "ranger", or that has a community_role column, goes to
+// RANGER_DEST_SHEET instead of the PUSH response tab. To send them to a
+// different workbook, change RANGER_DEST_SPREADSHEET_ID.
+const RANGER_DEST_SPREADSHEET_ID = DEST_SPREADSHEET_ID;
+// Where the Meta connector drops Ranger leads. Leave '' for this Leads
+// workbook; put another workbook's ID here if the Ranger forms are pointed
+// at their own sheet. PUSH tabs are always read from this workbook.
+const RANGER_SOURCE_SPREADSHEET_ID = '';
+const RANGER_DEST_SHEET = 'Ranger Leads';
+const RANGER_HEADERS = ['Timestamp', 'Full Name', 'Contact No', 'Age', 'Community Role', 'Recycled UCO',
+  'Platform', 'Form', 'Ad', 'Source Tab', 'Lead ID', 'Remarks', '2nd Remarks', '3rd Remarks', 'Lead Status'];
+
+function isRangerTab_(tabName, headers) {
+  if (/ranger/i.test(tabName)) return true;
+  return (headers || []).some(h => String(h).trim().toLowerCase() === 'community_role');
+}
+
 const HEADER_ROWS = 1;
 const POLL_MINUTES = 5;
 const SOURCE_VALUE = 'meta';
+
+// Which programme a lead applied to. The only thing that distinguishes them is
+// the tab the Meta connector drops them into, so the tab name is the source of
+// truth. Add a "Track" column to the destination sheet to capture it.
+const TRACK_RULES = [
+  { match: /usahawan|bos sendiri|hijau/i, value: 'USAHAWAN' },
+  { match: /driver|kerja tetap|pemandu/i, value: 'DRIVER' },
+];
+function trackFromTab_(tabName) {
+  for (const rule of TRACK_RULES) if (rule.match.test(tabName)) return rule.value;
+  return tabName;   // unknown form: keep the tab name so it is still traceable
+}
 const SYNC_LOG_SHEET = '__META_SYNC_LOG';
 
+// Every key here MUST also be returned by sourceLead_(), otherwise
+// buildDestinationRow_ writes `undefined` into that column.
+//
+// Alias lists are matched by pickAllIdx_ in tiers: exact, then prefix, then
+// substring - and the first tier that hits wins outright. Keep aliases specific
+// anyway: a bare 'name' would substring-match ad_name / campaign_name / form_name,
+// and a bare 'age' matches page_id.
 const FIELD_MAP = [
   { key: 'time',    src: ['created_time', 'created time', 'timestamp'], dest: 'Timestamp' },
-  { key: 'name',    src: ['full_name', 'full name', 'name', 'nama'], dest: 'Full Name' },
+  { key: 'name',    src: ['full_name', 'full name', 'nama'], dest: 'Full Name' },
   { key: 'phone',   src: ['phone_number', 'phone number', 'phone', 'contact_number', 'contact', 'mobile', 'no_telefon'], dest: 'Contact No' },
   { key: 'license', src: ['driving_license', 'driving license', 'license', 'lesen'], dest: 'Driving Licens' },
   { key: 'loc',     src: ['location_and_state', 'location and state', 'location', 'state', 'lokasi'], dest: 'Location and State' },
   { key: 'age',     src: ['age', 'umur'], dest: 'Age' },
+  // v2 only. Inert once the destination column is renamed to Full Time
+  // Commitment - it simply finds no destination and is skipped.
+  { key: 'day',     src: ['hari_mana_sesuai', 'hari mana sesuai', 'preferred_day', 'preferred day', 'taklimat'], dest: 'Preferred Day' },
+  // Dead as of v10: PUSH is a salaried role and the commitment question was
+  // removed, so this writes blank. Kept because v4-v9 rows already in the
+  // destination carry values here.
+  { key: 'commit',  src: ['komitmen_usahawan', 'komitmen_pendapatan', 'komitmen', 'push ialah kerja sepenuh masa', 'sepenuh masa'], dest: 'Full Time Commitment' },
+  // v7 onward: "Bila anda boleh mula?" Needs a 'Bila Boleh Mula' column in the destination.
+  { key: 'start',   src: ['bila_boleh_mula', 'bila boleh mula', 'boleh mula'], dest: 'Bila Boleh Mula' },
+  // Driver v12+ and Usahawan v11+: "PUSH WAJIB buat sales ... Setuju?" Answers
+  // are "Setuju" / "Tidak setuju". Needs a 'Sales Wajib' column in the
+  // destination. This is the strongest quality signal the form collects.
+  { key: 'sales',   src: ['sales_wajib', 'sales wajib', 'wajib buat sales'], dest: 'Sales Wajib' },
 ];
 
 const LEAD_ID_HEADERS = ['id', 'lead_id', 'lead id', 'leadgen_id', 'leadgen id'];
+const CREATED_TIME_HEADERS = ['created_time', 'created time'];
 
 /**
- * Run this once. It imports every missing VIDEO/POSTER lead first, then installs
- * an on-change trigger plus a reliable five-minute polling trigger.
+ * Run this once. It imports every missing lead first, then installs an
+ * on-change trigger plus a reliable five-minute polling trigger.
  */
 function setupAndBackfill() {
   syncMetaLeads();
@@ -34,11 +113,41 @@ function setupAndBackfill() {
 
   ScriptApp.newTrigger('syncMetaLeads').forSpreadsheet(ss).onChange().create();
   ScriptApp.newTrigger('syncMetaLeads').timeBased().everyMinutes(POLL_MINUTES).create();
-  Logger.log('Backfill complete. VIDEO and POSTER now sync every ' + POLL_MINUTES + ' minutes.');
+  Logger.log('Backfill complete. All Meta lead tabs now sync every ' + POLL_MINUTES + ' minutes.');
 }
 
 /**
- * Safe to run repeatedly. It scans both source tabs because Meta/connector
+ * Returns every tab that should be treated as a Meta lead source: the explicit
+ * SOURCE_TABS list, plus any other tab carrying a lead id and a created_time
+ * column. EXCLUDE_TABS and any tab starting with "__" are always skipped.
+ */
+function discoverSourceTabs_(book) {
+  const excluded = EXCLUDE_TABS.map(n => String(n).trim().toLowerCase());
+  const names = [];
+  const add = name => { if (names.indexOf(name) === -1) names.push(name); };
+
+  SOURCE_TABS.forEach(name => {
+    const sh = book.getSheetByName(name);
+    if (sh) add(sh.getName());
+  });
+
+  book.getSheets().forEach(sh => {
+    const name = sh.getName();
+    if (name.indexOf('__') === 0) return;
+    if (excluded.indexOf(name.trim().toLowerCase()) > -1) return;
+    if (sh.getLastRow() <= HEADER_ROWS || sh.getLastColumn() < 1) return;
+
+    const headers = headerRow_(sh);
+    const hasLeadId = pickAllIdx_(headers, LEAD_ID_HEADERS).length > 0;
+    const hasCreatedTime = pickAllIdx_(headers, CREATED_TIME_HEADERS).length > 0;
+    if (hasLeadId && hasCreatedTime) add(name);
+  });
+
+  return names;
+}
+
+/**
+ * Safe to run repeatedly. It scans every source tab because Meta/connector
  * refreshes are not guaranteed to behave like simple row appends.
  */
 function syncMetaLeads() {
@@ -53,12 +162,18 @@ function syncMetaLeads() {
     const loggedIds = getLoggedIds_(syncLog);
     const idsToLog = [];
     const rowsToAppend = [];
+    let skippedTests = 0;
 
-    SOURCE_TABS.forEach(tabName => {
+    const tabs = discoverSourceTabs_(sourceBook);
+    Logger.log('Scanning ' + tabs.length + ' source tab(s): ' + tabs.join(', '));
+
+    tabs.forEach(tabName => {
       const src = sourceBook.getSheetByName(tabName);
       if (!src || src.getLastRow() <= HEADER_ROWS) return;
 
       const headers = headerRow_(src);
+      if (isRangerTab_(tabName, headers)) return;   // handled by syncRangerLeads_
+      const formIndexes = pickAllIdx_(headers, ['form_name', 'form name']);
       const idIndexes = pickAllIdx_(headers, LEAD_ID_HEADERS);
       const rows = src.getRange(
         HEADER_ROWS + 1,
@@ -72,13 +187,26 @@ function syncMetaLeads() {
         // This is a Meta sync: ignore legacy/manual rows that have no Meta ID.
         if (!leadId) return;
         if (leadId && loggedIds.has(leadId)) return;
+        // A Ranger form wired into a PUSH tab by mistake still stays out of PUSH.
+        if (/ranger/i.test(firstValue_(row, formIndexes))) return;
 
         const lead = sourceLead_(headers, row);
         if ((!lead.name && !lead.phone) || !hasValidTimestamp_(lead.time)) return;
 
+        // Meta's "create test lead" tool writes rows with a real lead id and a
+        // valid timestamp, so they would otherwise sync as real applicants.
+        if (isTestLead_(lead)) {
+          skippedTests++;
+          if (leadId) {
+            loggedIds.add(leadId);
+            idsToLog.push([leadId, tabName + ' (test lead, skipped)', new Date()]);
+          }
+          return;
+        }
+
         const fingerprint = leadFingerprint_(lead.time, lead.phone, lead.name);
         if (!ctx.fingerprints.has(fingerprint)) {
-          const out = buildDestinationRow_(ctx, lead);
+          const out = buildDestinationRow_(ctx, lead, tabName);
           const phoneKey = normPhone_(lead.phone);
           if (ctx.duplicateCol > 0 && phoneKey && ctx.phones.has(phoneKey)) {
             out[ctx.duplicateCol - 1] = 'DUPLICATE';
@@ -110,10 +238,82 @@ function syncMetaLeads() {
       logRange.setValues(idsToLog);
     }
 
-    Logger.log('Added ' + rowsToAppend.length + ' missing lead(s); logged ' + idsToLog.length + ' Meta lead ID(s).');
+    Logger.log('Added ' + rowsToAppend.length + ' missing lead(s); logged ' +
+      idsToLog.length + ' Meta lead ID(s); skipped ' + skippedTests + ' test lead(s).');
+
+    syncRangerLeads_(sourceBook);
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Copies Ranger leads into RANGER_DEST_SHEET. Dedupe is by the Lead ID column
+ * of that tab, so it is independent of the PUSH sync log.
+ */
+function syncRangerLeads_(sourceBook) {
+  const book = SpreadsheetApp.openById(RANGER_DEST_SPREADSHEET_ID);
+  const dest = book.getSheetByName(RANGER_DEST_SHEET) || book.insertSheet(RANGER_DEST_SHEET);
+  if (dest.getLastRow() < 1) dest.getRange(1, 1, 1, RANGER_HEADERS.length).setValues([RANGER_HEADERS]);
+
+  const destHeaders = dest.getRange(1, 1, 1, dest.getLastColumn()).getValues()[0]
+    .map(v => String(v).trim().toLowerCase());
+  const idCol = destHeaders.indexOf('lead id') + 1;
+  if (idCol < 1) throw new Error('"' + RANGER_DEST_SHEET + '" needs a "Lead ID" column.');
+  const known = new Set();
+  if (dest.getLastRow() > 1) {
+    dest.getRange(2, idCol, dest.getLastRow() - 1, 1).getDisplayValues()
+      .forEach(r => { if (r[0]) known.add(String(r[0]).trim()); });
+  }
+
+  const col = name => destHeaders.indexOf(name.toLowerCase());
+  const out = [];
+  const rangerBook = RANGER_SOURCE_SPREADSHEET_ID
+    ? SpreadsheetApp.openById(RANGER_SOURCE_SPREADSHEET_ID) : sourceBook;
+  rangerBook.getSheets().forEach(src => {
+    const tabName = src.getName();
+    if (tabName.indexOf('__') === 0 || src.getLastRow() <= HEADER_ROWS) return;
+    const headers = headerRow_(src);
+    if (!isRangerTab_(tabName, headers)) return;
+
+    const lower = headers.map(h => String(h).trim().toLowerCase());
+    const at = name => lower.indexOf(name);
+    const rows = src.getRange(HEADER_ROWS + 1, 1, src.getLastRow() - HEADER_ROWS, src.getLastColumn()).getValues();
+    rows.forEach(row => {
+      const val = name => (at(name) > -1 ? row[at(name)] : '');
+      const leadId = String(val('id') || val('lead_id')).replace(/^l:/i, '').trim();
+      if (!leadId || known.has(leadId)) return;
+      const name = String(val('full_name')).trim();
+      if (/test lead|dummy data/i.test(name + ' ' + val('community_role'))) return;
+      const time = new Date(val('created_time'));
+      if (isNaN(time)) return;
+
+      const line = new Array(destHeaders.length).fill('');
+      const put = (header, value) => { if (col(header) > -1) line[col(header)] = value; };
+      put('Timestamp', time);
+      put('Full Name', name);
+      put('Contact No', cleanPhone_(val('phone_number')));
+      put('Age', val('age'));
+      put('Community Role', val('community_role'));
+      put('Recycled UCO', val('recycled_uco'));
+      put('Platform', val('platform'));
+      put('Form', val('form_name'));
+      put('Ad', val('ad_name'));
+      put('Source Tab', tabName);
+      put('Lead ID', leadId);
+      put('Lead Status', val('lead_status'));
+      known.add(leadId);
+      out.push(line);
+    });
+  });
+
+  if (out.length) {
+    out.sort((a, b) => a[col('Timestamp')] - b[col('Timestamp')]);
+    const start = dest.getLastRow() + 1;
+    dest.getRange(start, idCol, out.length, 1).setNumberFormat('@');
+    dest.getRange(start, 1, out.length, destHeaders.length).setValues(out);
+  }
+  Logger.log('Ranger: added ' + out.length + ' lead(s) to "' + RANGER_DEST_SHEET + '".');
 }
 
 /**
@@ -151,7 +351,8 @@ function recoverPosterAfterRow1404() {
     const output = sourceRows
       .map(row => sourceLead_(headers, row))
       .filter(lead => (lead.name || lead.phone) && hasValidTimestamp_(lead.time))
-      .map(lead => buildDestinationRow_(ctx, lead));
+      .filter(lead => !isTestLead_(lead))
+      .map(lead => buildDestinationRow_(ctx, lead, 'POSTER'));
 
     if (!output.length) {
       Logger.log('No valid poster leads found after row 1404.');
@@ -332,10 +533,18 @@ function quarantineDuplicateAndIncompleteSyncRows() {
   }
 }
 
-/** Logs the latest source timestamps and trigger status without changing data. */
+/** Logs which tabs are detected, their latest timestamps, and trigger status. */
 function diagnoseSync() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  SOURCE_TABS.forEach(tabName => {
+  const tabs = discoverSourceTabs_(ss);
+  Logger.log('Detected ' + tabs.length + ' source tab(s): ' + tabs.join(', '));
+
+  const skipped = ss.getSheets()
+    .map(sh => sh.getName())
+    .filter(name => tabs.indexOf(name) === -1);
+  Logger.log('Skipped tab(s): ' + skipped.join(', '));
+
+  tabs.forEach(tabName => {
     const sh = ss.getSheetByName(tabName);
     if (!sh || sh.getLastRow() <= HEADER_ROWS) {
       Logger.log(tabName + ': no source rows');
@@ -351,6 +560,33 @@ function diagnoseSync() {
     });
     Logger.log(tabName + ': ' + rows.length + ' lead rows; newest=' + (latest ? latest.toISOString() : 'unknown'));
   });
+
+  // Flags any FIELD_MAP key that has no matching destination header.
+  const ctx = buildDestContext_(getDestSheet_());
+  const unmapped = FIELD_MAP.filter(m => ctx.columns[m.key] < 1).map(m => m.key + ' -> ' + m.dest);
+  Logger.log(unmapped.length
+    ? 'FIELD_MAP entries with no destination column: ' + unmapped.join(', ')
+    : 'All FIELD_MAP entries have a destination column.');
+  Logger.log(ctx.trackCol > 0
+    ? 'Track column found at column ' + ctx.trackCol + '.'
+    : 'NO "Track" column in the destination - Driver/Usahawan cannot be told apart.');
+  Logger.log(ctx.columns.sales > 0
+    ? 'Sales Wajib column found at column ' + ctx.columns.sales + '.'
+    : 'NO "Sales Wajib" column in the destination - the sales qualifier is being discarded.');
+
+  // Shows which source column each key actually resolves to, per tab. Use this
+  // after any form change to confirm nothing is landing in the wrong column.
+  tabs.forEach(tabName => {
+    const sh = ss.getSheetByName(tabName);
+    if (!sh || sh.getLastRow() <= HEADER_ROWS) return;
+    const headers = headerRow_(sh);
+    const lines = FIELD_MAP.map(m => {
+      const idx = pickAllIdx_(headers, m.src);
+      return m.key + '=' + (idx.length ? headers[idx[0]] : '(none)');
+    });
+    Logger.log(tabName + ' resolves: ' + lines.join(', '));
+  });
+
   Logger.log('Installed sync triggers: ' + ScriptApp.getProjectTriggers()
     .filter(t => t.getHandlerFunction() === 'syncMetaLeads').length);
 }
@@ -370,16 +606,31 @@ function sourceLead_(headers, row) {
     license: String(get('license') || '').trim().toUpperCase(),
     loc: String(get('loc') || '').trim(),
     age: get('age'),
+    day: String(get('day') || '').trim(),
+    commit: String(get('commit') || '').trim(),
+    start: String(get('start') || '').trim(),
+    sales: String(get('sales') || '').trim(),
   };
 }
 
-function buildDestinationRow_(ctx, lead) {
+/**
+ * Meta's test-lead tool writes the literal string "<test lead: dummy data>"
+ * into every field, with a real lead id and a valid timestamp.
+ */
+function isTestLead_(lead) {
+  const blob = [lead.name, lead.phone, lead.loc, lead.license, lead.commit]
+    .join(' ').toLowerCase();
+  return blob.indexOf('test lead') > -1 || blob.indexOf('dummy data') > -1;
+}
+
+function buildDestinationRow_(ctx, lead, tabName) {
   const out = new Array(ctx.headers.length).fill('');
   FIELD_MAP.forEach(map => {
     const col = ctx.columns[map.key];
     if (col > 0) out[col - 1] = lead[map.key];
   });
   if (ctx.sourceCol > 0) out[ctx.sourceCol - 1] = SOURCE_VALUE;
+  if (ctx.trackCol > 0 && tabName) out[ctx.trackCol - 1] = trackFromTab_(tabName);
   return out;
 }
 
@@ -396,6 +647,7 @@ function buildDestContext_(dest) {
   const contactCol = columns.phone;
   const sourceCol = findDest('Source');
   const duplicateCol = findDest('Double Entry');
+  const trackCol = findDest('Track');
   const phones = new Set();
   const fingerprints = new Set();
 
@@ -413,7 +665,7 @@ function buildDestContext_(dest) {
     });
   }
 
-  return { headers, columns, contactCol, sourceCol, duplicateCol, phones, fingerprints };
+  return { headers, columns, contactCol, sourceCol, duplicateCol, trackCol, phones, fingerprints };
 }
 
 function getDestSheet_() {
@@ -528,14 +780,29 @@ function pickIdx_(headers, names) {
   return -1;
 }
 
+/**
+ * Matches in tiers and stops at the first tier that hits: exact header name,
+ * then prefix, then substring. Without the early returns, a loose alias reaches
+ * the substring tier and picks up Meta's metadata columns - 'age' matches
+ * page_id, 'name' matches ad_name / adset_name / campaign_name / form_name -
+ * so a lead with an empty Age or Full Name silently got a page ID or an ad name
+ * written into it.
+ */
 function pickAllIdx_(headers, names) {
   const indexes = [];
   const add = i => { if (i > -1 && !indexes.includes(i)) indexes.push(i); };
-  names.forEach(name => headers.forEach((header, i) => { if (header === String(name).toLowerCase()) add(i); }));
+
+  names.forEach(name => headers.forEach((header, i) => {
+    if (header === String(name).toLowerCase()) add(i);
+  }));
+  if (indexes.length) return indexes;
+
   names.forEach(name => {
     const key = String(name).toLowerCase();
     headers.forEach((header, i) => { if (header.startsWith(key)) add(i); });
   });
+  if (indexes.length) return indexes;
+
   names.forEach(name => {
     const key = String(name).toLowerCase();
     headers.forEach((header, i) => { if (header.includes(key)) add(i); });

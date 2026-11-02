@@ -37,6 +37,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { neon } from "@neondatabase/serverless";
+import { readFileSync } from "fs";
+import path from "path";
 
 const GRAPH = "https://graph.facebook.com/v23.0";
 
@@ -52,6 +54,9 @@ const MODEL = process.env.SPARRON_MODEL || "claude-sonnet-4-6";
 // a genuine long-running DM at message #4; a windowed cap still trips on a
 // rapid loop / troll in one sitting but resets for real ongoing relationships.
 const REPLY_CAP = Number(process.env.SPARRON_REPLY_CAP || 3);
+// DMs get a higher cap: a private "how can we help → clarify → answer" flow
+// needs more than 3 turns, and there's no public audience to spam.
+const DM_REPLY_CAP = Number(process.env.SPARRON_DM_REPLY_CAP || 8);
 const CAP_WINDOW_HOURS = Number(process.env.SPARRON_CAP_WINDOW_HOURS || 24);
 
 // "hybrid" (default) — auto-send simple, hold sensitive as drafts.
@@ -63,6 +68,10 @@ const AUTONOMY = (process.env.SPARRON_AUTONOMY || "hybrid") as Autonomy;
 // Don't necro-reply the whole back-catalogue on first deploy: only consider
 // inbound messages newer than this. Follow-ups are recent by definition.
 const MAX_AGE_HOURS = Number(process.env.SPARRON_MAX_AGE_HOURS || 72);
+// Hard floor on top of MAX_AGE_HOURS: nothing older than this ever gets a
+// reply, even if the age window is widened. Owner drew the line at the
+// Feng Qian IG DM (1 Sep 2026, 03:12 MYT).
+const NOT_BEFORE_MS = Date.parse(process.env.SPARRON_NOT_BEFORE || "2026-08-31T19:12:00Z");
 
 // How many recent media / posts to scan for comments each run.
 const SCAN = Number(process.env.SPARRON_MEDIA_SCAN || 10);
@@ -141,6 +150,7 @@ async function threadReplyCount(threadKey: string): Promise<number> {
   const rows = await sql`
     SELECT COUNT(*)::int AS n FROM mb_sparron_log
     WHERE thread_key = ${threadKey}
+      AND mode <> 'ignored'
       AND created_at > NOW() - (${CAP_WINDOW_HOURS}::int * INTERVAL '1 hour')
   `;
   return (rows[0]?.n as number) || 0;
@@ -149,7 +159,7 @@ async function threadReplyCount(threadKey: string): Promise<number> {
 async function recordReply(
   c: Candidate,
   text: string,
-  mode: "auto" | "approved",
+  mode: "auto" | "approved" | "ignored",
   replyRef: string | null,
 ): Promise<void> {
   await sql`
@@ -298,8 +308,39 @@ function parseTs(ts?: string): number {
 }
 
 function freshEnough(tsMs: number): boolean {
-  if (!tsMs) return false;
+  if (!tsMs || tsMs < NOT_BEFORE_MS) return false;
   return Date.now() - tsMs <= MAX_AGE_HOURS * 3600_000;
+}
+
+// FB comment attachments come back as a single `attachment.type`. GIFs posted
+// via the comment box (Giphy picker) land as "animated_image_share" — treat
+// that, and any other attachment type, as real engagement worth a reply
+// instead of silently dropping it like the old sticker/photo-only skip did.
+function attachmentText(message: string | undefined, attachmentType: string | undefined): string {
+  const text = (message || "").trim();
+  if (text) return text;
+  if (!attachmentType) return "";
+  if (attachmentType === "animated_image_share") return "[hantar GIF]";
+  if (attachmentType === "photo") return "[hantar gambar]";
+  if (attachmentType === "video_inline" || attachmentType === "video") return "[hantar video]";
+  return "[hantar attachment]";
+}
+
+// DM/Messenger attachments come back as `attachments.data[]`, each with a
+// mime_type. GIFs are image/gif; treat any recognised attachment the same
+// way as attachmentText above.
+function dmAttachmentText(
+  message: string | undefined,
+  attachments: { data?: Array<{ mime_type?: string }> } | undefined,
+): string {
+  const text = (message || "").trim();
+  if (text) return text;
+  const mime = attachments?.data?.[0]?.mime_type || "";
+  if (!mime) return "";
+  if (mime.includes("gif")) return "[hantar GIF]";
+  if (mime.startsWith("image/")) return "[hantar gambar]";
+  if (mime.startsWith("video/")) return "[hantar video]";
+  return "[hantar attachment]";
 }
 
 // --- Instagram comments -----------------------------------------------------
@@ -362,7 +403,16 @@ async function collectFbComments(ctx: PageContext): Promise<Candidate[]> {
           message?: string;
           created_time?: string;
           from?: { id?: string; name?: string };
-          comments?: { data?: Array<{ id: string; message?: string; created_time?: string; from?: { id?: string; name?: string } }> };
+          attachment?: { type?: string };
+          comments?: {
+            data?: Array<{
+              id: string;
+              message?: string;
+              created_time?: string;
+              from?: { id?: string; name?: string };
+              attachment?: { type?: string };
+            }>;
+          };
         }>;
       };
     }>;
@@ -370,7 +420,7 @@ async function collectFbComments(ctx: PageContext): Promise<Candidate[]> {
     `${ctx.pageId}/posts`,
     {
       fields:
-        "id,comments{id,message,created_time,from,comments{id,message,created_time,from}}",
+        "id,comments{id,message,created_time,from,attachment,comments{id,message,created_time,from,attachment}}",
       limit: String(SCAN),
     },
     ctx.pageToken,
@@ -379,18 +429,21 @@ async function collectFbComments(ctx: PageContext): Promise<Candidate[]> {
     for (const c of p.comments?.data || []) {
       const subs = c.comments?.data || [];
       const nodes = [
-        { id: c.id, fromId: c.from?.id, name: c.from?.name, text: c.message || "", ts: parseTs(c.created_time) },
+        { id: c.id, fromId: c.from?.id, name: c.from?.name, raw: c.message || "", text: attachmentText(c.message, c.attachment?.type), ts: parseTs(c.created_time) },
         ...subs.map((s) => ({
           id: s.id,
           fromId: s.from?.id,
           name: s.from?.name,
-          text: s.message || "",
+          raw: s.message || "",
+          text: attachmentText(s.message, s.attachment?.type),
           ts: parseTs(s.created_time),
         })),
       ].sort((a, b) => a.ts - b.ts);
       const last = nodes[nodes.length - 1];
       if (!last || last.fromId === ctx.pageId) continue;
-      if (!last.text.trim()) continue; // sticker/photo-only — nothing to answer
+      // Attachment-only comments (GIF, photo, sticker) get no reply — owner's rule.
+      // attachmentText() still labels them so they read sensibly in history.
+      if (!last.raw.trim()) continue;
       if (!freshEnough(last.ts)) continue;
       out.push({
         surface: "fb_comment",
@@ -407,6 +460,14 @@ async function collectFbComments(ctx: PageContext): Promise<Candidate[]> {
   return out;
 }
 
+// "@user mentioned you in their story" arrives as a DM. IG flags it with
+// story.mention; Messenger has no flag, so fall back to the notice text.
+function isStoryMention(m: { message?: string; story?: { mention?: unknown } }): boolean {
+  if (m.story?.mention) return true;
+  const t = (m.message || "").toLowerCase();
+  return /mentioned (you|your page) in (their|a|his|her) story|sebut anda dalam cerita|menyebut anda dalam cerita/.test(t);
+}
+
 // --- Direct messages (shared for IG + Messenger) ----------------------------
 async function collectDms(ctx: PageContext, platform: "instagram" | "messenger"): Promise<Candidate[]> {
   const out: Candidate[] = [];
@@ -418,6 +479,10 @@ async function collectDms(ctx: PageContext, platform: "instagram" | "messenger")
   // scan for any prior reply of ours.
   const igNewOnly = platform === "instagram" && IG_DM_NEW_ONLY;
   const msgLimit = igNewOnly ? "25" : "8";
+  // `story` only exists on IG message nodes; asking for it on Messenger errors.
+  const msgFields = platform === "instagram"
+    ? "id,message,from,created_time,attachments,story"
+    : "id,message,from,created_time,attachments";
   // The IG conversations edge is heavy and sometimes rate-errors; ask for the
   // minimum and fetch messages per-conversation. Best-effort — bail quietly.
   const conv = await graphGet<{ data?: Array<{ id: string; message_count?: number }>; error?: GraphError }>(
@@ -428,8 +493,15 @@ async function collectDms(ctx: PageContext, platform: "instagram" | "messenger")
   if (conv.error || !conv.data) return out;
   for (const cv of conv.data) {
     const mm = await graphGet<{
-      data?: Array<{ id: string; message?: string; created_time?: string; from?: { id?: string; name?: string; username?: string } }>;
-    }>(`${cv.id}/messages`, { fields: "id,message,from,created_time", limit: msgLimit }, ctx.pageToken);
+      data?: Array<{
+        id: string;
+        message?: string;
+        created_time?: string;
+        from?: { id?: string; name?: string; username?: string };
+        attachments?: { data?: Array<{ mime_type?: string; image_data?: unknown; video_data?: unknown }> };
+        story?: { mention?: unknown; reply_to?: unknown };
+      }>;
+    }>(`${cv.id}/messages`, { fields: msgFields, limit: msgLimit }, ctx.pageToken);
     const msgs = mm.data || [];
     if (!msgs.length) continue;
     const last = msgs[0]; // newest first
@@ -437,6 +509,13 @@ async function collectDms(ctx: PageContext, platform: "instagram" | "messenger")
     if (!fromId || fromId === selfId) continue; // we replied last
     const tsMs = parseTs(last.created_time);
     if (!freshEnough(tsMs)) continue;
+    // Story mentions never get a reply (owner's rule). Dropped here so the
+    // model never even sees them. Story REPLIES (someone answering our story)
+    // are real conversation and still go through.
+    if (isStoryMention(last)) continue;
+    // Attachment-only messages (photo, GIF, sticker, voice, shared post) are
+    // left for a person, owner's rule. Text sent WITH an attachment still counts.
+    if (!(last.message || "").trim()) continue;
     // IG-DM new-only gate: skip anyone we've ever engaged. "Existing" =
     // we've replied somewhere in the visible window, OR the thread has more
     // messages than we fetched (older history exists that we can't see, so a
@@ -449,12 +528,15 @@ async function collectDms(ctx: PageContext, platform: "instagram" | "messenger")
     // PSID = the participant's id (from the newest inbound message).
     const history = [...msgs]
       .reverse()
-      .map((m) => `${m.from?.id === selfId ? "FatHopes" : m.from?.name || m.from?.username || "user"}: ${m.message || ""}`);
+      .map(
+        (m) =>
+          `${m.from?.id === selfId ? "FatHopes" : m.from?.name || m.from?.username || "user"}: ${dmAttachmentText(m.message, m.attachments)}`,
+      );
     out.push({
       surface,
       threadKey: cv.id,
       itemId: last.id,
-      incomingText: last.message || "",
+      incomingText: dmAttachmentText(last.message, last.attachments),
       authorName: last.from?.name || last.from?.username || null,
       history,
       target: { kind: "dm", psid: fromId },
@@ -482,47 +564,29 @@ export async function collectCandidates(ctx: PageContext): Promise<Candidate[]> 
 // Sparron's brain — voice, facts, triage + reply generation.
 // ---------------------------------------------------------------------------
 
-// The persona. FatHopes = "kita"; the customer = "cik". Short, straightforward
-// KL Manglish in the FatHopes Threads voice, little-to-sometimes emoji.
-const VOICE = `You are Sparron, the social media manager for FatHopes Energy, replying to a comment or DM as the FatHopes brand account. Reply in ONE short message.
+// Voice, facts, flow and hold/ignore rules live in ONE editable file,
+// prompts/sparron.md, so the owner can retune her without touching code.
+// Read fresh each call (it's tiny) so local edits apply without a restart.
+// next.config.ts traces it into the /api/sparron bundle for Vercel.
+const PROMPT_PATH = path.join(process.cwd(), "prompts", "sparron.md");
+function loadPrompt(): string {
+  try {
+    return readFileSync(PROMPT_PATH, "utf8");
+  } catch (e) {
+    throw new Error(`Sparron prompt missing at ${PROMPT_PATH}: ${e instanceof Error ? e.message : e}`);
+  }
+}
 
-HARD RULES (address form):
-- Refer to FatHopes as "kita" (never "kami", never "saya", never "we/our").
-- Address the customer as "cik" (never "anda", never "awak").
+// The output contract stays in code — the parser below depends on it.
+const TRIAGE = `Decide how to handle the latest message using the rules above, then write the reply.
 
-VOICE (KL Manglish, FatHopes Threads energy — concise, straightforward, real):
-- Manglish: Malay-dominant KL rojak that code-switches into English naturally. NOT formal BM, NOT full English.
-- SHORT and to the point. One clear helpful answer, usually 1–2 short lines, under ~200 chars. No fluff, no corporate intro like "Terima kasih kerana menghubungi kami".
-- Mostly lowercase. Little to SOMETIMES an emoji (0–1, not every reply, never a string of them).
-- Malay shorthand is fine: je, sbb, dgn, tgk, byk, mcm, tp, lg, korg, ye, ni. Do NOT use a bare "x" for "tak" — write "tak".
-- Never end the whole message on a bare full stop (end on the last word, a "?" or a "!"). A trailing "..." is fine occasionally.
-- NEVER use em-dashes or en-dashes — use commas or line breaks.
-- Match the language the person used (Malay → Malay, English → English, mix → mix).
-- Warm and helpful, not stiff. You represent the brand, so stay friendly and never combative, even if they are.
-
-DON'T INVENT FACTS:
-- Never state a specific buy-back price per kg or a specific ringgit amount — say it follows "kadar semasa" (current rate) shown when weighed / in the app.
-- Never invent an exact address, phone number, or interview venue. For joining PUSH, tell them to share their name + phone + area and "team kita akan hubungi", or point to the link in bio.
-- If you genuinely can't answer without info we don't have, keep it short and ask a clarifying question.`;
-
-const FACTS = `ABOUT FATHOPES ENERGY (for grounding, do not dump all of this — use only what's relevant):
-- FatHopes buys used cooking oil (minyak masak terpakai / UCO, the minyak hitam lepas menggoreng). Cik jual, kita beli. Payment + reward points via the FatHopes Loyalty App. Free to sign up.
-- FatHopes recycles the UCO into Sustainable Aviation Fuel (SAF) — cleaner fuel for planes. Good angle when relevant.
-- Recycling & Buy-Back Centre (RBBC): P1 Parking Lot, IPC Shopping Centre (sebelah IKEA, Mutiara Damansara). Open the 2nd & 4th week of every month, 11am–3pm. Bring UCO, timbang with the team, earn on the spot.
-- Program PUSH: recruitment of drivers/agents who collect UCO with their own vehicle and get paid. A driving licence (incl. GDL) is welcome. It is NOT salaried employment and does NOT provide accommodation. To join: share name + phone + area, team follows up (or link in bio).
-- FatHopes also runs community gotong-royong recycling events in various towns/states from time to time.
-- Price is not fixed publicly — always "ikut kadar semasa".`;
-
-const TRIAGE = `Decide how to handle this message, then write Sparron's reply.
-
-Classify "action":
-- "auto"  — safe to send automatically: greetings/banter, thanks, "how does it work", where/when/location of a centre or event, the price MECHANISM (kadar semasa, no number), how to join PUSH, simple product/recycling questions, general positive or curious messages.
-- "hold"  — must be held for a human to approve: complaints or anger, payment problems or disputes ("belum dibayar", "tak bayar", "scam", "tipu", refunds), press/media/journalist enquiries, business/partnership/wholesale/bulk proposals, anything that needs a specific number, exact address, or a commitment we cannot verify, legal matters, spam, or anything genuinely ambiguous/unclear.
-
-ALWAYS write your best reply in "reply" even when action is "hold" (a human will review/edit it). Keep the same voice and rules.
+"action" is one of:
+- "auto"   — safe to send automatically.
+- "hold"   — a person must approve before it sends. ALWAYS still write your best reply (they'll review/edit it).
+- "ignore" — send nothing (story mention, stop request, conversation already over, spam). Leave "reply" empty.
 
 Respond with ONLY a JSON object, no prose, no code fence:
-{"action":"auto"|"hold","reason":"<short why>","reply":"<the reply text>"}`;
+{"action":"auto"|"hold"|"ignore","reason":"<short why>","reply":"<the reply text>"}`;
 
 let anthropic: Anthropic | null = null;
 function client(): Anthropic {
@@ -532,7 +596,7 @@ function client(): Anthropic {
 }
 
 export interface Triage {
-  action: "auto" | "hold";
+  action: "auto" | "hold" | "ignore";
   reason: string;
   reply: string;
 }
@@ -545,7 +609,7 @@ const SURFACE_LABEL: Record<Surface, string> = {
 };
 
 export async function triageAndDraft(c: Candidate): Promise<Triage> {
-  const system = [VOICE, FACTS, TRIAGE].join("\n\n");
+  const system = [loadPrompt(), TRIAGE].join("\n\n");
   const convo = c.history.length
     ? `Conversation so far (oldest first):\n${c.history.map((h) => `- ${h}`).join("\n")}`
     : `Message: ${c.incomingText}`;
@@ -572,6 +636,9 @@ export async function triageAndDraft(c: Candidate): Promise<Triage> {
     if (start >= 0 && end > start) parsed = JSON.parse(raw.slice(start, end + 1));
   } catch {
     /* fall through to guard below */
+  }
+  if (parsed.action === "ignore") {
+    return { action: "ignore", reason: (parsed.reason || "ignore").slice(0, 200), reply: "" };
   }
   let reply = (parsed.reply || "").trim();
   reply = cleanVoice(reply);
@@ -676,10 +743,11 @@ export async function runSparron(opts: { dry?: boolean } = {}): Promise<SparronR
       continue;
     }
     // Loop guard: had our say too many times in this thread?
-    if ((await threadReplyCount(c.threadKey)) >= REPLY_CAP) {
+    const cap = c.target.kind === "dm" ? DM_REPLY_CAP : REPLY_CAP;
+    if ((await threadReplyCount(c.threadKey)) >= cap) {
       run.capped++;
       const t = await triageAndDraft(c).catch(() => null);
-      if (t?.reply) await saveDraft(c, t.reply, `reply cap (${REPLY_CAP}) reached — needs human`);
+      if (t?.reply) await saveDraft(c, t.reply, `reply cap (${cap}) reached — needs human`);
       run.items.push({ surface: c.surface, author: c.authorName, incoming: c.incomingText, outcome: "capped", reason: "reply cap reached" });
       continue;
     }
@@ -690,6 +758,13 @@ export async function runSparron(opts: { dry?: boolean } = {}): Promise<SparronR
     } catch (e) {
       run.failed++;
       run.items.push({ surface: c.surface, author: c.authorName, incoming: c.incomingText, outcome: "failed", error: e instanceof Error ? e.message : "triage failed" });
+      continue;
+    }
+    if (t.action === "ignore") {
+      // Log it so the same message isn't re-triaged every 5 minutes.
+      if (!opts.dry) await recordReply(c, "", "ignored", null);
+      run.skipped++;
+      run.items.push({ surface: c.surface, author: c.authorName, incoming: c.incomingText, outcome: "skipped", reason: `ignored: ${t.reason}` });
       continue;
     }
     if (!t.reply) {
