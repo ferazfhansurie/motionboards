@@ -5,7 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 type Job = { id: string; depot: string; manager: string | null; status: string; videoUrl: string | null; previewUrl: string | null; driveUrl: string | null;
   instructions: { text: string; at: string; by?: string }[]; capcutName: string | null; note: string | null; updatedAt: string };
 type Site = { code: string; name: string; token: string; daily_limit: number };
-type User = { id: number; depot: string; name: string; phone: string; disabled: boolean; created_at: string; last_seen: string | null; videos: number };
+type User = { id: number; depot: string; name: string; phone: string; disabled: boolean; created_at: string; last_seen: string | null; videos: number;
+  last_msg: string | null; last_text: string | null };
+type Msg = { id: number; role: "user" | "bot"; author: string | null; text: string; media_url: string | null; created_at: string };
+const when = (s: string) => new Date(s).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kuala_Lumpur" });
 
 const LABEL: Record<string, string> = { queued: "Waiting to edit", working: "Editing", preview: "Manager reviewing", pending: "Needs your approval",
   approved: "Approved, uploading", publishing: "Uploading to Drive", done: "Done", failed: "Failed", rejected: "Change asked" };
@@ -15,7 +18,9 @@ export default function Approvals({ k }: { k: string }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [tab, setTab] = useState<"pending" | "all" | "people" | "links">("pending");
+  const [tab, setTab] = useState<"pending" | "all" | "chats" | "people" | "links">("pending");
+  const [chatUser, setChatUser] = useState<number | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const load = useCallback(async () => {
@@ -23,6 +28,14 @@ export default function Approvals({ k }: { k: string }) {
     if (r.ok) { const j = await r.json(); setJobs(j.jobs); setSites(j.sites); setUsers(j.users ?? []); }
   }, [k]);
   useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
+
+  // the open chat refreshes with the rest of the page
+  useEffect(() => {
+    if (tab !== "chats" || chatUser === null) return;
+    let live = true;
+    const get = async () => { const r = await fetch(`/api/depot/admin?k=${k}&chat=${chatUser}`, { cache: "no-store" }); if (r.ok && live) setMsgs((await r.json()).messages); };
+    get(); const t = setInterval(get, 5000); return () => { live = false; clearInterval(t); };
+  }, [tab, chatUser, k]);
 
   async function act(jobId: string, action: "approve" | "change") {
     setBusy(jobId);
@@ -48,15 +61,53 @@ export default function Approvals({ k }: { k: string }) {
         <div className="mx-auto flex max-w-5xl items-center gap-3">
           <img src="/depot/fathopes-logo-white.png" alt="" className="h-7" />
           <div className="flex-1 font-bold">Depot video approvals</div>
-          {(["pending", "all", "people", "links"] as const).map((t) => (
+          {(["pending", "all", "chats", "people", "links"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`rounded-full px-3 py-1 text-sm font-semibold ${tab === t ? "bg-white text-[#0a7a3a]" : "bg-white/15"}`}>
-              {t === "pending" ? `To approve (${jobs.filter((j) => j.status === "pending").length})` : t === "all" ? "All videos" : t === "people" ? `People (${users.length})` : "Depot links"}
+              {t === "pending" ? `To approve (${jobs.filter((j) => j.status === "pending").length})` : t === "all" ? "All videos" : t === "chats" ? "Chats" : t === "people" ? `People (${users.length})` : "Depot links"}
             </button>
           ))}
         </div>
       </header>
       <main className="mx-auto max-w-5xl p-5">
-        {tab === "people" ? (
+        {tab === "chats" ? (
+          users.length === 0 ? <div className="rounded-xl bg-white p-10 text-center text-[#5b6573] shadow-sm">Nobody has registered yet.</div> :
+          <div className="grid gap-4 md:grid-cols-[300px_1fr]">
+            <div className={`overflow-hidden rounded-xl bg-white shadow-sm ${chatUser !== null ? "hidden md:block" : ""}`}>
+              {users.map((u) => (
+                <button key={u.id} onClick={() => { setMsgs([]); setChatUser(u.id); }}
+                  className={`block w-full border-b border-[#eef0ee] px-4 py-3 text-left text-sm last:border-0 ${chatUser === u.id ? "bg-[#e8f5ee]" : "hover:bg-[#f7f8f7]"}`}>
+                  <div className="flex items-center gap-2"><b className="text-xs text-[#0a7a3a]">{u.depot}</b><span className="flex-1 truncate font-semibold">{u.name}</span>
+                    <span className="text-[11px] text-[#9aa3ae]">{u.last_msg ? ago(u.last_msg) : ""}</span></div>
+                  <div className="mt-0.5 truncate text-xs text-[#5b6573]">{u.last_text ?? "No messages yet"}</div>
+                </button>
+              ))}
+            </div>
+            <div className={`flex min-h-[60vh] flex-col overflow-hidden rounded-xl bg-white shadow-sm ${chatUser === null ? "hidden md:flex" : ""}`}>
+              {chatUser === null ? <div className="m-auto text-sm text-[#5b6573]">Pick a person to read their chat.</div> : (() => {
+                const u = users.find((x) => x.id === chatUser);
+                return <>
+                  <div className="flex items-center gap-2 border-b border-[#eef0ee] px-4 py-3 text-sm">
+                    <button onClick={() => setChatUser(null)} className="md:hidden">←</button>
+                    <b>{u?.name}</b><span className="text-[#5b6573]">{u?.depot} · +{u?.phone}</span>
+                    <span className="ml-auto text-xs text-[#9aa3ae]">read only</span>
+                  </div>
+                  <div className="flex-1 space-y-3 overflow-y-auto p-4" style={{ maxHeight: "75vh" }}>
+                    {msgs.length === 0 && <div className="text-center text-sm text-[#9aa3ae]">No messages yet.</div>}
+                    {msgs.map((m) => (
+                      <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "bg-[#f3f4f6]" : "border border-[#e3efe7] bg-[#f6fbf8]"}`}>
+                          <div className="mb-0.5 text-[11px] font-semibold text-[#7d8794]">{m.role === "user" ? (m.author || u?.name) : "Video Bot"} · {when(m.created_at)}</div>
+                          {m.media_url && <video src={m.media_url} controls playsInline preload="metadata" className="mb-1.5 max-h-72 rounded-lg bg-black" />}
+                          <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>;
+              })()}
+            </div>
+          </div>
+        ) : tab === "people" ? (
           users.length === 0 ? <div className="rounded-xl bg-white p-10 text-center text-[#5b6573] shadow-sm">Nobody has registered yet.</div> :
           <div className="overflow-hidden rounded-xl bg-white shadow-sm">
             {users.map((u) => (
@@ -65,6 +116,7 @@ export default function Approvals({ k }: { k: string }) {
                 <span className="w-32 text-[#5b6573]">+{u.phone}</span>
                 <span className="w-20 text-[#5b6573]">{u.videos} video{u.videos === 1 ? "" : "s"}</span>
                 <span className="w-24 text-xs text-[#7d8794]">{u.last_seen ? `seen ${ago(u.last_seen)}` : "never seen"}</span>
+                <button onClick={() => { setMsgs([]); setChatUser(u.id); setTab("chats"); }} className="rounded-lg border px-2.5 py-1 font-semibold">View chat</button>
                 <button onClick={() => userAct(u, "user_reset")} className="rounded-lg border px-2.5 py-1 font-semibold">Reset password</button>
                 <button onClick={() => userAct(u, u.disabled ? "user_on" : "user_off")} className={`rounded-lg border px-2.5 py-1 font-semibold ${u.disabled ? "" : "text-[#c62828]"}`}>{u.disabled ? "Turn on" : "Turn off"}</button>
               </div>
@@ -72,6 +124,11 @@ export default function Approvals({ k }: { k: string }) {
           </div>
         ) : tab === "links" ? (
           <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+            <div className="flex items-center gap-3 border-b border-[#eef0ee] bg-[#e8f5ee] px-4 py-3 text-sm">
+              <b className="w-12">ALL</b><span className="w-56 font-semibold">Shared link (give this one out)</span>
+              <code className="min-w-0 flex-1 truncate">{origin}/depot</code>
+              <button onClick={() => navigator.clipboard.writeText(`${origin}/depot`)} className="rounded-lg border bg-white px-2.5 py-1 font-semibold">Copy</button>
+            </div>
             {sites.map((s) => (
               <div key={s.code} className="flex items-center gap-3 border-b border-[#eef0ee] px-4 py-3 text-sm last:border-0">
                 <b className="w-12">{s.code}</b><span className="w-56 text-[#5b6573]">{s.name}</span>

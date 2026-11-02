@@ -5,10 +5,19 @@ import { addMessage, adminOk, depotSql as sql, hashPass, publicJob } from "@/lib
 // Faeez's approvals page. Key in ?k= (GET) or body.k (POST).
 export async function GET(req: NextRequest) {
   if (!(await adminOk(req.nextUrl.searchParams.get("k")))) return NextResponse.json({ error: "no" }, { status: 401 });
+  const chat = req.nextUrl.searchParams.get("chat");
+  if (chat) { // one person's full chat, oldest first
+    const messages = await sql`SELECT id, role, author, text, media_url, job_id, created_at FROM depot_messages
+      WHERE user_id = ${Number(chat)} ORDER BY id DESC LIMIT 300`;
+    return NextResponse.json({ messages: messages.reverse() });
+  }
   const jobs = await sql`SELECT * FROM depot_jobs ORDER BY updated_at DESC LIMIT 100`;
   const sites = await sql`SELECT code, name, token, daily_limit FROM depot_sites ORDER BY code`;
   const users = await sql`SELECT u.id, u.depot, u.name, u.phone, u.disabled, u.created_at, u.last_seen,
-    (SELECT count(*)::int FROM depot_jobs j WHERE j.user_id = u.id) AS videos FROM depot_users u ORDER BY u.depot, u.name`;
+    (SELECT count(*)::int FROM depot_jobs j WHERE j.user_id = u.id) AS videos,
+    (SELECT max(m.created_at) FROM depot_messages m WHERE m.user_id = u.id) AS last_msg,
+    (SELECT m.text FROM depot_messages m WHERE m.user_id = u.id ORDER BY m.id DESC LIMIT 1) AS last_text
+    FROM depot_users u ORDER BY last_msg DESC NULLS LAST, u.depot, u.name`;
   return NextResponse.json({ jobs: jobs.map(publicJob), sites, users });
 }
 
