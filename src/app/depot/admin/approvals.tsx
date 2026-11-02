@@ -21,7 +21,6 @@ export default function Approvals({ me }: { me: string }) {
   const [users, setUsers] = useState<User[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [reply, setReply] = useState("");
-  const [asEdit, setAsEdit] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [sendState, setSendState] = useState("");
   const [newAdmin, setNewAdmin] = useState({ name: "", phone: "", password: "" });
@@ -79,8 +78,8 @@ export default function Approvals({ me }: { me: string }) {
         videoUrl = pj.publicUrl;
       }
       setSendState("Sending…");
-      await post({ action: "reply", userId: chatUser, text: reply, videoUrl, asEdit });
-      setReply(""); setFile(null); setAsEdit(false); if (fileRef.current) fileRef.current.value = "";
+      await post({ action: "reply", userId: chatUser, text: reply, videoUrl });
+      setReply(""); setFile(null); if (fileRef.current) fileRef.current.value = "";
       await loadChat(chatUser); load();
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
     setSendState("");
@@ -179,8 +178,7 @@ export default function Approvals({ me }: { me: string }) {
                       <button disabled={!!sendState || (!reply.trim() && !file)} onClick={sendReply} className="rounded-lg bg-[#0a9b4a] px-4 py-2 text-sm font-bold text-white disabled:opacity-40">Send</button>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-xs text-[#5b6573]">
-                      <label className="flex items-center gap-1.5"><input type="checkbox" checked={asEdit} onChange={(e) => setAsEdit(e.target.checked)} />
-                        Also tell the bot to make this change to their latest video</label>
+                      <span>The bot answers. If they have a video in progress, your message is an edit to it.</span>
                       <span>{sendState}</span>
                     </div>
                   </div>

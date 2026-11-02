@@ -36,17 +36,17 @@ export async function POST(req: NextRequest) {
     const videoUrl = typeof b.videoUrl === "string" && b.videoUrl.startsWith("https://") ? b.videoUrl : null;
     if (!text && !videoUrl) return NextResponse.json({ error: "Empty message" }, { status: 400 });
     const userId = Number(u.id), depot = u.depot as string;
-    if (b.asEdit) {
-      if (!text) return NextResponse.json({ error: "Write the change" }, { status: 400 });
-      const [open] = await sql`SELECT id FROM depot_jobs WHERE user_id = ${userId} AND status = ANY(${OPEN}) ORDER BY created_at DESC LIMIT 1`;
-      if (!open) return NextResponse.json({ error: "They have no video in progress to change" }, { status: 409 });
+    // the bot always answers: with a video in progress it's an edit, otherwise a note
+    const [open] = await sql`SELECT id FROM depot_jobs WHERE user_id = ${userId} AND status = ANY(${OPEN}) ORDER BY created_at DESC LIMIT 1`;
+    if (open && text) {
       await sql`UPDATE depot_jobs SET instructions = instructions || ${JSON.stringify([{ text, at: new Date().toISOString(), by: admin.name }])}::jsonb,
         version = version + 1, status = CASE WHEN status = 'working' THEN 'working' ELSE 'queued' END, updated_at = now() WHERE id = ${open.id}`;
       await addMessage(depot, "admin", text, { jobId: open.id as string, author: admin.name, mediaUrl: videoUrl });
-      await addMessage(depot, "bot", "Okay, making that change now ✏️\n\nThe new preview will be here shortly.", { jobId: open.id as string });
-      return NextResponse.json({ ok: true });
+      await addMessage(depot, "bot", `Okay ${admin.name.split(" ")[0]}, making that change now ✏️\n\nThe new preview will be here shortly.`, { jobId: open.id as string });
+      return NextResponse.json({ ok: true, edit: true });
     }
     await addMessage(depot, "admin", text, { userId, author: admin.name, mediaUrl: videoUrl });
+    await addMessage(depot, "bot", "Noted 👍\n\nThere's no video being edited in this chat right now. Send a video and tell me what to add.", { userId });
     return NextResponse.json({ ok: true });
   }
   if (b.action === "admin_add") {
