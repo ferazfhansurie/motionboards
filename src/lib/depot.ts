@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import type { NextRequest, NextResponse } from "next/server";
 
 // Depot video bot: depot managers chat at /depot/<token>, a worker on Faeez's
 // Mac edits the videos (captions/text, CapCut project + ffmpeg render), Faeez
@@ -31,9 +32,50 @@ export const workerOk = (k: string | null) => keyOk("worker_hash", k);
 
 export const newJobId = () => `dj_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
 
-export async function addMessage(depot: string, role: "user" | "bot", text: string, o: { jobId?: string | null; author?: string | null; mediaUrl?: string | null } = {}) {
-  await sql`INSERT INTO depot_messages (depot, job_id, role, author, text, media_url)
-    VALUES (${depot}, ${o.jobId ?? null}, ${role}, ${o.author ?? null}, ${text}, ${o.mediaUrl ?? null})`;
+// Messages belong to one manager's chat: pass userId, or a jobId and the job's owner is used.
+export async function addMessage(depot: string, role: "user" | "bot", text: string, o: { jobId?: string | null; author?: string | null; mediaUrl?: string | null; userId?: number | null } = {}) {
+  await sql`INSERT INTO depot_messages (depot, job_id, role, author, text, media_url, user_id)
+    VALUES (${depot}, ${o.jobId ?? null}, ${role}, ${o.author ?? null}, ${text}, ${o.mediaUrl ?? null},
+      COALESCE(${o.userId ?? null}::bigint, (SELECT user_id FROM depot_jobs WHERE id = ${o.jobId ?? null})))`;
+}
+
+// ---- manager accounts: register with name + phone + password on their depot link
+export interface DepotUser { id: number; depot: string; name: string; phone: string }
+const COOKIE = "depot_session";
+const SESSION_DAYS = 90;
+
+export function normPhone(p: string) {
+  let d = String(p || "").replace(/\D/g, "");
+  if (d.startsWith("0")) d = "6" + d;
+  return /^60\d{8,10}$/.test(d) ? d : null;
+}
+export function hashPass(pw: string) {
+  const salt = randomBytes(16).toString("hex");
+  return `${salt}:${scryptSync(pw, salt, 32).toString("hex")}`;
+}
+export function checkPass(pw: string, stored: string) {
+  const [salt, h] = stored.split(":");
+  if (!salt || !h) return false;
+  return timingSafeEqual(Buffer.from(h, "hex"), scryptSync(pw, salt, 32));
+}
+export async function startSession(res: NextResponse, userId: number) {
+  const t = randomBytes(32).toString("base64url");
+  await sql`INSERT INTO depot_sessions (token_hash, user_id, expires_at) VALUES (${sha(t)}, ${userId}, now() + make_interval(days => ${SESSION_DAYS}))`;
+  res.cookies.set(COOKIE, t, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: SESSION_DAYS * 86400 });
+}
+export async function endSession(req: NextRequest, res: NextResponse) {
+  const t = req.cookies.get(COOKIE)?.value;
+  if (t) await sql`DELETE FROM depot_sessions WHERE token_hash = ${sha(t)}`;
+  res.cookies.delete(COOKIE);
+}
+// The signed-in manager, only if their account belongs to this depot.
+export async function currentUser(req: NextRequest, depot: string): Promise<DepotUser | null> {
+  const t = req.cookies.get(COOKIE)?.value;
+  if (!t) return null;
+  const r = await sql`UPDATE depot_users u SET last_seen = now() FROM depot_sessions s
+    WHERE s.token_hash = ${sha(t)} AND s.expires_at > now() AND u.id = s.user_id AND NOT u.disabled AND u.depot = ${depot}
+    RETURNING u.id, u.depot, u.name, u.phone`;
+  return r[0] ? { id: Number(r[0].id), depot: r[0].depot as string, name: r[0].name as string, phone: r[0].phone as string } : null;
 }
 
 export async function workerSeen(): Promise<number> {

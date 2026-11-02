@@ -3,13 +3,14 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomBytes } from "crypto";
 import { r2Client, r2Config } from "@/lib/r2";
-import { siteByToken } from "@/lib/depot";
+import { currentUser, siteByToken } from "@/lib/depot";
 
 // POST /api/depot/<token>/presign { filename, contentType, size } -> { uploadUrl, publicUrl }
 // The phone PUTs the video straight to R2, so Vercel's body limit doesn't apply.
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/depot/[token]/presign">) {
   const site = await siteByToken((await ctx.params).token);
   if (!site) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  if (!(await currentUser(req, site.code))) return NextResponse.json({ error: "Please log in again" }, { status: 401 });
   const cfg = r2Config();
   if (!cfg.ok) return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
   const b = await req.json().catch(() => ({}));

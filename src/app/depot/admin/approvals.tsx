@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 type Job = { id: string; depot: string; manager: string | null; status: string; videoUrl: string | null; previewUrl: string | null; driveUrl: string | null;
   instructions: { text: string; at: string; by?: string }[]; capcutName: string | null; note: string | null; updatedAt: string };
 type Site = { code: string; name: string; token: string; daily_limit: number };
+type User = { id: number; depot: string; name: string; phone: string; disabled: boolean; created_at: string; last_seen: string | null; videos: number };
 
 const LABEL: Record<string, string> = { queued: "Waiting to edit", working: "Editing", preview: "Manager reviewing", pending: "Needs your approval",
   approved: "Approved, uploading", publishing: "Uploading to Drive", done: "Done", failed: "Failed", rejected: "Change asked" };
@@ -13,12 +14,13 @@ const ago = (s: string) => { const m = Math.round((Date.now() - new Date(s).getT
 export default function Approvals({ k }: { k: string }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
-  const [tab, setTab] = useState<"pending" | "all" | "links">("pending");
+  const [users, setUsers] = useState<User[]>([]);
+  const [tab, setTab] = useState<"pending" | "all" | "people" | "links">("pending");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const load = useCallback(async () => {
     const r = await fetch(`/api/depot/admin?k=${k}`, { cache: "no-store" });
-    if (r.ok) { const j = await r.json(); setJobs(j.jobs); setSites(j.sites); }
+    if (r.ok) { const j = await r.json(); setJobs(j.jobs); setSites(j.sites); setUsers(j.users ?? []); }
   }, [k]);
   useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
 
@@ -29,6 +31,15 @@ export default function Approvals({ k }: { k: string }) {
     setNotes((n) => ({ ...n, [jobId]: "" })); setBusy(""); load();
   }
 
+  async function userAct(u: User, action: "user_off" | "user_on" | "user_reset") {
+    if (action !== "user_on" && !confirm(action === "user_off" ? `Turn off ${u.name}'s account?` : `Reset ${u.name}'s password?`)) return;
+    const r = await fetch("/api/depot/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ k, action, userId: u.id }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) alert(j.error || "Failed");
+    else if (j.password) alert(`New password for ${u.name}: ${j.password}\nSend it to them; they can log in with it now.`);
+    load();
+  }
+
   const shown = tab === "pending" ? jobs.filter((j) => j.status === "pending") : jobs;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   return (
@@ -37,15 +48,29 @@ export default function Approvals({ k }: { k: string }) {
         <div className="mx-auto flex max-w-5xl items-center gap-3">
           <img src="/depot/fathopes-logo-white.png" alt="" className="h-7" />
           <div className="flex-1 font-bold">Depot video approvals</div>
-          {(["pending", "all", "links"] as const).map((t) => (
+          {(["pending", "all", "people", "links"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`rounded-full px-3 py-1 text-sm font-semibold ${tab === t ? "bg-white text-[#0a7a3a]" : "bg-white/15"}`}>
-              {t === "pending" ? `To approve (${jobs.filter((j) => j.status === "pending").length})` : t === "all" ? "All videos" : "Depot links"}
+              {t === "pending" ? `To approve (${jobs.filter((j) => j.status === "pending").length})` : t === "all" ? "All videos" : t === "people" ? `People (${users.length})` : "Depot links"}
             </button>
           ))}
         </div>
       </header>
       <main className="mx-auto max-w-5xl p-5">
-        {tab === "links" ? (
+        {tab === "people" ? (
+          users.length === 0 ? <div className="rounded-xl bg-white p-10 text-center text-[#5b6573] shadow-sm">Nobody has registered yet.</div> :
+          <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+            {users.map((u) => (
+              <div key={u.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#eef0ee] px-4 py-3 text-sm last:border-0 ${u.disabled ? "opacity-50" : ""}`}>
+                <b className="w-12">{u.depot}</b><span className="min-w-32 flex-1 font-semibold">{u.name}</span>
+                <span className="w-32 text-[#5b6573]">+{u.phone}</span>
+                <span className="w-20 text-[#5b6573]">{u.videos} video{u.videos === 1 ? "" : "s"}</span>
+                <span className="w-24 text-xs text-[#7d8794]">{u.last_seen ? `seen ${ago(u.last_seen)}` : "never seen"}</span>
+                <button onClick={() => userAct(u, "user_reset")} className="rounded-lg border px-2.5 py-1 font-semibold">Reset password</button>
+                <button onClick={() => userAct(u, u.disabled ? "user_on" : "user_off")} className={`rounded-lg border px-2.5 py-1 font-semibold ${u.disabled ? "" : "text-[#c62828]"}`}>{u.disabled ? "Turn on" : "Turn off"}</button>
+              </div>
+            ))}
+          </div>
+        ) : tab === "links" ? (
           <div className="overflow-hidden rounded-xl bg-white shadow-sm">
             {sites.map((s) => (
               <div key={s.code} className="flex items-center gap-3 border-b border-[#eef0ee] px-4 py-3 text-sm last:border-0">
