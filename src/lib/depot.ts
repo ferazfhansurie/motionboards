@@ -68,6 +68,19 @@ export async function endSession(req: NextRequest, res: NextResponse) {
   if (t) await sql`DELETE FROM depot_sessions WHERE token_hash = ${sha(t)}`;
   res.cookies.delete(COOKIE);
 }
+export const SESSION_COOKIE = COOKIE;
+// The signed-in manager from a raw cookie value, any depot (for the shared /depot link).
+export async function sessionUser(t: string | undefined): Promise<(DepotUser & { token: string }) | null> {
+  if (!t) return null;
+  const r = await sql`SELECT u.id, u.depot, u.name, u.phone, d.token FROM depot_sessions s
+    JOIN depot_users u ON u.id = s.user_id JOIN depot_sites d ON d.code = u.depot
+    WHERE s.token_hash = ${sha(t)} AND s.expires_at > now() AND NOT u.disabled`;
+  return r[0] ? { id: Number(r[0].id), depot: r[0].depot as string, name: r[0].name as string, phone: r[0].phone as string, token: r[0].token as string } : null;
+}
+export async function listSites() {
+  const r = await sql`SELECT code, name FROM depot_sites ORDER BY name`;
+  return r.map((x) => ({ code: x.code as string, name: x.name as string }));
+}
 // The signed-in manager, only if their account belongs to this depot.
 export async function currentUser(req: NextRequest, depot: string): Promise<DepotUser | null> {
   const t = req.cookies.get(COOKIE)?.value;

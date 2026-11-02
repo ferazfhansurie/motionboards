@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { siteByToken } from "@/lib/depot";
+import { cookies } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { SESSION_COOKIE, sessionUser, siteByToken } from "@/lib/depot";
 import { Inter } from "next/font/google";
 import DepotChat from "./chat";
 
@@ -12,5 +13,8 @@ export default async function Page({ params }: PageProps<"/depot/[token]">) {
   const { token } = await params;
   const site = await siteByToken(token);
   if (!site) notFound();
+  // not signed in, or signed in to another depot: the shared /depot page logs them in and routes them
+  const user = await sessionUser((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!user || user.depot !== site.code) redirect("/depot");
   return <div className={inter.variable}><DepotChat token={token} code={site.code} siteName={site.name} /></div>;
 }

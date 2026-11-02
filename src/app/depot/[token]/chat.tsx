@@ -105,11 +105,12 @@ export default function DepotChat({ token, code }: { token: string; code: string
 
   async function logout() {
     await fetch(`/api/depot/${token}/auth`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) });
-    setMenu(false); await load();
+    location.replace("/depot");
   }
 
   if (!data) return <div style={{ minHeight: "100dvh", background: "#fff" }} />;
-  if (!data.user) return <Auth token={token} code={code} siteName={data.site.name} onDone={load} />;
+  // logged out or session expired: back to the shared login page
+  if (!data.user) { location.replace("/depot"); return <div style={{ minHeight: "100dvh", background: "#fff" }} />; }
 
   const lastMediaBot = new Map<string, number>();
   for (const m of data.messages) if (m.role === "bot" && m.media_url && m.job_id) lastMediaBot.set(m.job_id, m.id);
@@ -254,66 +255,6 @@ function Text({ text }: { text: string }) {
           ? <a key={i} href={p} target="_blank" rel="noreferrer" className="font-semibold underline" style={{ color: "#0a6fb5" }}>{p.includes("drive.google.com") ? "▶ Open video in Google Drive" : p}</a>
           : /^\*\*/.test(p) ? <b key={i} className="font-semibold">{p.slice(2, -2)}</b>
           : <span key={i}>{p}</span>)}
-    </div>
-  );
-}
-
-function Auth({ token, code, siteName, onDone }: { token: string; code: string; siteName: string; onDone: () => void }) {
-  // only rendered after the client has loaded data, so localStorage is safe here
-  const [mode, setMode] = useState<"login" | "register">(() => (localStorage.getItem("depot-registered") ? "login" : "register"));
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault(); setErr(""); setBusy(true);
-    const r = await fetch(`/api/depot/${token}/auth`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: mode, name, phone, password }) });
-    const j = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) { setErr(j.error || "Something went wrong"); if (r.status === 409) setMode("login"); return; }
-    localStorage.setItem("depot-registered", "1");
-    onDone();
-  }
-
-  const input = "mt-1.5 w-full rounded-xl border px-3.5 py-3 text-[16px] outline-none focus:border-[#0a9b4a]";
-  return (
-    <div style={{ minHeight: "100dvh", background: "#fff", color: INK, fontFamily: FONT }} className="flex items-center justify-center p-6">
-      <form onSubmit={submit} className="w-full max-w-sm">
-        <img src="/depot/avatar.png" alt="" className="h-12 w-12 rounded-full" />
-        <h1 className="mt-4 text-[24px] font-semibold tracking-tight">Video Bot · {code}</h1>
-        <p className="mt-1 text-[14px]" style={{ color: MUTED }}>{siteName} depot. Send a video, say what to add, and I&apos;ll edit it for you.</p>
-
-        <div className="mt-6 grid grid-cols-2 rounded-xl p-1 text-[14px] font-medium" style={{ background: PEARL }}>
-          {(["register", "login"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => { setMode(m); setErr(""); }} className="rounded-lg py-2"
-              style={mode === m ? { background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.1)" } : { color: MUTED }}>
-              {m === "register" ? "Register" : "Log in"}
-            </button>
-          ))}
-        </div>
-
-        {mode === "register" && (
-          <label className="mt-4 block text-[13px] font-medium">Your name
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ahmad" autoComplete="name" className={input} style={{ borderColor: "#d9dce1" }} />
-          </label>
-        )}
-        <label className="mt-4 block text-[13px] font-medium">Phone number
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="012-345 6789" inputMode="tel" autoComplete="tel" className={input} style={{ borderColor: "#d9dce1" }} />
-        </label>
-        <label className="mt-4 block text-[13px] font-medium">Password
-          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder={mode === "register" ? "At least 6 characters" : ""}
-            autoComplete={mode === "register" ? "new-password" : "current-password"} className={input} style={{ borderColor: "#d9dce1" }} />
-        </label>
-        {err && <div className="mt-3 rounded-xl bg-[#fdecea] px-3 py-2 text-sm text-[#c62828]">{err}</div>}
-        <button disabled={busy} className="mt-5 w-full rounded-xl py-3 text-[15px] font-semibold text-white disabled:opacity-60" style={{ background: GREEN }}>
-          {busy ? "Please wait…" : mode === "register" ? "Create account" : "Log in"}
-        </button>
-        <p className="mt-4 text-center text-[12px]" style={{ color: MUTED }}>
-          {mode === "login" ? "Forgot your password? Ask Faeez to reset it." : "Only for FatHopes depot staff."}
-        </p>
-      </form>
     </div>
   );
 }
