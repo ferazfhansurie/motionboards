@@ -155,34 +155,53 @@ export default function Approvals({ me }: { me: string }) {
                     <b>{u?.name}</b><span className="text-[#5b6573]">{u?.depot} · +{u?.phone}</span>
 
                   </div>
-                  <div className="flex-1 space-y-3 overflow-y-auto p-4" style={{ maxHeight: "75vh" }}>
-                    {msgs.length === 0 && <div className="text-center text-sm text-[#9aa3ae]">No messages yet.</div>}
-                    {msgs.map((m) => (
-                      <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
-                        <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "bg-[#f3f4f6]" : m.role === "admin" ? "border border-[#cfe0f5] bg-[#eef5fd]" : "border border-[#e3efe7] bg-[#f6fbf8]"}`}>
-                          <div className="mb-0.5 text-[11px] font-semibold text-[#7d8794]">{m.role === "user" ? (m.author || u?.name) : m.role === "admin" ? `${m.author || "Admin"} (admin)` : "Video Bot"} · {when(m.created_at)}</div>
-                          {m.media_url && (isImage(m.media_url) ? <a href={m.media_url} target="_blank" rel="noreferrer"><img src={m.media_url} alt="Poster" className="mb-1.5 max-h-72 rounded-lg" /></a>
-                            : <video src={m.media_url} controls playsInline preload="metadata" className="mb-1.5 max-h-72 rounded-lg bg-black" />)}
-                          <div className="whitespace-pre-wrap break-words">{m.text}</div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex-1 overflow-y-auto px-5 py-5" style={{ maxHeight: "75vh" }}>
+                    <div className="mx-auto flex max-w-2xl flex-col gap-[14px]">
+                    {msgs.length === 0 && <div className="text-center text-sm text-[#9a9da2]">No messages yet.</div>}
+                    {msgs.map((m) => {
+                      const media = m.media_url && (isImage(m.media_url) ? <a href={m.media_url} target="_blank" rel="noreferrer"><img src={m.media_url} alt="Poster" className="mb-2 w-full max-w-[320px] rounded-xl" /></a>
+                        : <video src={m.media_url} controls playsInline preload="metadata" className="mb-2 max-h-[60vh] w-full max-w-[320px] rounded-xl bg-black" />);
+                      if (m.role === "bot") return (
+                        <div key={m.id} className="flex items-start gap-2.5">
+                          <img src="/depot/avatar.png" alt="" className="mt-0.5 h-7 w-7 shrink-0 rounded-full" />
+                          <div className="min-w-0 flex-1 text-[15px] leading-[1.55] text-[#202225]">
+                            {media}<div className="whitespace-pre-wrap break-words">{m.text}</div>
+                            <div className="mt-1 text-[11px] text-[#9a9da2]">Video Bot · {when(m.created_at)}</div>
+                          </div>
+                        </div>);
+                      const mine = m.role === "admin";
+                      return (
+                        <div key={m.id} className={`flex flex-col ${mine ? "items-end pl-11" : "items-start pr-11"}`}>
+                          <div className="mb-1 text-[11px] text-[#9a9da2]">{mine ? `${m.author || "Admin"} · FatHopes` : (m.author || u?.name)}</div>
+                          <div className={`max-w-full rounded-[22px] px-4 py-2.5 text-[15px] leading-[1.5] text-[#202225] ${mine ? "bg-[#f3f4f6]" : "border border-[#e8e9ec] bg-white"}`}>
+                            {media}<div className="whitespace-pre-wrap break-words">{m.text}</div>
+                          </div>
+                          <div className="mt-1 text-[11px] text-[#9a9da2]">{when(m.created_at)}</div>
+                        </div>);
+                    })}
                     <div ref={threadEnd} />
-                  </div>
-                  <div className="border-t border-[#eef0ee] p-3">
-                    {file && <div className="mb-2 flex items-center gap-2 rounded-lg bg-[#f3f4f6] px-3 py-1.5 text-sm">🎬 <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                      <button onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }} className="text-[#7d8794]">✕</button></div>}
-                    <div className="flex items-end gap-2">
-                      <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-                      <button onClick={() => fileRef.current?.click()} title="Attach a video" className="rounded-lg border border-[#d9dce1] px-2.5 py-2">📎</button>
-                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} placeholder={`Reply to ${u?.name ?? "them"} as ${me}…`}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
-                        className="min-w-0 flex-1 resize-none rounded-lg border border-[#d9dce1] px-3 py-2 text-sm outline-none focus:border-[#0a9b4a]" />
-                      <button disabled={!!sendState || (!reply.trim() && !file)} onClick={sendReply} className="rounded-lg bg-[#0a9b4a] px-4 py-2 text-sm font-bold text-white disabled:opacity-40">Send</button>
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between text-xs text-[#5b6573]">
-                      <span>The bot answers. Ask for a poster and it makes one; otherwise, with a video in progress, your message is an edit to it.</span>
-                      <span>{sendState}</span>
+                  </div>
+                  <div className="px-4 pb-4 pt-1">
+                    <div className="mx-auto max-w-2xl">
+                    <div className="rounded-[22px] border border-[#d9dce1] bg-white px-3 pb-2 pt-2.5 shadow-[0_1px_6px_rgba(0,0,0,.06)]">
+                      {file && <div className="mb-2 flex items-center gap-2 rounded-xl bg-[#f3f4f6] px-3 py-2 text-sm">🎬 <span className="min-w-0 flex-1 truncate font-medium">{file.name}</span>
+                        <button onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }} className="px-1 text-[#7d8794]" aria-label="Remove video">✕</button></div>}
+                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={1} placeholder={`Reply to ${u?.name ?? "them"} as ${me}`}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+                        className="block w-full resize-none bg-transparent px-1 text-[15px] leading-[1.45] outline-none placeholder:text-[#9a9da2]" />
+                      <div className="mt-1.5 flex items-center justify-between gap-2">
+                        <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                        <button onClick={() => fileRef.current?.click()} disabled={!!sendState} aria-label="Attach video"
+                          className="flex h-9 items-center gap-1.5 rounded-full bg-[#f3f4f6] px-3 text-[13px] font-medium text-[#202225]"><span className="text-base">📎</span> Video</button>
+                        <span className="min-w-0 flex-1 truncate text-right text-xs text-[#7d8794]">{sendState}</span>
+                        <button disabled={!!sendState || (!reply.trim() && !file)} onClick={sendReply} aria-label="Send"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0a9b4a] text-white disabled:opacity-30">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-1.5 px-2 text-center text-[11px] text-[#9a9da2]">The bot answers. Ask for a poster and it makes one; otherwise, with a video in progress, your message is an edit to it.</div>
                     </div>
                   </div>
                 </>;
