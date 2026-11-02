@@ -118,7 +118,7 @@ export default function Approvals({ me }: { me: string }) {
     setTplState("");
   }
   async function deleteTemplate(t: Template) {
-    if (!confirm(`Delete the template "${t.name}"? Depot heads won't see it any more.`)) return;
+    if (!confirm(`Delete the template "${t.name}"? The bot won't use it any more.`)) return;
     try { await post({ action: "template_del", id: t.id }); load(); } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
   }
 
@@ -282,7 +282,7 @@ export default function Approvals({ me }: { me: string }) {
           <div className="space-y-4">
             <div className="rounded-xl bg-white p-4 shadow-sm">
               <div className="mb-1 font-bold">Add a poster template</div>
-              <div className="mb-3 text-sm text-[#5b6573]">Depot heads see these under Templates in their chat and can download them to use as a reference.</div>
+              <div className="mb-3 text-sm text-[#5b6573]">Only admins see these. Every poster the bot makes starts from one of these images: it keeps the logo, colours and characters and changes the event details. Upload images (PNG/JPG); PDFs and other files are kept here but the bot can't use them.</div>
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <input ref={tplRef} type="file" accept="image/*,application/pdf,.psd,.ai,.zip,.pptx,.key" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0] ?? null; setTpl((t) => ({ ...t, file: f, name: t.name || (f ? f.name.replace(/\.[^.]+$/, "") : "") })); }} />

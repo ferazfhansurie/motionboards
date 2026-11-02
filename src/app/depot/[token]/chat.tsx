@@ -9,11 +9,10 @@ const isImage = (u: string) => /\.(png|jpe?g|webp)(\?|$)/i.test(u);
 
 type Msg = { id: number; job_id: string | null; role: "user" | "bot" | "admin"; author: string | null; text: string | null; media_url: string | null; created_at: string };
 type Job = { id: string; kind?: string; status: string; previewUrl: string | null; driveUrl: string | null };
-type Template = { id: number; name: string; note: string | null; file_url: string; content_type: string | null };
 type State = {
   site: { code: string; name: string; limit: number; usedToday: number };
   user: { name: string; phone: string } | null;
-  messages: Msg[]; jobs: Job[]; workerOnline: boolean; templates?: Template[];
+  messages: Msg[]; jobs: Job[]; workerOnline: boolean;
 };
 
 const GREEN = "#0a9b4a";
@@ -36,7 +35,6 @@ const time = (s: string) => new Date(s).toLocaleTimeString("en-MY", { hour: "num
 
 export default function DepotChat({ token, code }: { token: string; code: string; siteName: string }) {
   const [data, setData] = useState<State | null>(null);
-  const [showTpl, setShowTpl] = useState(false);
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -131,7 +129,6 @@ export default function DepotChat({ token, code }: { token: string; code: string
             {typing ? <span style={{ color: GREEN }}>{typingLabel.toLowerCase()}…</span> : data.workerOnline ? "Online" : "Editor offline, videos wait in line"}
           </div>
         </div>
-        {(data.templates?.length ?? 0) > 0 && <button onClick={() => setShowTpl(true)} className="rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: "#e8f5ee", color: GREEN }}>🖼️ Templates</button>}
         <div className="rounded-full px-2.5 py-1 text-[12px] font-medium" style={{ background: PEARL, color: MUTED }}>{data.site.usedToday}/{data.site.limit} today</div>
         <button onClick={() => setMenu((m) => !m)} aria-label="Account" className="flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold text-white" style={{ background: INK }}>
           {data.user.name.slice(0, 1).toUpperCase()}
@@ -143,30 +140,6 @@ export default function DepotChat({ token, code }: { token: string; code: string
           </div>
         )}
       </header>
-      {showTpl && (
-        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowTpl(false)}>
-          <div className="flex max-h-[85dvh] w-full max-w-2xl flex-col rounded-t-2xl bg-white sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center border-b px-4 py-3" style={{ borderColor: "#e8e9ec" }}>
-              <div className="flex-1"><div className="text-[15px] font-semibold">Poster templates</div>
-                <div className="text-[12px]" style={{ color: MUTED }}>Download one to use as a reference for your poster.</div></div>
-              <button onClick={() => setShowTpl(false)} aria-label="Close" className="h-8 w-8 rounded-full text-lg" style={{ background: PEARL }}>✕</button>
-            </div>
-            <div className="grid grid-cols-2 gap-3 overflow-y-auto p-4 sm:grid-cols-3">
-              {data.templates!.map((t) => (
-                <div key={t.id} className="flex flex-col overflow-hidden rounded-xl border" style={{ borderColor: "#e8e9ec" }}>
-                  {t.content_type?.startsWith("image/") ? <a href={t.file_url} target="_blank" rel="noreferrer"><img src={t.file_url} alt={t.name} className="aspect-[4/5] w-full object-cover" style={{ background: PEARL }} /></a>
-                    : <div className="flex aspect-[4/5] items-center justify-center text-4xl" style={{ background: PEARL }}>📄</div>}
-                  <div className="flex flex-1 flex-col gap-1 p-2.5">
-                    <div className="text-[13px] font-semibold leading-tight">{t.name}</div>
-                    {t.note && <div className="text-[12px] leading-snug" style={{ color: MUTED }}>{t.note}</div>}
-                    <a href={`/api/depot/templates/${t.id}`} className="mt-auto rounded-lg py-1.5 text-center text-[13px] font-semibold text-white" style={{ background: GREEN }}>⬇ Download</a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex-1 overflow-y-auto px-4 py-5" onClick={() => setMenu(false)}>
         <div className="flex flex-col gap-[14px]">

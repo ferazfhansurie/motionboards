@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2Client, r2Config } from "@/lib/r2";
-import { currentAdmin, depotSql as sql, SESSION_COOKIE, sessionUser } from "@/lib/depot";
+import { currentAdmin, depotSql as sql } from "@/lib/depot";
 
-// GET /api/depot/templates/<id> -> the template file as a download (admins and signed-in depot staff)
+// GET /api/depot/templates/<id> -> the template file as a download (admins only)
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const allowed = (await currentAdmin(req)) || (await sessionUser(req.cookies.get(SESSION_COOKIE)?.value));
-  if (!allowed) return NextResponse.json({ error: "Please log in again" }, { status: 401 });
+  if (!(await currentAdmin(req))) return NextResponse.json({ error: "Please log in again" }, { status: 401 });
   const [t] = await sql`SELECT file_url, filename, name FROM depot_templates WHERE id = ${Number((await ctx.params).id)}`;
   if (!t) return NextResponse.json({ error: "Template not found" }, { status: 404 });
   const cfg = r2Config();

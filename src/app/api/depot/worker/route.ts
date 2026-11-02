@@ -12,7 +12,9 @@ export async function GET(req: NextRequest) {
     WHERE j.status IN ('queued','approved') ORDER BY j.updated_at LIMIT 5`;
   const pending = await sql`SELECT id, kind, depot, manager, instructions, capcut_name, done_version FROM depot_jobs
     WHERE status = 'pending' AND updated_at > now() - interval '2 days'`;
-  return NextResponse.json({ jobs, pending });
+  // poster templates the AI edits from (admin-uploaded images only)
+  const templates = await sql`SELECT id, name, note, file_url FROM depot_templates WHERE content_type LIKE 'image/%' ORDER BY id`;
+  return NextResponse.json({ jobs, pending, templates });
 }
 
 export async function POST(req: NextRequest) {
