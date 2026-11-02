@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomInt } from "crypto";
-import { addMessage, currentAdmin, depotSql as sql, hashPass, normPhone, publicJob } from "@/lib/depot";
+import { addMessage, currentAdmin, depotSql as sql, hashPass, newJobId, normPhone, publicJob } from "@/lib/depot";
 
+const POSTER = /\b(poster|posters|flyer|risalah|brosur|banner)\b/i;
 const OPEN = ["queued", "working", "preview", "pending", "rejected", "failed", "waiting"];
 
 // The admin page: signed-in admin accounts only (depot_admin cookie).
@@ -30,14 +31,23 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   // reply in someone's chat; with asEdit it also goes to their latest open video as a change
   if (b.action === "reply") {
-    const [u] = await sql`SELECT id, depot FROM depot_users WHERE id = ${Number(b.userId)}`;
+    const [u] = await sql`SELECT id, depot, name FROM depot_users WHERE id = ${Number(b.userId)}`;
     if (!u) return NextResponse.json({ error: "No such person" }, { status: 404 });
     const text = String(b.text || "").trim().slice(0, 2000);
     const videoUrl = typeof b.videoUrl === "string" && b.videoUrl.startsWith("https://") ? b.videoUrl : null;
     if (!text && !videoUrl) return NextResponse.json({ error: "Empty message" }, { status: 400 });
     const userId = Number(u.id), depot = u.depot as string;
     // the bot always answers: with a video in progress it's an edit, otherwise a note
-    const [open] = await sql`SELECT id FROM depot_jobs WHERE user_id = ${userId} AND status = ANY(${OPEN}) ORDER BY created_at DESC LIMIT 1`;
+    const [open] = await sql`SELECT id, kind FROM depot_jobs WHERE user_id = ${userId} AND status = ANY(${OPEN}) ORDER BY created_at DESC LIMIT 1`;
+    // asking for a poster while a video is open (or nothing is open) starts a poster job, same as when staff ask
+    if (text && !videoUrl && POSTER.test(text) && (!open || open.kind !== "poster")) {
+      const id = newJobId();
+      await sql`INSERT INTO depot_jobs (id, depot, manager, status, kind, instructions, user_id)
+        VALUES (${id}, ${depot}, ${u.name as string}, 'queued', 'poster', ${JSON.stringify([{ text, at: new Date().toISOString(), by: admin.name }])}::jsonb, ${userId})`;
+      await addMessage(depot, "admin", text, { jobId: id, author: admin.name });
+      await addMessage(depot, "bot", `Okay ${admin.name.split(" ")[0]}, making the poster now 🖼️\n\nThe preview will be here shortly.`, { jobId: id });
+      return NextResponse.json({ ok: true, jobId: id });
+    }
     if (open && text) {
       await sql`UPDATE depot_jobs SET instructions = instructions || ${JSON.stringify([{ text, at: new Date().toISOString(), by: admin.name }])}::jsonb,
         version = version + 1, status = CASE WHEN status = 'working' THEN 'working' ELSE 'queued' END, updated_at = now() WHERE id = ${open.id}`;

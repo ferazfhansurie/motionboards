@@ -181,7 +181,7 @@ export default function Approvals({ me }: { me: string }) {
                       <button disabled={!!sendState || (!reply.trim() && !file)} onClick={sendReply} className="rounded-lg bg-[#0a9b4a] px-4 py-2 text-sm font-bold text-white disabled:opacity-40">Send</button>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-xs text-[#5b6573]">
-                      <span>The bot answers. If they have a video in progress, your message is an edit to it.</span>
+                      <span>The bot answers. Ask for a poster and it makes one; otherwise, with a video in progress, your message is an edit to it.</span>
                       <span>{sendState}</span>
                     </div>
                   </div>
