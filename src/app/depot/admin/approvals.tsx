@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const isImage = (u: string) => /\.(png|jpe?g|webp)(\?|$)/i.test(u);
+
 type Job = { id: string; depot: string; manager: string | null; status: string; videoUrl: string | null; previewUrl: string | null; driveUrl: string | null;
   instructions: { text: string; at: string; by?: string }[]; capcutName: string | null; note: string | null; updatedAt: string };
 type Site = { code: string; name: string; token: string; daily_limit: number };
@@ -12,7 +14,7 @@ type Msg = { id: number; role: "user" | "bot" | "admin"; author: string | null; 
 const when = (s: string) => new Date(s).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kuala_Lumpur" });
 
 const LABEL: Record<string, string> = { queued: "Waiting to edit", working: "Editing", preview: "Manager reviewing", pending: "Needs your approval",
-  approved: "Approved, uploading", publishing: "Uploading to Drive", done: "Done", failed: "Failed", rejected: "Change asked" };
+  approved: "Approved, uploading", publishing: "Uploading to Drive", done: "Done", failed: "Failed", rejected: "Change asked", waiting: "Asking manager", closed: "Closed" };
 const ago = (s: string) => { const m = Math.round((Date.now() - new Date(s).getTime()) / 60000); return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
 
 export default function Approvals({ me }: { me: string }) {
@@ -159,7 +161,8 @@ export default function Approvals({ me }: { me: string }) {
                       <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
                         <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "bg-[#f3f4f6]" : m.role === "admin" ? "border border-[#cfe0f5] bg-[#eef5fd]" : "border border-[#e3efe7] bg-[#f6fbf8]"}`}>
                           <div className="mb-0.5 text-[11px] font-semibold text-[#7d8794]">{m.role === "user" ? (m.author || u?.name) : m.role === "admin" ? `${m.author || "Admin"} (admin)` : "Video Bot"} · {when(m.created_at)}</div>
-                          {m.media_url && <video src={m.media_url} controls playsInline preload="metadata" className="mb-1.5 max-h-72 rounded-lg bg-black" />}
+                          {m.media_url && (isImage(m.media_url) ? <a href={m.media_url} target="_blank" rel="noreferrer"><img src={m.media_url} alt="Poster" className="mb-1.5 max-h-72 rounded-lg" /></a>
+                            : <video src={m.media_url} controls playsInline preload="metadata" className="mb-1.5 max-h-72 rounded-lg bg-black" />)}
                           <div className="whitespace-pre-wrap break-words">{m.text}</div>
                         </div>
                       </div>
@@ -242,7 +245,8 @@ export default function Approvals({ me }: { me: string }) {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((j) => (
               <div key={j.id} className="flex flex-col overflow-hidden rounded-xl bg-white shadow-sm">
-                {j.previewUrl ? <video src={j.previewUrl} controls playsInline preload="metadata" className="aspect-[9/16] max-h-[460px] w-full bg-black" />
+                {j.previewUrl && isImage(j.previewUrl) ? <a href={j.previewUrl} target="_blank" rel="noreferrer"><img src={j.previewUrl} alt="Poster" className="w-full bg-[#eee] object-contain" /></a>
+                  : j.previewUrl ? <video src={j.previewUrl} controls playsInline preload="metadata" className="aspect-[9/16] max-h-[460px] w-full bg-black" />
                   : <div className="flex aspect-[9/16] max-h-[460px] items-center justify-center bg-[#222] text-sm text-white/60">{LABEL[j.status]}</div>}
                 <div className="flex flex-1 flex-col gap-2 p-3.5 text-sm">
                   <div className="flex items-center gap-2"><b>{j.depot}</b><span className="text-[#5b6573]">{j.manager}</span>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomInt } from "crypto";
 import { addMessage, currentAdmin, depotSql as sql, hashPass, normPhone, publicJob } from "@/lib/depot";
 
-const OPEN = ["queued", "working", "preview", "pending", "rejected", "failed"];
+const OPEN = ["queued", "working", "preview", "pending", "rejected", "failed", "waiting"];
 
 // The admin page: signed-in admin accounts only (depot_admin cookie).
 export async function GET(req: NextRequest) {

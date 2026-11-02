@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const isImage = (u: string) => /\.(png|jpe?g|webp)(\?|$)/i.test(u);
+
 // Styled after BOS Bot's chat: Inter, plain agent text with an avatar, grey
 // bubble for the person, one rounded composer. FatHopes green is the accent.
 
 type Msg = { id: number; job_id: string | null; role: "user" | "bot" | "admin"; author: string | null; text: string | null; media_url: string | null; created_at: string };
-type Job = { id: string; status: string; previewUrl: string | null; driveUrl: string | null };
+type Job = { id: string; kind?: string; status: string; previewUrl: string | null; driveUrl: string | null };
 type State = {
   site: { code: string; name: string; limit: number; usedToday: number };
   user: { name: string; phone: string } | null;
@@ -22,7 +24,7 @@ const FONT = 'var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, "SF P
 const STATUS: Record<string, [string, string]> = {
   queued: ["Waiting to edit", "#8a6d00"], working: ["Editing", "#0a6fb5"], preview: ["Preview ready", GREEN],
   pending: ["Waiting for Faeez", "#8a6d00"], approved: ["Approved, uploading", "#0a6fb5"], publishing: ["Uploading to Drive", "#0a6fb5"],
-  done: ["Done", GREEN], failed: ["Problem, see message", "#c62828"], rejected: ["Changes asked", "#8a6d00"],
+  done: ["Done", GREEN], failed: ["Problem, see message", "#c62828"], rejected: ["Changes asked", "#8a6d00"], waiting: ["Waiting for your answer", "#8a6d00"], closed: ["Closed", "#888"],
 };
 // what the bot is busy with, shown as "typing"
 const BUSY: Record<string, string> = {
@@ -53,7 +55,7 @@ export default function DepotChat({ token, code }: { token: string; code: string
   const jobs = new Map((data?.jobs ?? []).map((j) => [j.id, j]));
   const busyJob = (data?.jobs ?? []).find((j) => BUSY[j.status]);
   const typing = sending !== null || !!busyJob;
-  const typingLabel = sending !== null ? (progress !== null && progress < 100 ? `Uploading your video… ${progress}%` : "Typing") : busyJob ? BUSY[busyJob.status] : "";
+  const typingLabel = sending !== null ? (progress !== null && progress < 100 ? `Uploading your video… ${progress}%` : "Typing") : busyJob ? (busyJob.kind === "poster" && busyJob.status === "working" ? "Making your poster" : BUSY[busyJob.status]) : "";
 
   useEffect(() => {
     const key = `${data?.messages.length ?? 0}|${typing}|${sending ?? ""}`;
@@ -142,12 +144,14 @@ export default function DepotChat({ token, code }: { token: string; code: string
       <div className="flex-1 overflow-y-auto px-4 py-5" onClick={() => setMenu(false)}>
         <div className="flex flex-col gap-[14px]">
           <Bot>
-            <Text text={`Hi ${data.user.name}! 👋\n\nSend me a video and tell me what to add:\n• **Captions**: I write what people say\n• **Text**: like a title at the start\n\nI'll send you a preview first. Then Faeez approves it and you get a Google Drive link.`} />
+            <Text text={`Hi ${data.user.name}! 👋\n\nSend me a video and tell me what to add:\n• **Captions**: I write what people say\n• **Text**: like a title at the start\n\nOr tell me about your event and I'll make a **poster**: the date and the places with times.\n\nI'll send you a preview first. Then Faeez approves it and you get a Google Drive link.`} />
           </Bot>
           {data.messages.map((m) => {
             const job = m.job_id ? jobs.get(m.job_id) : undefined;
             const showActions = job && lastMediaBot.get(job.id) === m.id && ["preview", "rejected"].includes(job.status);
-            const media = m.media_url && <video src={m.media_url} controls playsInline preload="metadata" className="mb-2 max-h-[60vh] w-full max-w-[320px] rounded-xl bg-black" />;
+            const media = m.media_url && (isImage(m.media_url)
+              ? <a href={m.media_url} target="_blank" rel="noreferrer"><img src={m.media_url} alt="Poster" className="mb-2 w-full max-w-[320px] rounded-xl" /></a>
+              : <video src={m.media_url} controls playsInline preload="metadata" className="mb-2 max-h-[60vh] w-full max-w-[320px] rounded-xl bg-black" />);
             if (m.role === "user") return (
               <Human key={m.id} at={m.created_at}>{media}{m.text && <Text text={m.text} />}</Human>
             );

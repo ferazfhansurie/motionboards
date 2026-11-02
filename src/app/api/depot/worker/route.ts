@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
   const jobs = await sql`SELECT j.*, s.name AS site_name FROM depot_jobs j JOIN depot_sites s ON s.code = j.depot
     WHERE j.status IN ('queued','approved') ORDER BY j.updated_at LIMIT 5`;
-  const pending = await sql`SELECT id, depot, manager, instructions, capcut_name, done_version FROM depot_jobs
+  const pending = await sql`SELECT id, kind, depot, manager, instructions, capcut_name, done_version FROM depot_jobs
     WHERE status = 'pending' AND updated_at > now() - interval '2 days'`;
   return NextResponse.json({ jobs, pending });
 }
@@ -38,7 +38,13 @@ export async function POST(req: NextRequest) {
   }
   if (b.op === "done") {
     await sql`UPDATE depot_jobs SET status = 'done', drive_url = ${b.driveUrl}, updated_at = now() WHERE id = ${id}`;
-    await addMessage(depot, "bot", `✅ Approved by Faeez! Your video is on Google Drive:\n${b.driveUrl}`, { jobId: id });
+    await addMessage(depot, "bot", `✅ Approved by Faeez! Your ${job.kind === "poster" ? "poster" : "video"} is on Google Drive:\n${b.driveUrl}`, { jobId: id });
+    return NextResponse.json({ ok: true });
+  }
+  // poster bot needs more details (job stays open, the next message re-queues it) / message wasn't a poster request (job closed)
+  if (b.op === "ask" || b.op === "close") {
+    await sql`UPDATE depot_jobs SET status = ${b.op === "ask" ? "waiting" : "closed"}, spec = COALESCE(${b.spec ? JSON.stringify(b.spec) : null}::jsonb, spec), updated_at = now() WHERE id = ${id}`;
+    if (b.reply) await addMessage(depot, "bot", String(b.reply), { jobId: id });
     return NextResponse.json({ ok: true });
   }
   if (b.op === "fail") {

@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addMessage, currentUser, depotSql as sql, newJobId, publicJob, siteByToken, workerSeen } from "@/lib/depot";
 
-const HELP = `I edit videos for you 🎬
+const HELP = `I edit videos and make event posters for you 🎬🖼️
 
-I can:
-• Add captions (what people say), in BM or English
-• Add a title or text, at the top, middle or bottom
-• Make the text bigger or smaller, or move it
+Videos: tap 📎, pick your video, and tell me what to add.
+Example: "add captions in BM and title JOM KITAR SEMULA at the start"
 
-How: tap 📎, pick your video, and tell me what to add.
-Example: "add captions in BM and title JOM KITAR SEMULA at the start"`;
+Posters: just tell me the date and the places.
+Example: "poster kutipan Sabtu ni, Pasar Malam Kuah 4-8 malam, Masjid Al-Hana 9-12 pagi"`;
 // greetings / questions about the bot, so they don't become edit instructions
 const isChat = (t: string) =>
   /^(hi+|hai+|hello+|helo+|hey+|salam|assalamualaikum|test|testing|ok|okay|thanks?|thank you|terima kasih|tq)\b[\s!.?]*$/i.test(t.trim()) ||
@@ -31,7 +29,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/depot/[token
   return NextResponse.json({ ...base, user: { name: user.name, phone: user.phone }, messages: messages.reverse(), jobs: jobs.map(publicJob) });
 }
 
-const OPEN = ["queued", "working", "preview", "pending", "rejected", "failed"];
+const OPEN = ["queued", "working", "preview", "pending", "rejected", "failed", "waiting"];
+const POSTER = /\b(poster|posters|flyer|risalah|brosur|banner)\b/i;
 
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/depot/[token]">) {
   const site = await siteByToken((await ctx.params).token);
@@ -73,16 +72,27 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/depot/[toke
   }
 
   if (!text) return NextResponse.json({ error: "Empty message" }, { status: 400 });
-  const open = await sql`SELECT id, status FROM depot_jobs WHERE user_id = ${user.id} AND status = ANY(${OPEN})
+  const open = await sql`SELECT id, status, kind FROM depot_jobs WHERE user_id = ${user.id} AND status = ANY(${OPEN})
     ORDER BY created_at DESC LIMIT 1`;
+  // no open job (or asking for a poster while a video is open): this message starts a poster job; the worker's AI
+  // makes the poster, asks for missing details, or answers if it wasn't a poster request
+  if (!isChat(text) && (!open[0] || (POSTER.test(text) && open[0].kind !== "poster"))) {
+    const id = newJobId();
+    await sql`INSERT INTO depot_jobs (id, depot, manager, status, kind, instructions, user_id)
+      VALUES (${id}, ${site.code}, ${name}, 'queued', 'poster', ${JSON.stringify([{ text, at: now }])}::jsonb, ${user.id})`;
+    await addMessage(site.code, "user", text, { jobId: id, author: name });
+    const online = Date.now() - (await workerSeen()) < 120_000;
+    if (!online) await addMessage(site.code, "bot", "Got it 👍\n\nThe editor is offline right now, I'll answer as soon as it's back on.", { jobId: id });
+    return NextResponse.json({ ok: true, jobId: id });
+  }
   await addMessage(site.code, "user", text, { jobId: (open[0]?.id as string) ?? null, author: name, userId: user.id });
   if (!open[0] || isChat(text)) {
-    await addMessage(site.code, "bot", open[0] ? HELP : `${HELP}\n\nSend me a video to start 👇`, { userId: user.id });
+    await addMessage(site.code, "bot", open[0] ? HELP : `${HELP}\n\nSend me a video or tell me about your event 👇`, { userId: user.id });
     return NextResponse.json({ ok: true });
   }
   await sql`UPDATE depot_jobs SET instructions = instructions || ${JSON.stringify([{ text, at: now }])}::jsonb,
     version = version + 1, status = CASE WHEN status = 'working' THEN 'working' ELSE 'queued' END, updated_at = now()
     WHERE id = ${open[0].id}`;
-  await addMessage(site.code, "bot", "Okay, making that change now ✏️\n\nThe new preview will be here shortly.", { jobId: open[0].id as string });
+  if (open[0].status !== "waiting") await addMessage(site.code, "bot", "Okay, making that change now ✏️\n\nThe new preview will be here shortly.", { jobId: open[0].id as string });
   return NextResponse.json({ ok: true, jobId: open[0].id });
 }

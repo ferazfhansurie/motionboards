@@ -98,7 +98,7 @@ export async function workerSeen(): Promise<number> {
 
 export function publicJob(r: Row) {
   return {
-    id: r.id as string, depot: r.depot as string, manager: r.manager as string | null, status: r.status as string,
+    id: r.id as string, kind: (r.kind as string) || "video", depot: r.depot as string, manager: r.manager as string | null, status: r.status as string,
     videoUrl: r.video_url as string | null, previewUrl: r.preview_url as string | null, driveUrl: r.drive_url as string | null,
     instructions: r.instructions as { text: string; at: string }[], capcutName: r.capcut_name as string | null,
     note: r.note as string | null, createdAt: r.created_at, updatedAt: r.updated_at,
