@@ -1,52 +1,114 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Job = { id: string; depot: string; manager: string | null; status: string; videoUrl: string | null; previewUrl: string | null; driveUrl: string | null;
   instructions: { text: string; at: string; by?: string }[]; capcutName: string | null; note: string | null; updatedAt: string };
 type Site = { code: string; name: string; token: string; daily_limit: number };
 type User = { id: number; depot: string; name: string; phone: string; disabled: boolean; created_at: string; last_seen: string | null; videos: number;
   last_msg: string | null; last_text: string | null };
-type Msg = { id: number; role: "user" | "bot"; author: string | null; text: string; media_url: string | null; created_at: string };
+type Admin = { id: number; name: string; phone: string; last_seen: string | null };
+type Msg = { id: number; role: "user" | "bot" | "admin"; author: string | null; text: string; media_url: string | null; created_at: string };
 const when = (s: string) => new Date(s).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kuala_Lumpur" });
 
 const LABEL: Record<string, string> = { queued: "Waiting to edit", working: "Editing", preview: "Manager reviewing", pending: "Needs your approval",
   approved: "Approved, uploading", publishing: "Uploading to Drive", done: "Done", failed: "Failed", rejected: "Change asked" };
 const ago = (s: string) => { const m = Math.round((Date.now() - new Date(s).getTime()) / 60000); return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
 
-export default function Approvals({ k }: { k: string }) {
+export default function Approvals({ me }: { me: string }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [reply, setReply] = useState("");
+  const [asEdit, setAsEdit] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [sendState, setSendState] = useState("");
+  const [newAdmin, setNewAdmin] = useState({ name: "", phone: "", password: "" });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const threadEnd = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<"pending" | "all" | "chats" | "people" | "links">("pending");
   const [chatUser, setChatUser] = useState<number | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const load = useCallback(async () => {
-    const r = await fetch(`/api/depot/admin?k=${k}`, { cache: "no-store" });
-    if (r.ok) { const j = await r.json(); setJobs(j.jobs); setSites(j.sites); setUsers(j.users ?? []); }
-  }, [k]);
+    const r = await fetch("/api/depot/admin", { cache: "no-store" });
+    if (r.status === 401) { location.replace("/depot/admin"); return; }
+    if (r.ok) { const j = await r.json(); setJobs(j.jobs); setSites(j.sites); setUsers(j.users ?? []); setAdmins(j.admins ?? []); }
+  }, []);
   useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
 
   // the open chat refreshes with the rest of the page
+  const loadChat = useCallback(async (id: number) => {
+    const r = await fetch(`/api/depot/admin?chat=${id}`, { cache: "no-store" });
+    if (r.ok) setMsgs((await r.json()).messages);
+  }, []);
   useEffect(() => {
     if (tab !== "chats" || chatUser === null) return;
-    let live = true;
-    const get = async () => { const r = await fetch(`/api/depot/admin?k=${k}&chat=${chatUser}`, { cache: "no-store" }); if (r.ok && live) setMsgs((await r.json()).messages); };
-    get(); const t = setInterval(get, 5000); return () => { live = false; clearInterval(t); };
-  }, [tab, chatUser, k]);
+    loadChat(chatUser); const t = setInterval(() => loadChat(chatUser), 5000); return () => clearInterval(t);
+  }, [tab, chatUser, loadChat]);
+  useEffect(() => { threadEnd.current?.scrollIntoView({ block: "end" }); }, [msgs.length, chatUser]);
+
+  async function post(body: Record<string, unknown>) {
+    const r = await fetch("/api/depot/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Failed");
+    return j;
+  }
+
+  async function sendReply() {
+    if (chatUser === null || (!reply.trim() && !file)) return;
+    try {
+      let videoUrl: string | undefined;
+      if (file) {
+        setSendState("Uploading video… 0%");
+        const p = await fetch("/api/depot/admin/presign", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, contentType: file.type || "video/mp4", size: file.size }) });
+        const pj = await p.json();
+        if (!p.ok) throw new Error(pj.error || "Upload failed");
+        await new Promise<void>((res, rej) => {
+          const x = new XMLHttpRequest();
+          x.open("PUT", pj.uploadUrl);
+          x.setRequestHeader("Content-Type", file.type || "video/mp4");
+          x.upload.onprogress = (e) => e.lengthComputable && setSendState(`Uploading video… ${Math.round((e.loaded / e.total) * 100)}%`);
+          x.onload = () => (x.status < 300 ? res() : rej(new Error("Upload failed")));
+          x.onerror = () => rej(new Error("Upload failed"));
+          x.send(file);
+        });
+        videoUrl = pj.publicUrl;
+      }
+      setSendState("Sending…");
+      await post({ action: "reply", userId: chatUser, text: reply, videoUrl, asEdit });
+      setReply(""); setFile(null); setAsEdit(false); if (fileRef.current) fileRef.current.value = "";
+      await loadChat(chatUser); load();
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    setSendState("");
+  }
+
+  async function addAdmin() {
+    try { await post({ action: "admin_add", ...newAdmin }); setNewAdmin({ name: "", phone: "", password: "" }); load(); }
+    catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  }
+  async function removeAdmin(a: Admin) {
+    if (!confirm(`Remove ${a.name} as admin?`)) return;
+    try { await post({ action: "admin_remove", adminId: a.id }); load(); } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  }
+  async function logout() {
+    await fetch("/api/depot/admin/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) });
+    location.replace("/depot/admin");
+  }
 
   async function act(jobId: string, action: "approve" | "change") {
     setBusy(jobId);
-    const r = await fetch("/api/depot/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ k, jobId, action, note: notes[jobId] }) });
+    const r = await fetch("/api/depot/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId, action, note: notes[jobId] }) });
     if (!r.ok) alert((await r.json().catch(() => ({}))).error || "Failed");
     setNotes((n) => ({ ...n, [jobId]: "" })); setBusy(""); load();
   }
 
   async function userAct(u: User, action: "user_off" | "user_on" | "user_reset") {
     if (action !== "user_on" && !confirm(action === "user_off" ? `Turn off ${u.name}'s account?` : `Reset ${u.name}'s password?`)) return;
-    const r = await fetch("/api/depot/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ k, action, userId: u.id }) });
+    const r = await fetch("/api/depot/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, userId: u.id }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) alert(j.error || "Failed");
     else if (j.password) alert(`New password for ${u.name}: ${j.password}\nSend it to them; they can log in with it now.`);
@@ -66,6 +128,7 @@ export default function Approvals({ k }: { k: string }) {
               {t === "pending" ? `To approve (${jobs.filter((j) => j.status === "pending").length})` : t === "all" ? "All videos" : t === "chats" ? "Chats" : t === "people" ? `People (${users.length})` : "Depot links"}
             </button>
           ))}
+          <button onClick={logout} title={`Logged in as ${me}`} className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">Log out</button>
         </div>
       </header>
       <main className="mx-auto max-w-5xl p-5">
@@ -89,26 +152,63 @@ export default function Approvals({ k }: { k: string }) {
                   <div className="flex items-center gap-2 border-b border-[#eef0ee] px-4 py-3 text-sm">
                     <button onClick={() => setChatUser(null)} className="md:hidden">←</button>
                     <b>{u?.name}</b><span className="text-[#5b6573]">{u?.depot} · +{u?.phone}</span>
-                    <span className="ml-auto text-xs text-[#9aa3ae]">read only</span>
+
                   </div>
                   <div className="flex-1 space-y-3 overflow-y-auto p-4" style={{ maxHeight: "75vh" }}>
                     {msgs.length === 0 && <div className="text-center text-sm text-[#9aa3ae]">No messages yet.</div>}
                     {msgs.map((m) => (
                       <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
-                        <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "bg-[#f3f4f6]" : "border border-[#e3efe7] bg-[#f6fbf8]"}`}>
-                          <div className="mb-0.5 text-[11px] font-semibold text-[#7d8794]">{m.role === "user" ? (m.author || u?.name) : "Video Bot"} · {when(m.created_at)}</div>
+                        <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "bg-[#f3f4f6]" : m.role === "admin" ? "border border-[#cfe0f5] bg-[#eef5fd]" : "border border-[#e3efe7] bg-[#f6fbf8]"}`}>
+                          <div className="mb-0.5 text-[11px] font-semibold text-[#7d8794]">{m.role === "user" ? (m.author || u?.name) : m.role === "admin" ? `${m.author || "Admin"} (admin)` : "Video Bot"} · {when(m.created_at)}</div>
                           {m.media_url && <video src={m.media_url} controls playsInline preload="metadata" className="mb-1.5 max-h-72 rounded-lg bg-black" />}
                           <div className="whitespace-pre-wrap break-words">{m.text}</div>
                         </div>
                       </div>
                     ))}
+                    <div ref={threadEnd} />
+                  </div>
+                  <div className="border-t border-[#eef0ee] p-3">
+                    {file && <div className="mb-2 flex items-center gap-2 rounded-lg bg-[#f3f4f6] px-3 py-1.5 text-sm">🎬 <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                      <button onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }} className="text-[#7d8794]">✕</button></div>}
+                    <div className="flex items-end gap-2">
+                      <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                      <button onClick={() => fileRef.current?.click()} title="Attach a video" className="rounded-lg border border-[#d9dce1] px-2.5 py-2">📎</button>
+                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} placeholder={`Reply to ${u?.name ?? "them"} as ${me}…`}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+                        className="min-w-0 flex-1 resize-none rounded-lg border border-[#d9dce1] px-3 py-2 text-sm outline-none focus:border-[#0a9b4a]" />
+                      <button disabled={!!sendState || (!reply.trim() && !file)} onClick={sendReply} className="rounded-lg bg-[#0a9b4a] px-4 py-2 text-sm font-bold text-white disabled:opacity-40">Send</button>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-xs text-[#5b6573]">
+                      <label className="flex items-center gap-1.5"><input type="checkbox" checked={asEdit} onChange={(e) => setAsEdit(e.target.checked)} />
+                        Also tell the bot to make this change to their latest video</label>
+                      <span>{sendState}</span>
+                    </div>
                   </div>
                 </>;
               })()}
             </div>
           </div>
         ) : tab === "people" ? (
-          users.length === 0 ? <div className="rounded-xl bg-white p-10 text-center text-[#5b6573] shadow-sm">Nobody has registered yet.</div> :
+          <div className="flex flex-col gap-5">
+          <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+            <div className="border-b border-[#eef0ee] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-[#5b6573]">Admins: can see every chat, reply and approve</div>
+            {admins.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#eef0ee] px-4 py-3 text-sm">
+                <span className="min-w-32 flex-1 font-semibold">{a.name}{a.name === me ? " (you)" : ""}</span>
+                <span className="w-32 text-[#5b6573]">+{a.phone}</span>
+                <span className="w-24 text-xs text-[#7d8794]">{a.last_seen ? `seen ${ago(a.last_seen)}` : "never seen"}</span>
+                {a.name !== me && <button onClick={() => removeAdmin(a)} className="rounded-lg border px-2.5 py-1 font-semibold text-[#c62828]">Remove</button>}
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
+              <input value={newAdmin.name} onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })} placeholder="Name" className="w-36 rounded-lg border border-[#d9dce1] px-2.5 py-1.5" />
+              <input value={newAdmin.phone} onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value })} placeholder="Phone" className="w-36 rounded-lg border border-[#d9dce1] px-2.5 py-1.5" />
+              <input value={newAdmin.password} onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })} placeholder="Password (8+)" type="password" autoComplete="new-password" className="w-36 rounded-lg border border-[#d9dce1] px-2.5 py-1.5" />
+              <button onClick={addAdmin} className="rounded-lg border border-[#0a9b4a] px-2.5 py-1.5 font-semibold text-[#0a7a3a]">Add admin</button>
+            </div>
+          </div>
+          <div className="border-b-0 px-1 text-xs font-bold uppercase tracking-wide text-[#5b6573]">Depot staff</div>
+          {users.length === 0 ? <div className="rounded-xl bg-white p-10 text-center text-[#5b6573] shadow-sm">Nobody has registered yet.</div> :
           <div className="overflow-hidden rounded-xl bg-white shadow-sm">
             {users.map((u) => (
               <div key={u.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#eef0ee] px-4 py-3 text-sm last:border-0 ${u.disabled ? "opacity-50" : ""}`}>
@@ -121,6 +221,7 @@ export default function Approvals({ k }: { k: string }) {
                 <button onClick={() => userAct(u, u.disabled ? "user_on" : "user_off")} className={`rounded-lg border px-2.5 py-1 font-semibold ${u.disabled ? "" : "text-[#c62828]"}`}>{u.disabled ? "Turn on" : "Turn off"}</button>
               </div>
             ))}
+          </div>}
           </div>
         ) : tab === "links" ? (
           <div className="overflow-hidden rounded-xl bg-white shadow-sm">

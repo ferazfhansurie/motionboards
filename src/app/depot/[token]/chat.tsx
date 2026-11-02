@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // Styled after BOS Bot's chat: Inter, plain agent text with an avatar, grey
 // bubble for the person, one rounded composer. FatHopes green is the accent.
 
-type Msg = { id: number; job_id: string | null; role: "user" | "bot"; author: string | null; text: string | null; media_url: string | null; created_at: string };
+type Msg = { id: number; job_id: string | null; role: "user" | "bot" | "admin"; author: string | null; text: string | null; media_url: string | null; created_at: string };
 type Job = { id: string; status: string; previewUrl: string | null; driveUrl: string | null };
 type State = {
   site: { code: string; name: string; limit: number; usedToday: number };
@@ -150,6 +150,12 @@ export default function DepotChat({ token, code }: { token: string; code: string
             const media = m.media_url && <video src={m.media_url} controls playsInline preload="metadata" className="mb-2 max-h-[60vh] w-full max-w-[320px] rounded-xl bg-black" />;
             if (m.role === "user") return (
               <Human key={m.id} at={m.created_at}>{media}{m.text && <Text text={m.text} />}</Human>
+            );
+            if (m.role === "admin") return (
+              <Bot key={m.id} at={m.created_at}>
+                <div className="mb-1 text-[12px] font-semibold" style={{ color: "#0a6fb5" }}>{m.author || "Admin"} · FatHopes</div>
+                {media}{m.text && <Text text={m.text} />}
+              </Bot>
             );
             return (
               <Bot key={m.id} at={m.created_at}>

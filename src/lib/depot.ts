@@ -33,7 +33,7 @@ export const workerOk = (k: string | null) => keyOk("worker_hash", k);
 export const newJobId = () => `dj_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
 
 // Messages belong to one manager's chat: pass userId, or a jobId and the job's owner is used.
-export async function addMessage(depot: string, role: "user" | "bot", text: string, o: { jobId?: string | null; author?: string | null; mediaUrl?: string | null; userId?: number | null } = {}) {
+export async function addMessage(depot: string, role: "user" | "bot" | "admin", text: string, o: { jobId?: string | null; author?: string | null; mediaUrl?: string | null; userId?: number | null } = {}) {
   await sql`INSERT INTO depot_messages (depot, job_id, role, author, text, media_url, user_id)
     VALUES (${depot}, ${o.jobId ?? null}, ${role}, ${o.author ?? null}, ${text}, ${o.mediaUrl ?? null},
       COALESCE(${o.userId ?? null}::bigint, (SELECT user_id FROM depot_jobs WHERE id = ${o.jobId ?? null})))`;
@@ -103,4 +103,29 @@ export function publicJob(r: Row) {
     instructions: r.instructions as { text: string; at: string }[], capcutName: r.capcut_name as string | null,
     note: r.note as string | null, createdAt: r.created_at, updatedAt: r.updated_at,
   };
+}
+
+// ---- admin accounts: /depot/admin login. The first one is created with the admin key.
+export interface DepotAdmin { id: number; name: string; phone: string }
+export const ADMIN_COOKIE = "depot_admin";
+export async function startAdminSession(res: NextResponse, adminId: number) {
+  const t = randomBytes(32).toString("base64url");
+  await sql`INSERT INTO depot_admin_sessions (token_hash, admin_id, expires_at) VALUES (${sha(t)}, ${adminId}, now() + make_interval(days => 30))`;
+  res.cookies.set(ADMIN_COOKIE, t, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 30 * 86400 });
+}
+export async function endAdminSession(req: NextRequest, res: NextResponse) {
+  const t = req.cookies.get(ADMIN_COOKIE)?.value;
+  if (t) await sql`DELETE FROM depot_admin_sessions WHERE token_hash = ${sha(t)}`;
+  res.cookies.delete(ADMIN_COOKIE);
+}
+// The signed-in admin from the raw cookie value.
+export async function adminFromCookie(t: string | undefined): Promise<DepotAdmin | null> {
+  if (!t) return null;
+  const r = await sql`UPDATE depot_admins a SET last_seen = now() FROM depot_admin_sessions s
+    WHERE s.token_hash = ${sha(t)} AND s.expires_at > now() AND a.id = s.admin_id RETURNING a.id, a.name, a.phone`;
+  return r[0] ? { id: Number(r[0].id), name: r[0].name as string, phone: r[0].phone as string } : null;
+}
+export const currentAdmin = (req: NextRequest) => adminFromCookie(req.cookies.get(ADMIN_COOKIE)?.value);
+export async function adminCount() {
+  return Number((await sql`SELECT count(*)::int AS n FROM depot_admins`)[0].n);
 }
